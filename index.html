@@ -227,7 +227,6 @@
 
       const [tab, setTab] = useState("checklist");
       const [daily, setDaily] = useState({});
-      const [weekly, setWeekly] = useState({});
       const [customTasks, setCustomTasks] = useState([]);
       const [weeklyProgress, setWeeklyProgress] = useState({});
       const [labels, setLabels] = useState({});
@@ -239,12 +238,13 @@
       const [saving, setSaving] = useState(false);
 
       useEffect(() => {
+        // Daily resets each day — load from today's report only (null = fresh start)
         const d = (existing && existing.daily) || {};
         setDaily(d);
         setCustomTasks(d["__custom"] || []);
         setLabels(d["__labels"] || {});
+        // Weekly persists through the week — load from most recent report this Sun-Sat
         const w = (weeklySource && weeklySource.weekly) || {};
-        setWeekly(w);
         setWeeklyProgress(w["__progress"] || {});
         setWeeklyLabels(w["__labels"] || {});
         setNotes((existing && existing.notes) || "");
@@ -253,46 +253,16 @@
       }, [person, existing && existing.date, weeklySource && weeklySource.date]);
 
       const updateDaily = (id, val) => { setDaily(p => ({ ...p, [id]: val })); setSaved(false); };
-      const updateWeekly = (id, val) => { setWeekly(p => ({ ...p, [id]: val })); setSaved(false); };
       const doneCount = cfg.daily.filter((t) => isDone(t, daily[t.id])).length;
       const customDone = customTasks.filter(t => t.done).length;
       const barCount = tab === "manual" ? customDone : doneCount;
       const barTotal = tab === "manual" ? (customTasks.length || 1) : cfg.daily.length;
 
-      const buildEmail = () => {
-        const lines = [`MeowMesh ${cfg.label} Report — ${prettyDate(today)}`, ""];
-        lines.push("DAILY TASKS");
-        cfg.daily.forEach(t => {
-          const val = daily[t.id]; const lbl = labels[t.id] || t.text;
-          lines.push(`  ${isDone(t,val)?"✓":"○"} ${lbl}${t.type==="number"?" ("+( val||0)+")":""}`);
-        });
-        if (customTasks.length > 0) {
-          lines.push(""); lines.push("MY TASKS");
-          customTasks.forEach(t => lines.push(`  ${t.done?"✓":"○"} ${t.text}`));
-        }
-        lines.push(""); lines.push("WEEKLY TASKS");
-        cfg.weekly.forEach(t => {
-          const val = weekly[t.id]; const lbl = weeklyLabels[t.id] || t.text;
-          const pct = weeklyProgress[t.id] || 0;
-          if (t.type === "textarea") { lines.push(`  ${lbl}: ${(val&&val.text)||"—"}`); return; }
-          const activeDays = FULL_DAYS.filter((_,i) => val&&val[i]);
-          lines.push(`  ${lbl}: ${activeDays.length?activeDays.join(", "):"not started"} | Progress: ${pct}%`);
-        });
-        if (notes) { lines.push(""); lines.push(`NOTES:\n${notes}`); }
-        if (blockers) { lines.push(""); lines.push(`BLOCKERS:\n${blockers}`); }
-        return lines.join("\n");
-      };
-
-      const sendEmail = () => {
-        const subject = encodeURIComponent(`MeowMesh ${cfg.label} Report — ${prettyDate(today)}`);
-        const body = encodeURIComponent(buildEmail());
-        window.open(`mailto:?subject=${subject}&body=${body}`);
-      };
-
       const submit = async () => {
         setSaving(true);
         const dailySave = { ...daily, "__custom": customTasks, "__labels": labels };
-        const weeklySave = { ...weekly, "__progress": weeklyProgress, "__labels": weeklyLabels };
+        // Only save progress + labels — no stale 7-day grid data
+        const weeklySave = { "__progress": weeklyProgress, "__labels": weeklyLabels };
         const ok = await onSave({ date: today, person, daily: dailySave, weekly: weeklySave, notes, blockers, updated_at: new Date().toISOString() });
         setSaving(false);
         if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
@@ -319,7 +289,7 @@
           </div>
           {tab === "checklist" && (
             <>
-              <Section title="Daily tasks" sub={`${doneCount}/${cfg.daily.length} done`}>
+              <Section title="Daily tasks" sub={`${doneCount}/${cfg.daily.length} done · resets each day`}>
                 {cfg.daily.map((t) => (
                   <TaskItem key={t.id} task={t} value={daily[t.id]}
                     label={labels[t.id]} onLabelChange={(v) => { setLabels(p=>({...p,[t.id]:v})); setSaved(false); }}
@@ -339,7 +309,7 @@
                   ))}
                 </Section>
               )}
-              <Section title="Weekly progress" sub="drag slider to update %">
+              <Section title="Weekly progress" sub="carries through Sun–Sat · drag to update %">
                 {cfg.weekly.map(t => (
                   <SliderTask key={t.id} task={t} value={weeklyProgress[t.id] || 0} label={weeklyLabels[t.id]}
                     onLabelChange={(v) => { setWeeklyLabels(p=>({...p,[t.id]:v})); setSaved(false); }}
