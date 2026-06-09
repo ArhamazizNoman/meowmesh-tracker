@@ -19,6 +19,11 @@
     ::selection { background: #C8553D; color: #fff; }
     @keyframes pop { from { transform: scale(.96); opacity:0 } to { transform: scale(1); opacity:1 } }
     textarea, button, input { font-family: inherit; }
+    input[type=range] { -webkit-appearance:none; appearance:none; background:transparent; cursor:pointer; height:28px; outline:none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:#C8553D; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.25); margin-top:-7px; }
+    input[type=range]::-webkit-slider-runnable-track { height:6px; border-radius:999px; background:transparent; }
+    input[type=range]::-moz-range-thumb { width:20px; height:20px; border-radius:50%; background:#C8553D; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.25); }
+    input[type=range]::-moz-range-track { height:6px; border-radius:999px; background:transparent; }
   </style>
 </head>
 <body>
@@ -43,27 +48,25 @@
     const TASKS = {
       marketer: { label: "Marketer",
         daily: [
-          { id: "m_d1", text: "Engaging content post (reach / attention)" },
-          { id: "m_d2", text: "Customer review / testimonial post" },
-          { id: "m_d3", text: "Respond to comments & Messenger messages" },
-          { id: "m_d4", text: "Outreach to customers / influencers" },
+          { id: "m_d1", text: "Content Posting -1 (Engagement)", type: "check" },
+          { id: "m_d2", text: "Content Posting -2 (Review / Product pic)", type: "check" },
+          { id: "m_d3", text: "Support Customer (Sending Reply)", type: "number" },
+          { id: "m_d4", text: "Previous Customer Reach", type: "number" },
         ],
         weekly: [
-          { id: "m_w1", text: "Plan next week's content calendar" },
-          { id: "m_w2", text: "Batch & pre-schedule posts" },
-          { id: "m_w3", text: "Influencer outreach & collaborations" },
-          { id: "m_w4", text: "Analyse engagement metrics" },
-          { id: "m_w5", text: "Newsletter / blog / retention outreach" },
+          { id: "m_w1", text: "Content Plan for Next Week", type: "check" },
+          { id: "m_w2", text: "Offer Creation", type: "check" },
         ] },
       operations: { label: "Operations",
         daily: [
-          { id: "o_d1", text: "Fulfil & pack orders" },
-          { id: "o_d2", text: "Arrange delivery to customers" },
-          { id: "o_d3", text: "Check stock levels, flag low items" },
+          { id: "o_d1", text: "Product Making", type: "number" },
+          { id: "o_d2", text: "Product Delivery", type: "number" },
+          { id: "o_d3", text: "Update the Cost in Excel", type: "check" },
         ],
         weekly: [
-          { id: "o_w1", text: "Weekly inventory report (used + needed)" },
-          { id: "o_w2", text: "Product development (design / source / test)" },
+          { id: "o_w1", text: "Plan for Next Week", type: "check" },
+          { id: "o_w2", text: "Make Next Week Must-Have Items", type: "check" },
+          { id: "o_w3", text: "Product Development", type: "textarea" },
         ] },
     };
 
@@ -74,6 +77,23 @@
     const prettyDate = (s) => {
       const [y,m,d] = s.split("-").map(Number);
       return new Date(y, m-1, d).toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" });
+    };
+
+    const DAY_LABELS = ["S","M","T","W","T","F","S"];
+    const FULL_DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+    const getWeekStart = (dateStr) => {
+      const [y,m,d] = dateStr.split("-").map(Number);
+      const dt = new Date(y, m-1, d);
+      dt.setDate(dt.getDate() - dt.getDay());
+      return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+    };
+
+    const isDone = (task, val) => {
+      if (task.type === "check") return !!val;
+      if (task.type === "number") return (val || 0) > 0;
+      if (task.type === "textarea") return !!(val && val.text && val.text.trim());
+      return false;
     };
 
     // ---- Supabase connection ----
@@ -194,28 +214,52 @@
     function EmployeeView({ person, reports, onSave }) {
       const cfg = TASKS[person];
       const today = todayStr();
+      const todayDow = new Date().getDay();
+      const weekStart = getWeekStart(today);
       const existing = reports[`${today}:${person}`];
+
+      const weeklySource = (() => {
+        const wr = Object.values(reports)
+          .filter(r => r.person === person && getWeekStart(r.date) === weekStart)
+          .sort((a,b) => b.date.localeCompare(a.date));
+        return wr[0] || null;
+      })();
+
+      const [tab, setTab] = useState("checklist");
       const [daily, setDaily] = useState({});
       const [weekly, setWeekly] = useState({});
+      const [customTasks, setCustomTasks] = useState([]);
+      const [weeklyProgress, setWeeklyProgress] = useState({});
+      const [newTaskText, setNewTaskText] = useState("");
       const [notes, setNotes] = useState("");
       const [blockers, setBlockers] = useState("");
       const [saved, setSaved] = useState(false);
       const [saving, setSaving] = useState(false);
 
       useEffect(() => {
-        setDaily((existing && existing.daily) || {});
-        setWeekly((existing && existing.weekly) || {});
+        const d = (existing && existing.daily) || {};
+        setDaily(d);
+        setCustomTasks(d["__custom"] || []);
+        const w = (weeklySource && weeklySource.weekly) || {};
+        setWeekly(w);
+        setWeeklyProgress(w["__progress"] || {});
         setNotes((existing && existing.notes) || "");
         setBlockers((existing && existing.blockers) || "");
         setSaved(false);
-      }, [person, existing]);
+      }, [person, existing && existing.date, weeklySource && weeklySource.date]);
 
-      const toggle = (setter, obj, id) => { setter({ ...obj, [id]: !obj[id] }); setSaved(false); };
-      const doneCount = cfg.daily.filter((t) => daily[t.id]).length;
+      const updateDaily = (id, val) => { setDaily(p => ({ ...p, [id]: val })); setSaved(false); };
+      const updateWeekly = (id, val) => { setWeekly(p => ({ ...p, [id]: val })); setSaved(false); };
+      const doneCount = cfg.daily.filter((t) => isDone(t, daily[t.id])).length;
+      const customDone = customTasks.filter(t => t.done).length;
+      const barCount = tab === "manual" ? customDone : doneCount;
+      const barTotal = tab === "manual" ? (customTasks.length || 1) : cfg.daily.length;
 
       const submit = async () => {
         setSaving(true);
-        const ok = await onSave({ date: today, person, daily, weekly, notes, blockers, updated_at: new Date().toISOString() });
+        const dailySave = { ...daily, "__custom": customTasks };
+        const weeklySave = { ...weekly, "__progress": weeklyProgress };
+        const ok = await onSave({ date: today, person, daily: dailySave, weekly: weeklySave, notes, blockers, updated_at: new Date().toISOString() });
         setSaving(false);
         if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
       };
@@ -226,15 +270,38 @@
             <p style={{ fontFamily:"'Fraunces', serif", fontSize:30, fontWeight:600, margin:"4px 0", letterSpacing:"-0.02em" }}>{cfg.label} — today</p>
             <span style={{ color:COLORS.inkSoft, fontSize:15 }}>{prettyDate(today)}</span>
           </div>
-          <div style={{ height:8, background:COLORS.paper2, borderRadius:999, overflow:"hidden", margin:"14px 0 28px" }}>
-            <div style={{ height:"100%", width:`${(doneCount/cfg.daily.length)*100}%`, background:COLORS.clay, transition:"width .3s" }} />
+          <div style={{ height:8, background:COLORS.paper2, borderRadius:999, overflow:"hidden", margin:"14px 0 20px" }}>
+            <div style={{ height:"100%", width:`${(barCount/barTotal)*100}%`, background:COLORS.clay, transition:"width .3s" }} />
           </div>
-          <Section title="Daily tasks" sub={`${doneCount}/${cfg.daily.length} done`}>
-            {cfg.daily.map((t) => <Check key={t.id} checked={!!daily[t.id]} onChange={() => toggle(setDaily, daily, t.id)} label={t.text} />)}
-          </Section>
-          <Section title="Weekly tasks" sub="check when worked on">
-            {cfg.weekly.map((t) => <Check key={t.id} checked={!!weekly[t.id]} onChange={() => toggle(setWeekly, weekly, t.id)} label={t.text} />)}
-          </Section>
+          <div style={{ display:"flex", marginBottom:28, borderRadius:10, overflow:"hidden", border:`1px solid ${COLORS.line}` }}>
+            {[["checklist","✓  Checklist"],["manual","✏  Manual Entry"]].map(([id,lbl]) => (
+              <button key={id} onClick={() => setTab(id)}
+                style={{ all:"unset", cursor:"pointer", flex:1, padding:"11px 16px", textAlign:"center", fontSize:14, fontWeight:600,
+                  background: tab===id ? COLORS.ink : COLORS.white,
+                  color: tab===id ? "#fff" : COLORS.inkSoft, transition:"background .15s" }}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+          {tab === "checklist" && (
+            <>
+              <Section title="Daily tasks" sub={`${doneCount}/${cfg.daily.length} done`}>
+                {cfg.daily.map((t) => (
+                  <TaskItem key={t.id} task={t} value={daily[t.id]} onChange={(v) => updateDaily(t.id, v)} />
+                ))}
+              </Section>
+              <Section title="Weekly tasks" sub="Sun → Sat">
+                {cfg.weekly.map((t) => (
+                  <WeeklyTaskItem key={t.id} task={t} value={weekly[t.id]} todayDow={todayDow} onChange={(v) => updateWeekly(t.id, v)} />
+                ))}
+              </Section>
+            </>
+          )}
+          {tab === "manual" && (
+            <ManualView cfg={cfg} customTasks={customTasks} setCustomTasks={setCustomTasks}
+              newTaskText={newTaskText} setNewTaskText={setNewTaskText}
+              weeklyProgress={weeklyProgress} setWeeklyProgress={setWeeklyProgress} setSaved={setSaved} />
+          )}
           <Section title="Notes — what got done">
             <Textarea value={notes} onChange={(v)=>{setNotes(v);setSaved(false);}} placeholder="e.g. posted reel + 2 reviews, replied to 14 messages…" />
           </Section>
@@ -277,10 +344,15 @@
 
     function ReportCard({ report }) {
       const cfg = TASKS[report.person];
-      const dailyDone = cfg.daily.filter((t) => report.daily && report.daily[t.id]).length;
-      const weeklyDone = cfg.weekly.filter((t) => report.weekly && report.weekly[t.id]).length;
+      const dailyDone = cfg.daily.filter((t) => isDone(t, report.daily && report.daily[t.id])).length;
       const pct = Math.round((dailyDone/cfg.daily.length)*100);
       const color = report.person === "marketer" ? COLORS.clay : COLORS.sage;
+      const hasWeekly = cfg.weekly.some(t => {
+        const v = report.weekly && report.weekly[t.id];
+        if (!v) return false;
+        if (t.type === "textarea") return !!(v.text && v.text.trim());
+        return Object.values(v).some(Boolean);
+      });
       return (
         <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, padding:"18px 20px" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
@@ -292,14 +364,136 @@
           </div>
           <div style={{ display:"flex", gap:6, marginBottom:12, flexWrap:"wrap" }}>
             {cfg.daily.map((t) => {
-              const on = report.daily && report.daily[t.id];
-              return <span key={t.id} style={{ fontSize:12.5, padding:"4px 9px", borderRadius:7, background: on?"#EAF1EC":COLORS.paper2, color: on?COLORS.sage:COLORS.inkSoft, border:`1px solid ${on?"#CFE0D4":COLORS.line}` }}>{on?"✓ ":"○ "}{t.text}</span>;
+              const val = report.daily && report.daily[t.id];
+              const done = isDone(t, val);
+              return (
+                <span key={t.id} style={{ fontSize:12.5, padding:"4px 9px", borderRadius:7, background: done?"#EAF1EC":COLORS.paper2, color: done?COLORS.sage:COLORS.inkSoft, border:`1px solid ${done?"#CFE0D4":COLORS.line}` }}>
+                  {done ? "✓" : "○"} {t.text}{t.type === "number" && done ? ` (${val})` : ""}
+                </span>
+              );
             })}
           </div>
-          {weeklyDone > 0 &&
-            <p style={{ margin:"0 0 8px", fontSize:13.5, color:COLORS.inkSoft }}>Weekly: {cfg.weekly.filter((t)=>report.weekly&&report.weekly[t.id]).map((t)=>t.text).join(" · ")}</p>}
+          {hasWeekly && (
+            <div style={{ marginBottom:8 }}>
+              {cfg.weekly.map(t => {
+                const val = report.weekly && report.weekly[t.id];
+                if (!val) return null;
+                if (t.type === "textarea") {
+                  if (!val.text || !val.text.trim()) return null;
+                  return <p key={t.id} style={{ margin:"0 0 4px", fontSize:13, color:COLORS.inkSoft }}><span style={{ fontWeight:600, color:COLORS.ink }}>{t.text}:</span> {val.text}</p>;
+                }
+                const activeDays = FULL_DAYS.filter((_, i) => val[i]);
+                if (!activeDays.length) return null;
+                return <p key={t.id} style={{ margin:"0 0 4px", fontSize:13, color:COLORS.inkSoft }}><span style={{ fontWeight:600, color:COLORS.ink }}>{t.text}:</span> {activeDays.join(", ")}</p>;
+              })}
+            </div>
+          )}
+          {(() => {
+            const progress = report.weekly && report.weekly["__progress"];
+            if (!progress) return null;
+            const entries = cfg.weekly.filter(t => (progress[t.id] || 0) > 0);
+            if (!entries.length) return null;
+            return (
+              <div style={{ marginBottom:8 }}>
+                <p style={{ margin:"0 0 4px", fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", color:COLORS.inkSoft }}>Weekly Progress</p>
+                {entries.map(t => {
+                  const pct = progress[t.id] || 0;
+                  return (
+                    <div key={t.id} style={{ marginBottom:5 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", fontSize:12.5, marginBottom:3 }}>
+                        <span style={{ color:COLORS.ink }}>{t.text}</span>
+                        <span style={{ fontWeight:600, color: pct>=100?COLORS.sage:COLORS.clay }}>{pct}%</span>
+                      </div>
+                      <div style={{ height:4, background:COLORS.paper2, borderRadius:999, overflow:"hidden" }}>
+                        <div style={{ height:"100%", width:`${pct}%`, background: pct>=100?COLORS.sage:COLORS.clay, borderRadius:999 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+          {(() => {
+            const custom = report.daily && report.daily["__custom"];
+            if (!custom || !custom.length) return null;
+            const done = custom.filter(t => t.done).length;
+            return (
+              <div style={{ marginBottom:8 }}>
+                <p style={{ margin:"0 0 4px", fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", color:COLORS.inkSoft }}>Manual tasks ({done}/{custom.length})</p>
+                <p style={{ margin:0, fontSize:13, color:COLORS.inkSoft }}>{custom.map(t => (t.done ? "✓ " : "○ ") + t.text).join("  ·  ")}</p>
+              </div>
+            );
+          })()}
           {report.notes && <Line label="Notes" text={report.notes} />}
           {report.blockers && <Line label="Blockers" text={report.blockers} warn />}
+        </div>
+      );
+    }
+
+    function ManualView({ cfg, customTasks, setCustomTasks, newTaskText, setNewTaskText, weeklyProgress, setWeeklyProgress, setSaved }) {
+      const addTask = () => {
+        if (!newTaskText.trim()) return;
+        setCustomTasks(p => [...p, { id: Date.now().toString(), text: newTaskText.trim(), done: false }]);
+        setNewTaskText("");
+        setSaved(false);
+      };
+      const toggleTask = (id) => { setCustomTasks(p => p.map(t => t.id === id ? {...t, done: !t.done} : t)); setSaved(false); };
+      const removeTask = (id) => { setCustomTasks(p => p.filter(t => t.id !== id)); setSaved(false); };
+      const done = customTasks.filter(t => t.done).length;
+      return (
+        <>
+          <Section title="Today's tasks" sub={customTasks.length > 0 ? `${done}/${customTasks.length} done` : "add what you worked on"}>
+            <div style={{ display:"flex", gap:8, marginBottom:4 }}>
+              <input value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addTask(); }}
+                placeholder="Type a task and press Enter…"
+                style={{ flex:1, padding:"11px 14px", borderRadius:10, border:`1px solid ${COLORS.line}`, fontSize:15, fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
+              <button onClick={addTask}
+                style={{ all:"unset", cursor:"pointer", padding:"11px 18px", borderRadius:10, background:COLORS.clay, color:"#fff", fontSize:14, fontWeight:700 }}>Add</button>
+            </div>
+            {customTasks.length === 0 && (
+              <div style={{ padding:"20px 14px", textAlign:"center", color:COLORS.inkSoft, fontSize:14, background:COLORS.white, borderRadius:12, border:`1px dashed ${COLORS.line}` }}>
+                No tasks yet — type above and hit Add or Enter
+              </div>
+            )}
+            {customTasks.map(t => (
+              <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:12, background: t.done?"#F1F6F2":COLORS.white, border:`1px solid ${t.done?"#CFE0D4":COLORS.line}`, transition:"background .15s" }}>
+                <button onClick={() => toggleTask(t.id)}
+                  style={{ all:"unset", cursor:"pointer", width:22, height:22, borderRadius:7, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background: t.done?COLORS.sage:"transparent", border:`2px solid ${t.done?COLORS.sage:COLORS.line}`, color:"#fff", fontSize:14, fontWeight:700 }}>
+                  {t.done ? "✓" : ""}
+                </button>
+                <span style={{ flex:1, fontSize:15, color: t.done?COLORS.inkSoft:COLORS.ink, textDecoration: t.done?"line-through":"none" }}>{t.text}</span>
+                <button onClick={() => removeTask(t.id)}
+                  style={{ all:"unset", cursor:"pointer", width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, color:COLORS.inkSoft, lineHeight:1, borderRadius:4 }}>×</button>
+              </div>
+            ))}
+          </Section>
+          <Section title="Weekly progress" sub="drag to update">
+            {cfg.weekly.map(t => (
+              <SliderTask key={t.id} task={t} value={weeklyProgress[t.id] || 0}
+                onChange={(v) => { setWeeklyProgress(p => ({...p, [t.id]: v})); setSaved(false); }} />
+            ))}
+          </Section>
+        </>
+      );
+    }
+
+    function SliderTask({ task, value, onChange }) {
+      const pct = value || 0;
+      const trackColor = pct >= 100 ? COLORS.sage : pct > 0 ? COLORS.clay : COLORS.line;
+      return (
+        <div style={{ padding:"14px 16px", borderRadius:12, background: pct > 0 ? "#F1F6F2" : COLORS.white, border:`1px solid ${pct > 0 ? "#CFE0D4" : COLORS.line}` }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:10 }}>
+            <span style={{ fontSize:15, fontWeight:500, color:COLORS.ink }}>{task.text}</span>
+            <span style={{ fontFamily:"'Fraunces', serif", fontWeight:600, fontSize:20, color: pct >= 100 ? COLORS.sage : pct > 0 ? COLORS.clay : COLORS.inkSoft }}>{pct}%</span>
+          </div>
+          <div style={{ position:"relative", height:28, display:"flex", alignItems:"center" }}>
+            <div style={{ position:"absolute", left:0, right:0, height:6, borderRadius:999, background:COLORS.paper2, pointerEvents:"none" }} />
+            <div style={{ position:"absolute", left:0, width:`${pct}%`, height:6, borderRadius:999, background:trackColor, transition:"width .05s", pointerEvents:"none" }} />
+            <input type="range" min="0" max="100" step="5" value={pct}
+              onChange={(e) => onChange(parseInt(e.target.value))}
+              style={{ position:"relative", width:"100%", margin:0 }} />
+          </div>
         </div>
       );
     }
@@ -317,11 +511,65 @@
         </div>
         <div style={{ display:"grid", gap:8 }}>{children}</div></div>;
     }
-    function Check({ checked, onChange, label }) {
-      return <button onClick={onChange}
-        style={{ all:"unset", cursor:"pointer", display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:12, background: checked?"#F1F6F2":COLORS.white, border:`1px solid ${checked?"#CFE0D4":COLORS.line}`, transition:"background .15s" }}>
-        <span style={{ width:22, height:22, borderRadius:7, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background: checked?COLORS.sage:"transparent", border:`2px solid ${checked?COLORS.sage:COLORS.line}`, color:"#fff", fontSize:14, fontWeight:700 }}>{checked?"✓":""}</span>
-        <span style={{ fontSize:15, color: checked?COLORS.inkSoft:COLORS.ink, textDecoration: checked?"line-through":"none" }}>{label}</span></button>;
+    function TaskItem({ task, value, onChange }) {
+      if (task.type === "number") {
+        const num = value || 0;
+        const done = num > 0;
+        return (
+          <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:12, background: done?"#F1F6F2":COLORS.white, border:`1px solid ${done?"#CFE0D4":COLORS.line}` }}>
+            <span style={{ flex:1, fontSize:15, color: done?COLORS.inkSoft:COLORS.ink }}>{task.text}</span>
+            <input type="number" min="0" value={num === 0 ? "" : num} placeholder="0"
+              onChange={(e) => { const v = parseInt(e.target.value); onChange(isNaN(v) ? 0 : Math.max(0, v)); }}
+              style={{ width:64, padding:"7px 10px", borderRadius:8, border:`1px solid ${COLORS.line}`, fontSize:15, textAlign:"center", fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
+          </div>
+        );
+      }
+      const checked = !!value;
+      return (
+        <button onClick={() => onChange(!checked)}
+          style={{ all:"unset", cursor:"pointer", display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:12, background: checked?"#F1F6F2":COLORS.white, border:`1px solid ${checked?"#CFE0D4":COLORS.line}`, transition:"background .15s" }}>
+          <span style={{ width:22, height:22, borderRadius:7, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background: checked?COLORS.sage:"transparent", border:`2px solid ${checked?COLORS.sage:COLORS.line}`, color:"#fff", fontSize:14, fontWeight:700 }}>{checked?"✓":""}</span>
+          <span style={{ fontSize:15, color: checked?COLORS.inkSoft:COLORS.ink, textDecoration: checked?"line-through":"none" }}>{task.text}</span>
+        </button>
+      );
+    }
+
+    function WeeklyTaskItem({ task, value, todayDow, onChange }) {
+      if (task.type === "textarea") {
+        const text = (value && value.text) || "";
+        const done = text.trim().length > 0;
+        return (
+          <div style={{ borderRadius:12, background: done?"#F1F6F2":COLORS.white, border:`1px solid ${done?"#CFE0D4":COLORS.line}`, padding:"12px 14px" }}>
+            <p style={{ margin:"0 0 8px", fontSize:15, fontWeight:500, color:COLORS.ink }}>{task.text}</p>
+            <textarea value={text} rows={2} placeholder="Describe what you worked on…"
+              onChange={(e) => onChange({ ...(value || {}), text: e.target.value })}
+              style={{ width:"100%", resize:"vertical", padding:"8px 10px", borderRadius:8, border:`1px solid ${COLORS.line}`, fontSize:14, color:COLORS.ink, fontFamily:"inherit", background:COLORS.white, outline:"none" }} />
+          </div>
+        );
+      }
+      const days = value || {};
+      const anyDone = DAY_LABELS.some((_, i) => days[i]);
+      return (
+        <div style={{ padding:"12px 14px", borderRadius:12, background: anyDone?"#F1F6F2":COLORS.white, border:`1px solid ${anyDone?"#CFE0D4":COLORS.line}` }}>
+          <p style={{ margin:"0 0 10px", fontSize:15, fontWeight:500, color:COLORS.ink }}>{task.text}</p>
+          <div style={{ display:"flex", gap:6 }}>
+            {DAY_LABELS.map((lbl, i) => {
+              const checked = !!days[i];
+              const isToday = i === todayDow;
+              return (
+                <button key={i} onClick={() => onChange({ ...days, [i]: !checked })}
+                  style={{ all:"unset", cursor:"pointer", width:34, height:34, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center",
+                    background: checked ? COLORS.sage : (isToday ? COLORS.paper2 : COLORS.white),
+                    border: `2px solid ${checked ? COLORS.sage : (isToday ? COLORS.clay : COLORS.line)}`,
+                    color: checked ? "#fff" : (isToday ? COLORS.clay : COLORS.inkSoft),
+                    fontSize:12, fontWeight:700, transition:"background .15s" }}>
+                  {lbl}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
     }
     function Textarea({ value, onChange, placeholder }) {
       return <textarea value={value} onChange={(e)=>onChange(e.target.value)} placeholder={placeholder} rows={2}
