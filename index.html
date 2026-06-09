@@ -225,9 +225,30 @@
         return wr[0] || null;
       })();
 
+      // Derive overdue tasks from all previous days' unfinished custom tasks
+      const allDueTasks = (() => {
+        const completedIds = new Set(((existing && existing.daily && existing.daily["__dueCompleted"]) || []).map(d => d.id));
+        const seen = new Set();
+        const due = [];
+        Object.values(reports)
+          .filter(r => r.person === person && r.date < today)
+          .sort((a,b) => b.date.localeCompare(a.date))
+          .forEach(r => {
+            const custom = (r.daily && r.daily["__custom"]) || [];
+            custom.forEach(t => {
+              if (!t.done && !seen.has(t.id) && !completedIds.has(t.id)) {
+                seen.add(t.id);
+                due.push({ ...t, fromDate: r.date });
+              }
+            });
+          });
+        return due;
+      })();
+
       const [tab, setTab] = useState("checklist");
       const [daily, setDaily] = useState({});
       const [customTasks, setCustomTasks] = useState([]);
+      const [dueCompleted, setDueCompleted] = useState([]);
       const [weeklyProgress, setWeeklyProgress] = useState({});
       const [labels, setLabels] = useState({});
       const [weeklyLabels, setWeeklyLabels] = useState({});
@@ -242,6 +263,7 @@
         const d = (existing && existing.daily) || {};
         setDaily(d);
         setCustomTasks(d["__custom"] || []);
+        setDueCompleted(d["__dueCompleted"] || []);
         setLabels(d["__labels"] || {});
         // Weekly persists through the week — load from most recent report this Sun-Sat
         const w = (weeklySource && weeklySource.weekly) || {};
@@ -253,6 +275,10 @@
       }, [person, existing && existing.date, weeklySource && weeklySource.date]);
 
       const updateDaily = (id, val) => { setDaily(p => ({ ...p, [id]: val })); setSaved(false); };
+      const completeDue = (task) => { setDueCompleted(p => [...p, { id: task.id, text: task.text, fromDate: task.fromDate }]); setSaved(false); };
+      const completedDueIds = new Set(dueCompleted.map(d => d.id));
+      const visibleDue = allDueTasks.filter(t => !completedDueIds.has(t.id));
+
       const doneCount = cfg.daily.filter((t) => isDone(t, daily[t.id])).length;
       const customDone = customTasks.filter(t => t.done).length;
       const barCount = tab === "manual" ? customDone : doneCount;
@@ -260,8 +286,7 @@
 
       const submit = async () => {
         setSaving(true);
-        const dailySave = { ...daily, "__custom": customTasks, "__labels": labels };
-        // Only save progress + labels — no stale 7-day grid data
+        const dailySave = { ...daily, "__custom": customTasks, "__labels": labels, "__dueCompleted": dueCompleted };
         const weeklySave = { "__progress": weeklyProgress, "__labels": weeklyLabels };
         const ok = await onSave({ date: today, person, daily: dailySave, weekly: weeklySave, notes, blockers, updated_at: new Date().toISOString() });
         setSaving(false);
@@ -277,8 +302,27 @@
           <div style={{ height:8, background:COLORS.paper2, borderRadius:999, overflow:"hidden", margin:"14px 0 20px" }}>
             <div style={{ height:"100%", width:`${(barCount/barTotal)*100}%`, background:COLORS.clay, transition:"width .3s" }} />
           </div>
+          {visibleDue.length > 0 && (
+            <div style={{ marginBottom:24 }}>
+              <div style={{ display:"flex", alignItems:"baseline", gap:10, marginBottom:10 }}>
+                <h3 style={{ fontFamily:"'Fraunces', serif", fontSize:18, fontWeight:600, margin:0, color:COLORS.clayDark }}>Overdue</h3>
+                <span style={{ fontSize:13, color:COLORS.clay, fontWeight:600 }}>{visibleDue.length} task{visibleDue.length>1?"s":""} missed</span>
+              </div>
+              <div style={{ display:"grid", gap:8 }}>
+                {visibleDue.map(t => (
+                  <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:12, background:"#FEF3EF", border:`1.5px solid ${COLORS.clay}` }}>
+                    <button onClick={() => completeDue(t)}
+                      style={{ all:"unset", cursor:"pointer", width:22, height:22, borderRadius:7, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background:"transparent", border:`2px solid ${COLORS.clay}`, color:"#fff", fontSize:14, fontWeight:700 }}>
+                    </button>
+                    <span style={{ flex:1, fontSize:15, color:COLORS.ink }}>{t.text}</span>
+                    <span style={{ fontSize:12, color:COLORS.clay, fontWeight:600, whiteSpace:"nowrap" }}>{prettyDate(t.fromDate)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div style={{ display:"flex", marginBottom:28, borderRadius:10, overflow:"hidden", border:`1px solid ${COLORS.line}` }}>
-            {[["checklist","✓  Checklist"],["manual","✏  Manual Entry"]].map(([id,lbl]) => (
+            {[["checklist",`✓  Checklist`],["manual","✏  Manual Entry"]].map(([id,lbl]) => (
               <button key={id} onClick={() => setTab(id)}
                 style={{ all:"unset", cursor:"pointer", flex:1, padding:"11px 16px", textAlign:"center", fontSize:14, fontWeight:600,
                   background: tab===id ? COLORS.ink : COLORS.white,
@@ -444,6 +488,22 @@
                   <div key={t.id} style={{ display:"flex", alignItems:"center", gap:7, marginBottom:3 }}>
                     <span style={{ width:16, height:16, borderRadius:4, flexShrink:0, display:"inline-flex", alignItems:"center", justifyContent:"center", background: t.done?COLORS.sage:"transparent", border:`2px solid ${t.done?COLORS.sage:COLORS.line}`, color:"#fff", fontSize:10, fontWeight:700 }}>{t.done?"✓":""}</span>
                     <span style={{ fontSize:13, color: t.done?COLORS.inkSoft:COLORS.ink, textDecoration: t.done?"line-through":"none" }}>{t.text}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          {(() => {
+            const due = report.daily && report.daily["__dueCompleted"];
+            if (!due || !due.length) return null;
+            return (
+              <div style={{ marginBottom:8, padding:"8px 12px", background:"#FEF3EF", borderRadius:10, border:`1px solid #F5C9BB` }}>
+                <p style={{ margin:"0 0 5px", fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", color:COLORS.clay }}>Caught up ({due.length})</p>
+                {due.map(t => (
+                  <div key={t.id} style={{ display:"flex", alignItems:"center", gap:6, marginBottom:3 }}>
+                    <span style={{ width:14, height:14, borderRadius:4, flexShrink:0, display:"inline-flex", alignItems:"center", justifyContent:"center", background:COLORS.clay, color:"#fff", fontSize:9, fontWeight:700 }}>✓</span>
+                    <span style={{ fontSize:13, color:COLORS.ink }}>{t.text}</span>
+                    <span style={{ fontSize:11, color:COLORS.clay, marginLeft:"auto" }}>was due {prettyDate(t.fromDate)}</span>
                   </div>
                 ))}
               </div>
