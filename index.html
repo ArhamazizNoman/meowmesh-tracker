@@ -317,6 +317,18 @@
       const barCount = tab === "manual" ? customDone : doneCount;
       const barTotal = tab === "manual" ? (customTasks.length || 1) : cfg.daily.length;
 
+      const streak = (() => {
+        let count = 0;
+        const dt = new Date();
+        if (!reports[`${today}:${person}`]) dt.setDate(dt.getDate() - 1);
+        while (true) {
+          const s = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+          if (reports[`${s}:${person}`]) { count++; dt.setDate(dt.getDate() - 1); }
+          else break;
+        }
+        return count;
+      })();
+
       const submit = async () => {
         setSaving(true);
         const dailySave = { ...daily, "__custom": customTasks, "__labels": labels, "__dueCompleted": dueCompleted };
@@ -332,6 +344,14 @@
             <p style={{ fontFamily:"'Fraunces', serif", fontSize:30, fontWeight:600, margin:"4px 0", letterSpacing:"-0.02em" }}>{cfg.label} — today</p>
             <span style={{ color:COLORS.inkSoft, fontSize:15 }}>{prettyDate(today)}</span>
           </div>
+          {streak > 0 && (
+            <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"6px 14px", borderRadius:999, background:"#FEF3EF", border:`1px solid ${COLORS.clay}`, margin:"10px 0 4px" }}>
+              <span style={{ fontSize:15 }}>🔥</span>
+              <span style={{ fontSize:14, fontWeight:700, color:COLORS.clay }}>
+                {streak}-day streak{streak >= 7 ? " 🏆 Perfect week!" : streak >= 5 ? " — keep going!" : ""}
+              </span>
+            </div>
+          )}
           <div style={{ height:8, background:COLORS.paper2, borderRadius:999, overflow:"hidden", margin:"14px 0 20px" }}>
             <div style={{ height:"100%", width:`${(barCount/barTotal)*100}%`, background:COLORS.clay, transition:"width .3s" }} />
           </div>
