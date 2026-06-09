@@ -230,6 +230,8 @@
       const [weekly, setWeekly] = useState({});
       const [customTasks, setCustomTasks] = useState([]);
       const [weeklyProgress, setWeeklyProgress] = useState({});
+      const [labels, setLabels] = useState({});
+      const [weeklyLabels, setWeeklyLabels] = useState({});
       const [newTaskText, setNewTaskText] = useState("");
       const [notes, setNotes] = useState("");
       const [blockers, setBlockers] = useState("");
@@ -240,9 +242,11 @@
         const d = (existing && existing.daily) || {};
         setDaily(d);
         setCustomTasks(d["__custom"] || []);
+        setLabels(d["__labels"] || {});
         const w = (weeklySource && weeklySource.weekly) || {};
         setWeekly(w);
         setWeeklyProgress(w["__progress"] || {});
+        setWeeklyLabels(w["__labels"] || {});
         setNotes((existing && existing.notes) || "");
         setBlockers((existing && existing.blockers) || "");
         setSaved(false);
@@ -255,10 +259,40 @@
       const barCount = tab === "manual" ? customDone : doneCount;
       const barTotal = tab === "manual" ? (customTasks.length || 1) : cfg.daily.length;
 
+      const buildEmail = () => {
+        const lines = [`MeowMesh ${cfg.label} Report — ${prettyDate(today)}`, ""];
+        lines.push("DAILY TASKS");
+        cfg.daily.forEach(t => {
+          const val = daily[t.id]; const lbl = labels[t.id] || t.text;
+          lines.push(`  ${isDone(t,val)?"✓":"○"} ${lbl}${t.type==="number"?" ("+( val||0)+")":""}`);
+        });
+        if (customTasks.length > 0) {
+          lines.push(""); lines.push("MY TASKS");
+          customTasks.forEach(t => lines.push(`  ${t.done?"✓":"○"} ${t.text}`));
+        }
+        lines.push(""); lines.push("WEEKLY TASKS");
+        cfg.weekly.forEach(t => {
+          const val = weekly[t.id]; const lbl = weeklyLabels[t.id] || t.text;
+          const pct = weeklyProgress[t.id] || 0;
+          if (t.type === "textarea") { lines.push(`  ${lbl}: ${(val&&val.text)||"—"}`); return; }
+          const activeDays = FULL_DAYS.filter((_,i) => val&&val[i]);
+          lines.push(`  ${lbl}: ${activeDays.length?activeDays.join(", "):"not started"} | Progress: ${pct}%`);
+        });
+        if (notes) { lines.push(""); lines.push(`NOTES:\n${notes}`); }
+        if (blockers) { lines.push(""); lines.push(`BLOCKERS:\n${blockers}`); }
+        return lines.join("\n");
+      };
+
+      const sendEmail = () => {
+        const subject = encodeURIComponent(`MeowMesh ${cfg.label} Report — ${prettyDate(today)}`);
+        const body = encodeURIComponent(buildEmail());
+        window.open(`mailto:?subject=${subject}&body=${body}`);
+      };
+
       const submit = async () => {
         setSaving(true);
-        const dailySave = { ...daily, "__custom": customTasks };
-        const weeklySave = { ...weekly, "__progress": weeklyProgress };
+        const dailySave = { ...daily, "__custom": customTasks, "__labels": labels };
+        const weeklySave = { ...weekly, "__progress": weeklyProgress, "__labels": weeklyLabels };
         const ok = await onSave({ date: today, person, daily: dailySave, weekly: weeklySave, notes, blockers, updated_at: new Date().toISOString() });
         setSaving(false);
         if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
@@ -287,20 +321,42 @@
             <>
               <Section title="Daily tasks" sub={`${doneCount}/${cfg.daily.length} done`}>
                 {cfg.daily.map((t) => (
-                  <TaskItem key={t.id} task={t} value={daily[t.id]} onChange={(v) => updateDaily(t.id, v)} />
+                  <TaskItem key={t.id} task={t} value={daily[t.id]}
+                    label={labels[t.id]} onLabelChange={(v) => { setLabels(p=>({...p,[t.id]:v})); setSaved(false); }}
+                    onChange={(v) => updateDaily(t.id, v)} />
                 ))}
               </Section>
+              {customTasks.length > 0 && (
+                <Section title="My tasks" sub={`${customDone}/${customTasks.length} done`}>
+                  {customTasks.map(t => (
+                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:12, background: t.done?"#F1F6F2":COLORS.white, border:`1px solid ${t.done?"#CFE0D4":COLORS.line}` }}>
+                      <button onClick={() => { setCustomTasks(p=>p.map(ct=>ct.id===t.id?{...ct,done:!ct.done}:ct)); setSaved(false); }}
+                        style={{ all:"unset", cursor:"pointer", width:22, height:22, borderRadius:7, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background: t.done?COLORS.sage:"transparent", border:`2px solid ${t.done?COLORS.sage:COLORS.line}`, color:"#fff", fontSize:14, fontWeight:700 }}>
+                        {t.done ? "✓" : ""}
+                      </button>
+                      <span style={{ flex:1, fontSize:15, color: t.done?COLORS.inkSoft:COLORS.ink, textDecoration: t.done?"line-through":"none" }}>{t.text}</span>
+                    </div>
+                  ))}
+                </Section>
+              )}
               <Section title="Weekly tasks" sub="Sun → Sat">
                 {cfg.weekly.map((t) => (
-                  <WeeklyTaskItem key={t.id} task={t} value={weekly[t.id]} todayDow={todayDow} onChange={(v) => updateWeekly(t.id, v)} />
+                  <WeeklyTaskItem key={t.id} task={t} value={weekly[t.id]} todayDow={todayDow}
+                    label={weeklyLabels[t.id]} onLabelChange={(v) => { setWeeklyLabels(p=>({...p,[t.id]:v})); setSaved(false); }}
+                    onChange={(v) => updateWeekly(t.id, v)} />
+                ))}
+              </Section>
+              <Section title="Weekly progress" sub="drag slider to update %">
+                {cfg.weekly.map(t => (
+                  <SliderTask key={t.id} task={t} value={weeklyProgress[t.id] || 0} label={weeklyLabels[t.id]}
+                    onChange={(v) => { setWeeklyProgress(p => ({...p, [t.id]: v})); setSaved(false); }} />
                 ))}
               </Section>
             </>
           )}
           {tab === "manual" && (
-            <ManualView cfg={cfg} customTasks={customTasks} setCustomTasks={setCustomTasks}
-              newTaskText={newTaskText} setNewTaskText={setNewTaskText}
-              weeklyProgress={weeklyProgress} setWeeklyProgress={setWeeklyProgress} setSaved={setSaved} />
+            <ManualView customTasks={customTasks} setCustomTasks={setCustomTasks}
+              newTaskText={newTaskText} setNewTaskText={setNewTaskText} setSaved={setSaved} />
           )}
           <Section title="Notes — what got done">
             <Textarea value={notes} onChange={(v)=>{setNotes(v);setSaved(false);}} placeholder="e.g. posted reel + 2 reviews, replied to 14 messages…" />
@@ -311,6 +367,10 @@
           <button onClick={submit} disabled={saving}
             style={{ all:"unset", cursor: saving?"default":"pointer", display:"block", textAlign:"center", width:"100%", padding:"16px", borderRadius:14, background: saved?COLORS.sage:COLORS.clay, color:"#fff", fontWeight:600, fontSize:16, marginTop:8, transition:"background .2s", opacity: saving?0.7:1 }}>
             {saving ? "Saving…" : saved ? "✓ Saved — thanks!" : existing ? "Update today's report" : "Submit today's report"}
+          </button>
+          <button onClick={sendEmail}
+            style={{ all:"unset", cursor:"pointer", display:"block", textAlign:"center", width:"100%", padding:"12px", borderRadius:14, background:COLORS.white, color:COLORS.inkSoft, fontWeight:600, fontSize:14, marginTop:8, border:`1px solid ${COLORS.line}` }}>
+            📧 Send summary to owner
           </button>
         </div>
       );
@@ -430,7 +490,7 @@
       );
     }
 
-    function ManualView({ cfg, customTasks, setCustomTasks, newTaskText, setNewTaskText, weeklyProgress, setWeeklyProgress, setSaved }) {
+    function ManualView({ customTasks, setCustomTasks, newTaskText, setNewTaskText, setSaved }) {
       const addTask = () => {
         if (!newTaskText.trim()) return;
         setCustomTasks(p => [...p, { id: Date.now().toString(), text: newTaskText.trim(), done: false }]);
@@ -439,52 +499,66 @@
       };
       const toggleTask = (id) => { setCustomTasks(p => p.map(t => t.id === id ? {...t, done: !t.done} : t)); setSaved(false); };
       const removeTask = (id) => { setCustomTasks(p => p.filter(t => t.id !== id)); setSaved(false); };
+      const editTask = (id, text) => { setCustomTasks(p => p.map(t => t.id === id ? {...t, text} : t)); setSaved(false); };
       const done = customTasks.filter(t => t.done).length;
       return (
-        <>
-          <Section title="Today's tasks" sub={customTasks.length > 0 ? `${done}/${customTasks.length} done` : "add what you worked on"}>
-            <div style={{ display:"flex", gap:8, marginBottom:4 }}>
-              <input value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") addTask(); }}
-                placeholder="Type a task and press Enter…"
-                style={{ flex:1, padding:"11px 14px", borderRadius:10, border:`1px solid ${COLORS.line}`, fontSize:15, fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
-              <button onClick={addTask}
-                style={{ all:"unset", cursor:"pointer", padding:"11px 18px", borderRadius:10, background:COLORS.clay, color:"#fff", fontSize:14, fontWeight:700 }}>Add</button>
+        <Section title="Today's tasks" sub={customTasks.length > 0 ? `${done}/${customTasks.length} done — also in Checklist` : "tasks added here appear in Checklist too"}>
+          <div style={{ display:"flex", gap:8, marginBottom:4 }}>
+            <input value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") addTask(); }}
+              placeholder="Type a task and press Enter…"
+              style={{ flex:1, padding:"11px 14px", borderRadius:10, border:`1px solid ${COLORS.line}`, fontSize:15, fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
+            <button onClick={addTask}
+              style={{ all:"unset", cursor:"pointer", padding:"11px 18px", borderRadius:10, background:COLORS.clay, color:"#fff", fontSize:14, fontWeight:700 }}>Add</button>
+          </div>
+          {customTasks.length === 0 && (
+            <div style={{ padding:"20px 14px", textAlign:"center", color:COLORS.inkSoft, fontSize:14, background:COLORS.white, borderRadius:12, border:`1px dashed ${COLORS.line}` }}>
+              No tasks yet — type above and hit Add or Enter
             </div>
-            {customTasks.length === 0 && (
-              <div style={{ padding:"20px 14px", textAlign:"center", color:COLORS.inkSoft, fontSize:14, background:COLORS.white, borderRadius:12, border:`1px dashed ${COLORS.line}` }}>
-                No tasks yet — type above and hit Add or Enter
-              </div>
-            )}
-            {customTasks.map(t => (
-              <div key={t.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:12, background: t.done?"#F1F6F2":COLORS.white, border:`1px solid ${t.done?"#CFE0D4":COLORS.line}`, transition:"background .15s" }}>
-                <button onClick={() => toggleTask(t.id)}
-                  style={{ all:"unset", cursor:"pointer", width:22, height:22, borderRadius:7, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background: t.done?COLORS.sage:"transparent", border:`2px solid ${t.done?COLORS.sage:COLORS.line}`, color:"#fff", fontSize:14, fontWeight:700 }}>
-                  {t.done ? "✓" : ""}
-                </button>
-                <span style={{ flex:1, fontSize:15, color: t.done?COLORS.inkSoft:COLORS.ink, textDecoration: t.done?"line-through":"none" }}>{t.text}</span>
-                <button onClick={() => removeTask(t.id)}
-                  style={{ all:"unset", cursor:"pointer", width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, color:COLORS.inkSoft, lineHeight:1, borderRadius:4 }}>×</button>
-              </div>
-            ))}
-          </Section>
-          <Section title="Weekly progress" sub="drag to update">
-            {cfg.weekly.map(t => (
-              <SliderTask key={t.id} task={t} value={weeklyProgress[t.id] || 0}
-                onChange={(v) => { setWeeklyProgress(p => ({...p, [t.id]: v})); setSaved(false); }} />
-            ))}
-          </Section>
-        </>
+          )}
+          {customTasks.map(t => (
+            <EditableCustomTask key={t.id} task={t}
+              onToggle={() => toggleTask(t.id)}
+              onRemove={() => removeTask(t.id)}
+              onEdit={(text) => editTask(t.id, text)} />
+          ))}
+        </Section>
       );
     }
 
-    function SliderTask({ task, value, onChange }) {
+    function EditableCustomTask({ task, onToggle, onRemove, onEdit }) {
+      const [editing, setEditing] = useState(false);
+      const [editText, setEditText] = useState(task.text);
+      const finish = () => { if (editText.trim()) onEdit(editText.trim()); setEditing(false); };
+      return (
+        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:12, background: task.done?"#F1F6F2":COLORS.white, border:`1px solid ${task.done?"#CFE0D4":COLORS.line}`, transition:"background .15s" }}>
+          <button onClick={onToggle}
+            style={{ all:"unset", cursor:"pointer", width:22, height:22, borderRadius:7, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background: task.done?COLORS.sage:"transparent", border:`2px solid ${task.done?COLORS.sage:COLORS.line}`, color:"#fff", fontSize:14, fontWeight:700 }}>
+            {task.done ? "✓" : ""}
+          </button>
+          {editing ? (
+            <input value={editText} onChange={(e)=>setEditText(e.target.value)} onBlur={finish}
+              onKeyDown={(e)=>{if(e.key==="Enter")finish();}} autoFocus
+              style={{ flex:1, padding:"4px 8px", borderRadius:6, border:`1px solid ${COLORS.clay}`, fontSize:15, fontFamily:"inherit", outline:"none" }} />
+          ) : (
+            <span style={{ flex:1, fontSize:15, color: task.done?COLORS.inkSoft:COLORS.ink, textDecoration: task.done?"line-through":"none" }}>{task.text}</span>
+          )}
+          <button onClick={() => { setEditText(task.text); setEditing(e=>!e); }}
+            style={{ all:"unset", cursor:"pointer", fontSize:13, color:COLORS.inkSoft, padding:"3px 6px", borderRadius:4 }}>✏</button>
+          <button onClick={onRemove}
+            style={{ all:"unset", cursor:"pointer", width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, color:COLORS.inkSoft, lineHeight:1, borderRadius:4 }}>×</button>
+        </div>
+      );
+    }
+
+    function SliderTask({ task, value, onChange, label }) {
       const pct = value || 0;
+      const displayText = label || task.text;
       const trackColor = pct >= 100 ? COLORS.sage : pct > 0 ? COLORS.clay : COLORS.line;
       return (
         <div style={{ padding:"14px 16px", borderRadius:12, background: pct > 0 ? "#F1F6F2" : COLORS.white, border:`1px solid ${pct > 0 ? "#CFE0D4" : COLORS.line}` }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:10 }}>
-            <span style={{ fontSize:15, fontWeight:500, color:COLORS.ink }}>{task.text}</span>
+            <span style={{ fontSize:15, fontWeight:500, color:COLORS.ink }}>{displayText}</span>
             <span style={{ fontFamily:"'Fraunces', serif", fontWeight:600, fontSize:20, color: pct >= 100 ? COLORS.sage : pct > 0 ? COLORS.clay : COLORS.inkSoft }}>{pct}%</span>
           </div>
           <div style={{ position:"relative", height:28, display:"flex", alignItems:"center" }}>
@@ -511,13 +585,25 @@
         </div>
         <div style={{ display:"grid", gap:8 }}>{children}</div></div>;
     }
-    function TaskItem({ task, value, onChange }) {
+    function TaskItem({ task, value, onChange, label, onLabelChange }) {
+      const [editing, setEditing] = useState(false);
+      const [editText, setEditText] = useState("");
+      const displayText = label || task.text;
+      const startEdit = (e) => { e.stopPropagation(); setEditText(displayText); setEditing(true); };
+      const finishEdit = () => { if (editText.trim()) onLabelChange(editText.trim()); setEditing(false); };
       if (task.type === "number") {
         const num = value || 0;
         const done = num > 0;
         return (
-          <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:12, background: done?"#F1F6F2":COLORS.white, border:`1px solid ${done?"#CFE0D4":COLORS.line}` }}>
-            <span style={{ flex:1, fontSize:15, color: done?COLORS.inkSoft:COLORS.ink }}>{task.text}</span>
+          <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", borderRadius:12, background: done?"#F1F6F2":COLORS.white, border:`1px solid ${done?"#CFE0D4":COLORS.line}` }}>
+            {editing ? (
+              <input value={editText} onChange={(e)=>setEditText(e.target.value)} onBlur={finishEdit}
+                onKeyDown={(e)=>{if(e.key==="Enter")finishEdit();}} autoFocus
+                style={{ flex:1, padding:"4px 8px", borderRadius:6, border:`1px solid ${COLORS.clay}`, fontSize:15, fontFamily:"inherit", outline:"none" }} />
+            ) : (
+              <span style={{ flex:1, fontSize:15, color: done?COLORS.inkSoft:COLORS.ink }}>{displayText}</span>
+            )}
+            <button onClick={startEdit} style={{ all:"unset", cursor:"pointer", fontSize:13, color:COLORS.line, padding:"3px 5px", borderRadius:4 }}>✏</button>
             <input type="number" min="0" value={num === 0 ? "" : num} placeholder="0"
               onChange={(e) => { const v = parseInt(e.target.value); onChange(isNaN(v) ? 0 : Math.max(0, v)); }}
               style={{ width:64, padding:"7px 10px", borderRadius:8, border:`1px solid ${COLORS.line}`, fontSize:15, textAlign:"center", fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
@@ -526,21 +612,47 @@
       }
       const checked = !!value;
       return (
-        <button onClick={() => onChange(!checked)}
-          style={{ all:"unset", cursor:"pointer", display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:12, background: checked?"#F1F6F2":COLORS.white, border:`1px solid ${checked?"#CFE0D4":COLORS.line}`, transition:"background .15s" }}>
-          <span style={{ width:22, height:22, borderRadius:7, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background: checked?COLORS.sage:"transparent", border:`2px solid ${checked?COLORS.sage:COLORS.line}`, color:"#fff", fontSize:14, fontWeight:700 }}>{checked?"✓":""}</span>
-          <span style={{ fontSize:15, color: checked?COLORS.inkSoft:COLORS.ink, textDecoration: checked?"line-through":"none" }}>{task.text}</span>
-        </button>
+        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", borderRadius:12, background: checked?"#F1F6F2":COLORS.white, border:`1px solid ${checked?"#CFE0D4":COLORS.line}`, transition:"background .15s" }}>
+          <button onClick={() => onChange(!checked)}
+            style={{ all:"unset", cursor:"pointer", width:22, height:22, borderRadius:7, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background: checked?COLORS.sage:"transparent", border:`2px solid ${checked?COLORS.sage:COLORS.line}`, color:"#fff", fontSize:14, fontWeight:700 }}>
+            {checked?"✓":""}
+          </button>
+          {editing ? (
+            <input value={editText} onChange={(e)=>setEditText(e.target.value)} onBlur={finishEdit}
+              onKeyDown={(e)=>{if(e.key==="Enter")finishEdit();}} autoFocus
+              style={{ flex:1, padding:"4px 8px", borderRadius:6, border:`1px solid ${COLORS.clay}`, fontSize:15, fontFamily:"inherit", outline:"none" }} />
+          ) : (
+            <span onClick={() => onChange(!checked)} style={{ flex:1, fontSize:15, cursor:"pointer", color: checked?COLORS.inkSoft:COLORS.ink, textDecoration: checked?"line-through":"none" }}>{displayText}</span>
+          )}
+          <button onClick={startEdit} style={{ all:"unset", cursor:"pointer", fontSize:13, color:COLORS.line, padding:"3px 5px", borderRadius:4 }}>✏</button>
+        </div>
       );
     }
 
-    function WeeklyTaskItem({ task, value, todayDow, onChange }) {
+    function WeeklyTaskItem({ task, value, todayDow, onChange, label, onLabelChange }) {
+      const [editing, setEditing] = useState(false);
+      const [editText, setEditText] = useState("");
+      const displayText = label || task.text;
+      const startEdit = () => { setEditText(displayText); setEditing(true); };
+      const finishEdit = () => { if (editText.trim()) onLabelChange(editText.trim()); setEditing(false); };
+      const LabelRow = () => (
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom: task.type==="textarea"?8:10 }}>
+          {editing ? (
+            <input value={editText} onChange={(e)=>setEditText(e.target.value)} onBlur={finishEdit}
+              onKeyDown={(e)=>{if(e.key==="Enter")finishEdit();}} autoFocus
+              style={{ flex:1, padding:"4px 8px", borderRadius:6, border:`1px solid ${COLORS.clay}`, fontSize:15, fontFamily:"inherit", outline:"none" }} />
+          ) : (
+            <p style={{ flex:1, margin:0, fontSize:15, fontWeight:500, color:COLORS.ink }}>{displayText}</p>
+          )}
+          <button onClick={startEdit} style={{ all:"unset", cursor:"pointer", fontSize:13, color:COLORS.line, padding:"3px 5px", borderRadius:4 }}>✏</button>
+        </div>
+      );
       if (task.type === "textarea") {
         const text = (value && value.text) || "";
         const done = text.trim().length > 0;
         return (
           <div style={{ borderRadius:12, background: done?"#F1F6F2":COLORS.white, border:`1px solid ${done?"#CFE0D4":COLORS.line}`, padding:"12px 14px" }}>
-            <p style={{ margin:"0 0 8px", fontSize:15, fontWeight:500, color:COLORS.ink }}>{task.text}</p>
+            <LabelRow />
             <textarea value={text} rows={2} placeholder="Describe what you worked on…"
               onChange={(e) => onChange({ ...(value || {}), text: e.target.value })}
               style={{ width:"100%", resize:"vertical", padding:"8px 10px", borderRadius:8, border:`1px solid ${COLORS.line}`, fontSize:14, color:COLORS.ink, fontFamily:"inherit", background:COLORS.white, outline:"none" }} />
@@ -551,7 +663,7 @@
       const anyDone = DAY_LABELS.some((_, i) => days[i]);
       return (
         <div style={{ padding:"12px 14px", borderRadius:12, background: anyDone?"#F1F6F2":COLORS.white, border:`1px solid ${anyDone?"#CFE0D4":COLORS.line}` }}>
-          <p style={{ margin:"0 0 10px", fontSize:15, fontWeight:500, color:COLORS.ink }}>{task.text}</p>
+          <LabelRow />
           <div style={{ display:"flex", gap:6 }}>
             {DAY_LABELS.map((lbl, i) => {
               const checked = !!days[i];
