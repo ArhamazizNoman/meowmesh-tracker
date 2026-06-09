@@ -70,10 +70,24 @@
         ] },
     };
 
+    const OWNER_TASKS = [
+      { id: "ow_1", text: "Review monthly revenue & sales", type: "check" },
+      { id: "ow_2", text: "Supplier payments & procurement", type: "check" },
+      { id: "ow_3", text: "Team performance review", type: "check" },
+      { id: "ow_4", text: "Marketing review & next month plan", type: "check" },
+      { id: "ow_5", text: "Set next month's goals", type: "check" },
+      { id: "ow_6", text: "Stock & inventory audit", type: "check" },
+    ];
+
     const todayStr = () => {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
     };
+    const monthStr = () => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`;
+    };
+    const prettyMonth = () => new Date().toLocaleDateString(undefined, { month: "long", year: "numeric" });
     const prettyDate = (s) => {
       const [y,m,d] = s.split("-").map(Number);
       return new Date(y, m-1, d).toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" });
@@ -138,7 +152,7 @@
             {view === "select" && <RolePicker setView={setView} />}
             {(view === "marketer" || view === "operations") &&
               <EmployeeView person={view} reports={reports} onSave={saveReport} />}
-            {view === "owner" && <OwnerView reports={reports} loading={loading} reload={loadReports} />}
+            {view === "owner" && <OwnerView reports={reports} loading={loading} reload={loadReports} onSave={saveReport} />}
           </div>
         </div>
       );
@@ -410,28 +424,168 @@
       );
     }
 
-    function OwnerView({ reports, loading, reload }) {
+    function OwnerView({ reports, loading, reload, onSave }) {
+      const [ownerTab, setOwnerTab] = useState("team");
       const [filter, setFilter] = useState("all");
-      const list = Object.values(reports).sort((a,b) => (a.date<b.date?1:a.date>b.date?-1:a.person.localeCompare(b.person)));
+      const teamReports = Object.values(reports).filter(r => r.person !== "owner");
+      const list = teamReports.sort((a,b) => (a.date<b.date?1:a.date>b.date?-1:a.person.localeCompare(b.person)));
       const filtered = filter === "all" ? list : list.filter((r) => r.person === filter);
-      const tabs = [["all","All"],["marketer","Marketer"],["operations","Operations"]];
+      const filterTabs = [["all","All"],["marketer","Marketer"],["operations","Operations"]];
       return (
         <div style={{ animation:"pop .3s ease" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
-            <p style={{ fontFamily:"'Fraunces', serif", fontSize:30, fontWeight:600, margin:"4px 0", letterSpacing:"-0.02em" }}>Team dashboard</p>
-            <button onClick={reload} style={{ all:"unset", cursor:"pointer", fontSize:13.5, fontWeight:600, color:COLORS.inkSoft, padding:"7px 13px", borderRadius:999, border:`1px solid ${COLORS.line}`, background:COLORS.white }}>⟳ Refresh</button>
+            <p style={{ fontFamily:"'Fraunces', serif", fontSize:30, fontWeight:600, margin:"4px 0", letterSpacing:"-0.02em" }}>Owner</p>
+            {ownerTab === "team" && <button onClick={reload} style={{ all:"unset", cursor:"pointer", fontSize:13.5, fontWeight:600, color:COLORS.inkSoft, padding:"7px 13px", borderRadius:999, border:`1px solid ${COLORS.line}`, background:COLORS.white }}>⟳ Refresh</button>}
           </div>
-          <div style={{ display:"flex", gap:8, margin:"18px 0 24px" }}>
-            {tabs.map(([id,lbl]) => (
-              <button key={id} onClick={() => setFilter(id)}
-                style={{ all:"unset", cursor:"pointer", padding:"8px 16px", borderRadius:999, fontSize:14, fontWeight:600, background: filter===id?COLORS.ink:COLORS.white, color: filter===id?"#fff":COLORS.inkSoft, border:`1px solid ${filter===id?COLORS.ink:COLORS.line}` }}>{lbl}</button>
+          <div style={{ display:"flex", marginBottom:28, marginTop:18, borderRadius:10, overflow:"hidden", border:`1px solid ${COLORS.line}` }}>
+            {[["team","📊  Team Dashboard"],["mytasks","📋  My Tasks"]].map(([id,lbl]) => (
+              <button key={id} onClick={() => setOwnerTab(id)}
+                style={{ all:"unset", cursor:"pointer", flex:1, padding:"11px 16px", textAlign:"center", fontSize:14, fontWeight:600,
+                  background: ownerTab===id ? COLORS.ink : COLORS.white,
+                  color: ownerTab===id ? "#fff" : COLORS.inkSoft, transition:"background .15s" }}>
+                {lbl}
+              </button>
             ))}
           </div>
-          {loading && <Empty text="Loading…" />}
-          {!loading && filtered.length === 0 && <Empty text="No reports yet. Once your team submits, their updates show up here." />}
-          <div style={{ display:"grid", gap:14 }}>
-            {filtered.map((r) => <ReportCard key={`${r.date}:${r.person}`} report={r} />)}
+          {ownerTab === "team" && (
+            <>
+              <div style={{ display:"flex", gap:8, marginBottom:24 }}>
+                {filterTabs.map(([id,lbl]) => (
+                  <button key={id} onClick={() => setFilter(id)}
+                    style={{ all:"unset", cursor:"pointer", padding:"8px 16px", borderRadius:999, fontSize:14, fontWeight:600, background: filter===id?COLORS.ink:COLORS.white, color: filter===id?"#fff":COLORS.inkSoft, border:`1px solid ${filter===id?COLORS.ink:COLORS.line}` }}>{lbl}</button>
+                ))}
+              </div>
+              {loading && <Empty text="Loading…" />}
+              {!loading && filtered.length === 0 && <Empty text="No reports yet. Once your team submits, their updates show up here." />}
+              <div style={{ display:"grid", gap:14 }}>
+                {filtered.map((r) => <ReportCard key={`${r.date}:${r.person}`} report={r} />)}
+              </div>
+            </>
+          )}
+          {ownerTab === "mytasks" && <OwnerTaskView reports={reports} onSave={onSave} />}
+        </div>
+      );
+    }
+
+    function OwnerTaskView({ reports, onSave }) {
+      const thisMonth = monthStr();
+      const existing = reports[`${thisMonth}:owner`];
+
+      const [tasks, setTasks] = useState({});
+      const [labels, setLabels] = useState({});
+      const [customTasks, setCustomTasks] = useState([]);
+      const [monthlyProgress, setMonthlyProgress] = useState([]);
+      const [newCustomText, setNewCustomText] = useState("");
+      const [newProgressText, setNewProgressText] = useState("");
+      const [notes, setNotes] = useState("");
+      const [blockers, setBlockers] = useState("");
+      const [saved, setSaved] = useState(false);
+      const [saving, setSaving] = useState(false);
+
+      useEffect(() => {
+        const d = (existing && existing.daily) || {};
+        setTasks(d);
+        setLabels(d["__labels"] || {});
+        setCustomTasks(d["__custom"] || []);
+        const w = (existing && existing.weekly) || {};
+        setMonthlyProgress(w["__customProgress"] || []);
+        setNotes((existing && existing.notes) || "");
+        setBlockers((existing && existing.blockers) || "");
+        setSaved(false);
+      }, [existing && existing.date]);
+
+      const doneCount = OWNER_TASKS.filter(t => !!tasks[t.id]).length;
+      const customDone = customTasks.filter(t => t.done).length;
+
+      const addCustomTask = () => {
+        if (!newCustomText.trim()) return;
+        setCustomTasks(p => [...p, { id: Date.now().toString(), text: newCustomText.trim(), done: false }]);
+        setNewCustomText("");
+        setSaved(false);
+      };
+      const addProgress = () => {
+        if (!newProgressText.trim()) return;
+        setMonthlyProgress(p => [...p, { id: Date.now().toString(), text: newProgressText.trim(), pct: 0 }]);
+        setNewProgressText("");
+        setSaved(false);
+      };
+
+      const submit = async () => {
+        setSaving(true);
+        const dailySave = { ...tasks, "__labels": labels, "__custom": customTasks };
+        const weeklySave = { "__customProgress": monthlyProgress };
+        const ok = await onSave({ date: thisMonth, person: "owner", daily: dailySave, weekly: weeklySave, notes, blockers, updated_at: new Date().toISOString() });
+        setSaving(false);
+        if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
+      };
+
+      return (
+        <div>
+          <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom:14 }}>
+            <span style={{ fontFamily:"'Fraunces', serif", fontSize:20, fontWeight:600, color:COLORS.inkSoft }}>{prettyMonth()}</span>
+            <span style={{ fontSize:13, color:COLORS.inkSoft }}>resets each month</span>
           </div>
+          <div style={{ height:8, background:COLORS.paper2, borderRadius:999, overflow:"hidden", marginBottom:28 }}>
+            <div style={{ height:"100%", width:`${((doneCount+customDone)/(OWNER_TASKS.length+(customTasks.length||1)))*100}%`, background:COLORS.clay, transition:"width .3s" }} />
+          </div>
+          <Section title="Monthly tasks" sub={`${doneCount}/${OWNER_TASKS.length} done`}>
+            {OWNER_TASKS.map(t => (
+              <TaskItem key={t.id} task={t} value={tasks[t.id]}
+                label={labels[t.id]} onLabelChange={(v) => { setLabels(p=>({...p,[t.id]:v})); setSaved(false); }}
+                onChange={(v) => { setTasks(p=>({...p,[t.id]:v})); setSaved(false); }} />
+            ))}
+          </Section>
+          {customTasks.length > 0 && (
+            <Section title="My tasks" sub={`${customDone}/${customTasks.length} done`}>
+              {customTasks.map(t => (
+                <EditableCustomTask key={t.id} task={t}
+                  onToggle={() => { setCustomTasks(p=>p.map(ct=>ct.id===t.id?{...ct,done:!ct.done}:ct)); setSaved(false); }}
+                  onRemove={() => { setCustomTasks(p=>p.filter(ct=>ct.id!==t.id)); setSaved(false); }}
+                  onEdit={(text) => { setCustomTasks(p=>p.map(ct=>ct.id===t.id?{...ct,text}:ct)); setSaved(false); }} />
+              ))}
+            </Section>
+          )}
+          <Section title="Monthly progress" sub="drag slider to update %">
+            {monthlyProgress.map(t => (
+              <div key={t.id} style={{ display:"flex", alignItems:"stretch", gap:6 }}>
+                <div style={{ flex:1 }}>
+                  <SliderTask task={{ id: t.id, text: t.text, type: "check" }} value={t.pct} label={t.text}
+                    onLabelChange={(v) => { setMonthlyProgress(p=>p.map(ct=>ct.id===t.id?{...ct,text:v}:ct)); setSaved(false); }}
+                    onChange={(v) => { setMonthlyProgress(p=>p.map(ct=>ct.id===t.id?{...ct,pct:v}:ct)); setSaved(false); }} />
+                </div>
+                <button onClick={() => { setMonthlyProgress(p=>p.filter(ct=>ct.id!==t.id)); setSaved(false); }}
+                  style={{ all:"unset", cursor:"pointer", display:"flex", alignItems:"center", paddingLeft:4, fontSize:20, color:COLORS.inkSoft }}>×</button>
+              </div>
+            ))}
+            <div style={{ display:"flex", gap:8, marginTop:4 }}>
+              <input value={newProgressText} onChange={(e) => setNewProgressText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addProgress(); }}
+                placeholder="Add a monthly goal…"
+                style={{ flex:1, padding:"10px 14px", borderRadius:10, border:`1px solid ${COLORS.line}`, fontSize:14, fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
+              <button onClick={addProgress}
+                style={{ all:"unset", cursor:"pointer", padding:"10px 16px", borderRadius:10, background:COLORS.clay, color:"#fff", fontSize:14, fontWeight:700 }}>+ Add</button>
+            </div>
+          </Section>
+          <Section title="Add custom task" sub="">
+            <div style={{ display:"flex", gap:8 }}>
+              <input value={newCustomText} onChange={(e) => setNewCustomText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addCustomTask(); }}
+                placeholder="Type a task and press Enter…"
+                style={{ flex:1, padding:"11px 14px", borderRadius:10, border:`1px solid ${COLORS.line}`, fontSize:15, fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
+              <button onClick={addCustomTask}
+                style={{ all:"unset", cursor:"pointer", padding:"11px 18px", borderRadius:10, background:COLORS.clay, color:"#fff", fontSize:14, fontWeight:700 }}>Add</button>
+            </div>
+          </Section>
+          <Section title="Notes">
+            <Textarea value={notes} onChange={(v)=>{setNotes(v);setSaved(false);}} placeholder="Monthly notes, decisions, key events…" />
+          </Section>
+          <Section title="Blockers / Issues">
+            <Textarea value={blockers} onChange={(v)=>{setBlockers(v);setSaved(false);}} placeholder="Any blockers or issues this month…" />
+          </Section>
+          <button onClick={submit} disabled={saving}
+            style={{ all:"unset", cursor: saving?"default":"pointer", display:"block", textAlign:"center", width:"100%", padding:"16px", borderRadius:14, background: saved?COLORS.sage:COLORS.clay, color:"#fff", fontWeight:600, fontSize:16, marginTop:8, transition:"background .2s", opacity: saving?0.7:1 }}>
+            {saving ? "Saving…" : saved ? "✓ Saved!" : existing ? "Update this month" : "Save this month"}
+          </button>
         </div>
       );
     }
