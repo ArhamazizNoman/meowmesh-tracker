@@ -103,6 +103,13 @@
       dt.setDate(dt.getDate() - dt.getDay());
       return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
     };
+    const getWeekDays = (weekStartStr) => {
+      const [y,m,d] = weekStartStr.split("-").map(Number);
+      return Array.from({length:7}, (_,i) => {
+        const dt = new Date(y, m-1, d+i);
+        return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+      });
+    };
 
     const isDone = (task, val) => {
       if (task.type === "check") return !!val;
@@ -454,6 +461,9 @@
           </div>
           {ownerTab === "team" && (
             <>
+              {!loading && <WeeklyStats reports={teamReports} />}
+              {!loading && <WeeklyRecap reports={teamReports} />}
+              {!loading && <MonthCalendar reports={teamReports} />}
               <div style={{ display:"flex", gap:8, marginBottom:24 }}>
                 {filterTabs.map(([id,lbl]) => (
                   <button key={id} onClick={() => setFilter(id)}
@@ -791,6 +801,118 @@
             <input type="range" min="0" max="100" step="5" value={pct}
               onChange={(e) => onChange(parseInt(e.target.value))}
               style={{ position:"relative", width:"100%", margin:0 }} />
+          </div>
+        </div>
+      );
+    }
+
+    function WeeklyStats({ reports }) {
+      const today = todayStr();
+      const ws = getWeekStart(today);
+      const week = reports.filter(r => getWeekStart(r.date) === ws);
+      if (!week.length) return null;
+      const mkt = week.filter(r => r.person === "marketer");
+      const ops = week.filter(r => r.person === "operations");
+      const sum = (arr, key) => arr.reduce((s,r) => s + (Number(r.daily?.[key])||0), 0);
+      const avgPct = Math.round(week.reduce((s,r) => {
+        const cfg = TASKS[r.person];
+        return s + cfg.daily.filter(t => isDone(t, r.daily?.[t.id])).length / cfg.daily.length * 100;
+      }, 0) / week.length);
+      const stats = [
+        { label:"Products Made", val:sum(ops,"o_d1"), color:COLORS.sage },
+        { label:"Deliveries", val:sum(ops,"o_d2"), color:COLORS.sage },
+        { label:"Customer Replies", val:sum(mkt,"m_d3"), color:COLORS.clay },
+        { label:"Customer Reach", val:sum(mkt,"m_d4"), color:COLORS.clay },
+        { label:"Avg Completion", val:`${avgPct}%`, color:COLORS.ink },
+      ];
+      return (
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))", gap:8, marginBottom:20 }}>
+          {stats.map(s => (
+            <div key={s.label} style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:12, padding:"12px 14px" }}>
+              <p style={{ margin:"0 0 4px", fontSize:11, color:COLORS.inkSoft, textTransform:"uppercase", letterSpacing:"0.05em", fontWeight:600 }}>{s.label}</p>
+              <p style={{ margin:0, fontFamily:"'Fraunces', serif", fontSize:24, fontWeight:700, color:s.color }}>{s.val}</p>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    function WeeklyRecap({ reports }) {
+      const today = todayStr();
+      const ws = getWeekStart(today);
+      const weekDays = getWeekDays(ws);
+      const pastDays = weekDays.filter(d => d <= today);
+      const persons = [["marketer","Marketer",COLORS.clay],["operations","Operations",COLORS.sage]];
+      return (
+        <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, padding:"16px 18px", marginBottom:20 }}>
+          <p style={{ fontFamily:"'Fraunces', serif", fontSize:16, fontWeight:600, margin:"0 0 14px" }}>
+            This week · {prettyDate(ws)} – {prettyDate(weekDays[6])}
+          </p>
+          {persons.map(([person, label, color]) => {
+            const submitted = weekDays.filter(d => reports.some(r => r.person === person && r.date === d));
+            const missed = pastDays.filter(d => !submitted.includes(d));
+            return (
+              <div key={person} style={{ marginBottom:12 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:6 }}>
+                  <span style={{ fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", color:"#fff", background:color, padding:"2px 7px", borderRadius:5 }}>{label}</span>
+                  <span style={{ fontSize:13, color:COLORS.inkSoft }}>{submitted.length} / {pastDays.length} days submitted</span>
+                  {missed.length > 0 && <span style={{ fontSize:12, color:COLORS.clay }}>missed: {missed.map(d => { const [y,mo,dy] = d.split("-").map(Number); return FULL_DAYS[new Date(y,mo-1,dy).getDay()]; }).join(", ")}</span>}
+                </div>
+                <div style={{ display:"flex", gap:3 }}>
+                  {weekDays.map(d => {
+                    const sub = submitted.includes(d);
+                    const future = d > today;
+                    return <div key={d} style={{ flex:1, height:8, borderRadius:4, background:future?COLORS.paper2:sub?color:COLORS.line }} />;
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    function MonthCalendar({ reports }) {
+      const today = todayStr();
+      const [y, mo] = today.split("-").map(Number);
+      const firstDow = new Date(y, mo-1, 1).getDay();
+      const daysInMonth = new Date(y, mo, 0).getDate();
+      const monthLabel = new Date(y, mo-1, 1).toLocaleDateString(undefined, { month:"long", year:"numeric" });
+      const days = Array.from({length:daysInMonth}, (_,i) => {
+        const day = i+1;
+        return `${y}-${String(mo).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+      });
+      const subSet = new Set(reports.map(r => `${r.date}:${r.person}`));
+      return (
+        <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, padding:"16px 18px", marginBottom:20 }}>
+          <p style={{ fontFamily:"'Fraunces', serif", fontSize:16, fontWeight:600, margin:"0 0 10px" }}>{monthLabel}</p>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2, marginBottom:6 }}>
+            {DAY_LABELS.map((l,i) => <div key={i} style={{ textAlign:"center", fontSize:10, fontWeight:700, color:COLORS.inkSoft, paddingBottom:4 }}>{l}</div>)}
+            {Array.from({length:firstDow}, (_,i) => <div key={`e${i}`} />)}
+            {days.map(date => {
+              const mkt = subSet.has(`${date}:marketer`);
+              const ops = subSet.has(`${date}:operations`);
+              const future = date > today;
+              const isToday = date === today;
+              const day = parseInt(date.split("-")[2]);
+              return (
+                <div key={date} style={{ borderRadius:6, padding:"3px 2px", textAlign:"center", minHeight:32, background:isToday?COLORS.paper2:COLORS.white, border:`1px solid ${isToday?COLORS.clay:COLORS.line}` }}>
+                  <p style={{ margin:"0 0 3px", fontSize:10, fontWeight:isToday?700:400, color:isToday?COLORS.clay:COLORS.inkSoft }}>{day}</p>
+                  <div style={{ display:"flex", gap:2, justifyContent:"center" }}>
+                    <div style={{ width:5, height:5, borderRadius:"50%", background:future?COLORS.paper2:mkt?COLORS.clay:COLORS.line }} />
+                    <div style={{ width:5, height:5, borderRadius:"50%", background:future?COLORS.paper2:ops?COLORS.sage:COLORS.line }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display:"flex", gap:12, marginTop:4 }}>
+            {[["Marketer",COLORS.clay],["Operations",COLORS.sage]].map(([lbl,col]) => (
+              <div key={lbl} style={{ display:"flex", alignItems:"center", gap:5 }}>
+                <div style={{ width:7, height:7, borderRadius:"50%", background:col }} />
+                <span style={{ fontSize:11, color:COLORS.inkSoft }}>{lbl}</span>
+              </div>
+            ))}
           </div>
         </div>
       );
