@@ -250,24 +250,25 @@
       const [customTasks, setCustomTasks] = useState([]);
       const [dueCompleted, setDueCompleted] = useState([]);
       const [weeklyProgress, setWeeklyProgress] = useState({});
+      const [customWeeklyTasks, setCustomWeeklyTasks] = useState([]);
       const [labels, setLabels] = useState({});
       const [weeklyLabels, setWeeklyLabels] = useState({});
       const [newTaskText, setNewTaskText] = useState("");
+      const [newWeeklyText, setNewWeeklyText] = useState("");
       const [notes, setNotes] = useState("");
       const [blockers, setBlockers] = useState("");
       const [saved, setSaved] = useState(false);
       const [saving, setSaving] = useState(false);
 
       useEffect(() => {
-        // Daily resets each day — load from today's report only (null = fresh start)
         const d = (existing && existing.daily) || {};
         setDaily(d);
         setCustomTasks(d["__custom"] || []);
         setDueCompleted(d["__dueCompleted"] || []);
         setLabels(d["__labels"] || {});
-        // Weekly persists through the week — load from most recent report this Sun-Sat
         const w = (weeklySource && weeklySource.weekly) || {};
         setWeeklyProgress(w["__progress"] || {});
+        setCustomWeeklyTasks(w["__customProgress"] || []);
         setWeeklyLabels(w["__labels"] || {});
         setNotes((existing && existing.notes) || "");
         setBlockers((existing && existing.blockers) || "");
@@ -279,6 +280,16 @@
       const completedDueIds = new Set(dueCompleted.map(d => d.id));
       const visibleDue = allDueTasks.filter(t => !completedDueIds.has(t.id));
 
+      const addWeeklyTask = () => {
+        if (!newWeeklyText.trim()) return;
+        setCustomWeeklyTasks(p => [...p, { id: Date.now().toString(), text: newWeeklyText.trim(), pct: 0 }]);
+        setNewWeeklyText("");
+        setSaved(false);
+      };
+      const updateCustomWeeklyPct = (id, pct) => { setCustomWeeklyTasks(p => p.map(t => t.id===id?{...t,pct}:t)); setSaved(false); };
+      const removeCustomWeeklyTask = (id) => { setCustomWeeklyTasks(p => p.filter(t => t.id!==id)); setSaved(false); };
+      const renameCustomWeeklyTask = (id, text) => { setCustomWeeklyTasks(p => p.map(t => t.id===id?{...t,text}:t)); setSaved(false); };
+
       const doneCount = cfg.daily.filter((t) => isDone(t, daily[t.id])).length;
       const customDone = customTasks.filter(t => t.done).length;
       const barCount = tab === "manual" ? customDone : doneCount;
@@ -287,7 +298,7 @@
       const submit = async () => {
         setSaving(true);
         const dailySave = { ...daily, "__custom": customTasks, "__labels": labels, "__dueCompleted": dueCompleted };
-        const weeklySave = { "__progress": weeklyProgress, "__labels": weeklyLabels };
+        const weeklySave = { "__progress": weeklyProgress, "__labels": weeklyLabels, "__customProgress": customWeeklyTasks };
         const ok = await onSave({ date: today, person, daily: dailySave, weekly: weeklySave, notes, blockers, updated_at: new Date().toISOString() });
         setSaving(false);
         if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
@@ -359,6 +370,25 @@
                     onLabelChange={(v) => { setWeeklyLabels(p=>({...p,[t.id]:v})); setSaved(false); }}
                     onChange={(v) => { setWeeklyProgress(p => ({...p, [t.id]: v})); setSaved(false); }} />
                 ))}
+                {customWeeklyTasks.map(t => (
+                  <div key={t.id} style={{ display:"flex", alignItems:"stretch", gap:6 }}>
+                    <div style={{ flex:1 }}>
+                      <SliderTask task={{ id: t.id, text: t.text, type: "check" }} value={t.pct} label={t.text}
+                        onLabelChange={(v) => renameCustomWeeklyTask(t.id, v)}
+                        onChange={(v) => updateCustomWeeklyPct(t.id, v)} />
+                    </div>
+                    <button onClick={() => removeCustomWeeklyTask(t.id)}
+                      style={{ all:"unset", cursor:"pointer", display:"flex", alignItems:"center", paddingLeft:4, fontSize:20, color:COLORS.inkSoft }}>×</button>
+                  </div>
+                ))}
+                <div style={{ display:"flex", gap:8, marginTop:4 }}>
+                  <input value={newWeeklyText} onChange={(e) => setNewWeeklyText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") addWeeklyTask(); }}
+                    placeholder="Add a weekly task…"
+                    style={{ flex:1, padding:"10px 14px", borderRadius:10, border:`1px solid ${COLORS.line}`, fontSize:14, fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
+                  <button onClick={addWeeklyTask}
+                    style={{ all:"unset", cursor:"pointer", padding:"10px 16px", borderRadius:10, background:COLORS.clay, color:"#fff", fontSize:14, fontWeight:700 }}>+ Add</button>
+                </div>
               </Section>
             </>
           )}
@@ -454,26 +484,25 @@
           )}
           {(() => {
             const progress = report.weekly && report.weekly["__progress"];
-            if (!progress) return null;
-            const entries = cfg.weekly.filter(t => (progress[t.id] || 0) > 0);
-            if (!entries.length) return null;
+            const customProg = (report.weekly && report.weekly["__customProgress"]) || [];
+            const predefined = cfg.weekly.filter(t => (progress && progress[t.id] || 0) > 0);
+            if (!predefined.length && !customProg.length) return null;
+            const ProgBar = ({text, pct}) => (
+              <div style={{ marginBottom:5 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", fontSize:12.5, marginBottom:3 }}>
+                  <span style={{ color:COLORS.ink }}>{text}</span>
+                  <span style={{ fontWeight:600, color: pct>=100?COLORS.sage:COLORS.clay }}>{pct}%</span>
+                </div>
+                <div style={{ height:4, background:COLORS.paper2, borderRadius:999, overflow:"hidden" }}>
+                  <div style={{ height:"100%", width:`${pct}%`, background: pct>=100?COLORS.sage:COLORS.clay, borderRadius:999 }} />
+                </div>
+              </div>
+            );
             return (
               <div style={{ marginBottom:8 }}>
                 <p style={{ margin:"0 0 4px", fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", color:COLORS.inkSoft }}>Weekly Progress</p>
-                {entries.map(t => {
-                  const pct = progress[t.id] || 0;
-                  return (
-                    <div key={t.id} style={{ marginBottom:5 }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", fontSize:12.5, marginBottom:3 }}>
-                        <span style={{ color:COLORS.ink }}>{t.text}</span>
-                        <span style={{ fontWeight:600, color: pct>=100?COLORS.sage:COLORS.clay }}>{pct}%</span>
-                      </div>
-                      <div style={{ height:4, background:COLORS.paper2, borderRadius:999, overflow:"hidden" }}>
-                        <div style={{ height:"100%", width:`${pct}%`, background: pct>=100?COLORS.sage:COLORS.clay, borderRadius:999 }} />
-                      </div>
-                    </div>
-                  );
-                })}
+                {predefined.map(t => <ProgBar key={t.id} text={t.text} pct={progress[t.id]||0} />)}
+                {customProg.filter(t => t.pct > 0).map(t => <ProgBar key={t.id} text={t.text} pct={t.pct} />)}
               </div>
             );
           })()}
