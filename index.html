@@ -411,12 +411,16 @@
             <ManualView customTasks={customTasks} setCustomTasks={setCustomTasks}
               newTaskText={newTaskText} setNewTaskText={setNewTaskText} setSaved={setSaved} />
           )}
-          <Section title="Notes — what got done">
-            <Textarea value={notes} onChange={(v)=>{setNotes(v);setSaved(false);}} placeholder="e.g. posted reel + 2 reviews, replied to 14 messages…" />
-          </Section>
-          <Section title="Blockers">
-            <Textarea value={blockers} onChange={(v)=>{setBlockers(v);setSaved(false);}} placeholder="Anything stopping you? (out of stock, waiting on supplier…)" />
-          </Section>
+          {tab === "checklist" && (
+            <>
+              <Section title="Notes — what got done">
+                <Textarea value={notes} onChange={(v)=>{setNotes(v);setSaved(false);}} placeholder="e.g. posted reel + 2 reviews, replied to 14 messages…" />
+              </Section>
+              <Section title="Blockers">
+                <Textarea value={blockers} onChange={(v)=>{setBlockers(v);setSaved(false);}} placeholder="Anything stopping you? (out of stock, waiting on supplier…)" />
+              </Section>
+            </>
+          )}
           <button onClick={submit} disabled={saving}
             style={{ all:"unset", cursor: saving?"default":"pointer", display:"block", textAlign:"center", width:"100%", padding:"16px", borderRadius:14, background: saved?COLORS.sage:COLORS.clay, color:"#fff", fontWeight:600, fontSize:16, marginTop:8, transition:"background .2s", opacity: saving?0.7:1 }}>
             {saving ? "Saving…" : saved ? "✓ Saved — thanks!" : existing ? "Update today's report" : "Submit today's report"}
