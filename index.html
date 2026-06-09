@@ -339,16 +339,10 @@
                   ))}
                 </Section>
               )}
-              <Section title="Weekly tasks" sub="Sun → Sat">
-                {cfg.weekly.map((t) => (
-                  <WeeklyTaskItem key={t.id} task={t} value={weekly[t.id]} todayDow={todayDow}
-                    label={weeklyLabels[t.id]} onLabelChange={(v) => { setWeeklyLabels(p=>({...p,[t.id]:v})); setSaved(false); }}
-                    onChange={(v) => updateWeekly(t.id, v)} />
-                ))}
-              </Section>
               <Section title="Weekly progress" sub="drag slider to update %">
                 {cfg.weekly.map(t => (
                   <SliderTask key={t.id} task={t} value={weeklyProgress[t.id] || 0} label={weeklyLabels[t.id]}
+                    onLabelChange={(v) => { setWeeklyLabels(p=>({...p,[t.id]:v})); setSaved(false); }}
                     onChange={(v) => { setWeeklyProgress(p => ({...p, [t.id]: v})); setSaved(false); }} />
                 ))}
               </Section>
@@ -367,10 +361,6 @@
           <button onClick={submit} disabled={saving}
             style={{ all:"unset", cursor: saving?"default":"pointer", display:"block", textAlign:"center", width:"100%", padding:"16px", borderRadius:14, background: saved?COLORS.sage:COLORS.clay, color:"#fff", fontWeight:600, fontSize:16, marginTop:8, transition:"background .2s", opacity: saving?0.7:1 }}>
             {saving ? "Saving…" : saved ? "✓ Saved — thanks!" : existing ? "Update today's report" : "Submit today's report"}
-          </button>
-          <button onClick={sendEmail}
-            style={{ all:"unset", cursor:"pointer", display:"block", textAlign:"center", width:"100%", padding:"12px", borderRadius:14, background:COLORS.white, color:COLORS.inkSoft, fontWeight:600, fontSize:14, marginTop:8, border:`1px solid ${COLORS.line}` }}>
-            📧 Send summary to owner
           </button>
         </div>
       );
@@ -478,9 +468,14 @@
             if (!custom || !custom.length) return null;
             const done = custom.filter(t => t.done).length;
             return (
-              <div style={{ marginBottom:8 }}>
-                <p style={{ margin:"0 0 4px", fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", color:COLORS.inkSoft }}>Manual tasks ({done}/{custom.length})</p>
-                <p style={{ margin:0, fontSize:13, color:COLORS.inkSoft }}>{custom.map(t => (t.done ? "✓ " : "○ ") + t.text).join("  ·  ")}</p>
+              <div style={{ marginBottom:8, padding:"10px 12px", background:COLORS.paper2, borderRadius:10 }}>
+                <p style={{ margin:"0 0 6px", fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", color:COLORS.inkSoft }}>My tasks ({done}/{custom.length})</p>
+                {custom.map(t => (
+                  <div key={t.id} style={{ display:"flex", alignItems:"center", gap:7, marginBottom:3 }}>
+                    <span style={{ width:16, height:16, borderRadius:4, flexShrink:0, display:"inline-flex", alignItems:"center", justifyContent:"center", background: t.done?COLORS.sage:"transparent", border:`2px solid ${t.done?COLORS.sage:COLORS.line}`, color:"#fff", fontSize:10, fontWeight:700 }}>{t.done?"✓":""}</span>
+                    <span style={{ fontSize:13, color: t.done?COLORS.inkSoft:COLORS.ink, textDecoration: t.done?"line-through":"none" }}>{t.text}</span>
+                  </div>
+                ))}
               </div>
             );
           })()}
@@ -551,14 +546,25 @@
       );
     }
 
-    function SliderTask({ task, value, onChange, label }) {
+    function SliderTask({ task, value, onChange, label, onLabelChange }) {
+      const [editing, setEditing] = useState(false);
+      const [editText, setEditText] = useState("");
       const pct = value || 0;
       const displayText = label || task.text;
       const trackColor = pct >= 100 ? COLORS.sage : pct > 0 ? COLORS.clay : COLORS.line;
+      const startEdit = () => { setEditText(displayText); setEditing(true); };
+      const finishEdit = () => { if (editText.trim()) onLabelChange(editText.trim()); setEditing(false); };
       return (
         <div style={{ padding:"14px 16px", borderRadius:12, background: pct > 0 ? "#F1F6F2" : COLORS.white, border:`1px solid ${pct > 0 ? "#CFE0D4" : COLORS.line}` }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:10 }}>
-            <span style={{ fontSize:15, fontWeight:500, color:COLORS.ink }}>{displayText}</span>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+            {editing ? (
+              <input value={editText} onChange={(e)=>setEditText(e.target.value)} onBlur={finishEdit}
+                onKeyDown={(e)=>{if(e.key==="Enter")finishEdit();}} autoFocus
+                style={{ flex:1, padding:"4px 8px", borderRadius:6, border:`1px solid ${COLORS.clay}`, fontSize:15, fontFamily:"inherit", outline:"none" }} />
+            ) : (
+              <span style={{ flex:1, fontSize:15, fontWeight:500, color:COLORS.ink }}>{displayText}</span>
+            )}
+            <button onClick={startEdit} style={{ all:"unset", cursor:"pointer", fontSize:13, color:COLORS.line, padding:"3px 5px", borderRadius:4 }}>✏</button>
             <span style={{ fontFamily:"'Fraunces', serif", fontWeight:600, fontSize:20, color: pct >= 100 ? COLORS.sage : pct > 0 ? COLORS.clay : COLORS.inkSoft }}>{pct}%</span>
           </div>
           <div style={{ position:"relative", height:28, display:"flex", alignItems:"center" }}>
