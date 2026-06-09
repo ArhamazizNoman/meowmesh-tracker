@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MeowMesh — Team Tracker</title>
+
+  <!-- React + Babel (no build step needed) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Supabase client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap');
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    ::selection { background: #C8553D; color: #fff; }
+    @keyframes pop { from { transform: scale(.96); opacity:0 } to { transform: scale(1); opacity:1 } }
+    textarea, button, input { font-family: inherit; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- ============================================================= -->
+  <!--  STEP 1 of setup: paste your Supabase details on the 2 lines  -->
+  <!--  below (you'll get them from supabase.com — see the README).  -->
+  <!-- ============================================================= -->
+  <script>
+    window.SUPABASE_URL = "PASTE_YOUR_SUPABASE_URL_HERE";
+    window.SUPABASE_ANON_KEY = "PASTE_YOUR_SUPABASE_ANON_KEY_HERE";
+  </script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const COLORS = {
+      paper: "#FBF6EC", paper2: "#F3EADB", ink: "#23201A", inkSoft: "#6B6255",
+      clay: "#C8553D", clayDark: "#A8422F", sage: "#4F7060", line: "#E2D6C2", white: "#FFFFFF",
+    };
+
+    const TASKS = {
+      marketer: { label: "Marketer",
+        daily: [
+          { id: "m_d1", text: "Engaging content post (reach / attention)" },
+          { id: "m_d2", text: "Customer review / testimonial post" },
+          { id: "m_d3", text: "Respond to comments & Messenger messages" },
+          { id: "m_d4", text: "Outreach to customers / influencers" },
+        ],
+        weekly: [
+          { id: "m_w1", text: "Plan next week's content calendar" },
+          { id: "m_w2", text: "Batch & pre-schedule posts" },
+          { id: "m_w3", text: "Influencer outreach & collaborations" },
+          { id: "m_w4", text: "Analyse engagement metrics" },
+          { id: "m_w5", text: "Newsletter / blog / retention outreach" },
+        ] },
+      operations: { label: "Operations",
+        daily: [
+          { id: "o_d1", text: "Fulfil & pack orders" },
+          { id: "o_d2", text: "Arrange delivery to customers" },
+          { id: "o_d3", text: "Check stock levels, flag low items" },
+        ],
+        weekly: [
+          { id: "o_w1", text: "Weekly inventory report (used + needed)" },
+          { id: "o_w2", text: "Product development (design / source / test)" },
+        ] },
+    };
+
+    const todayStr = () => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    };
+    const prettyDate = (s) => {
+      const [y,m,d] = s.split("-").map(Number);
+      return new Date(y, m-1, d).toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" });
+    };
+
+    // ---- Supabase connection ----
+    const CONFIGURED = window.SUPABASE_URL && window.SUPABASE_URL.indexOf("PASTE_") === -1
+      && window.SUPABASE_ANON_KEY && window.SUPABASE_ANON_KEY.indexOf("PASTE_") === -1;
+    const sb = CONFIGURED ? supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY) : null;
+
+    function App() {
+      const [view, setView] = useState("select");
+      const [reports, setReports] = useState({});
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState("");
+
+      const loadReports = async () => {
+        if (!sb) { setLoading(false); return; }
+        setLoading(true); setError("");
+        const { data, error } = await sb.from("reports").select("*");
+        if (error) { setError(error.message); setLoading(false); return; }
+        const out = {};
+        (data || []).forEach((r) => { out[`${r.date}:${r.person}`] = r; });
+        setReports(out); setLoading(false);
+      };
+
+      useEffect(() => { loadReports(); }, []);
+
+      const saveReport = async (report) => {
+        if (!sb) return false;
+        const { error } = await sb.from("reports")
+          .upsert(report, { onConflict: "date,person" });
+        if (error) { setError(error.message); return false; }
+        setReports((p) => ({ ...p, [`${report.date}:${report.person}`]: report }));
+        return true;
+      };
+
+      if (!CONFIGURED) return <SetupNeeded />;
+
+      return (
+        <div style={{ minHeight:"100vh", background:COLORS.paper, color:COLORS.ink, fontFamily:"'DM Sans', sans-serif" }}>
+          <Header view={view} setView={setView} />
+          <div style={{ maxWidth:880, margin:"0 auto", padding:"0 20px 64px" }}>
+            {error && <Banner text={"Connection issue: " + error} />}
+            {view === "select" && <RolePicker setView={setView} />}
+            {(view === "marketer" || view === "operations") &&
+              <EmployeeView person={view} reports={reports} onSave={saveReport} />}
+            {view === "owner" && <OwnerView reports={reports} loading={loading} reload={loadReports} />}
+          </div>
+        </div>
+      );
+    }
+
+    function SetupNeeded() {
+      return (
+        <div style={{ minHeight:"100vh", background:COLORS.paper, color:COLORS.ink, fontFamily:"'DM Sans', sans-serif", display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+          <div style={{ maxWidth:520, background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:18, padding:"32px 28px" }}>
+            <div style={{ fontSize:34 }}>🐾</div>
+            <h1 style={{ fontFamily:"'Fraunces', serif", fontSize:26, margin:"10px 0 8px" }}>Almost there!</h1>
+            <p style={{ color:COLORS.inkSoft, lineHeight:1.6, margin:"0 0 14px" }}>
+              The app is installed but not yet connected to your database. Open <b>index.html</b>, find the two lines near the top that say <code>PASTE_YOUR_…</code>, and replace them with your Supabase URL and anon key.
+            </p>
+            <p style={{ color:COLORS.inkSoft, lineHeight:1.6, margin:0 }}>
+              The README file has the exact steps. Once saved and uploaded, this screen disappears.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    function Banner({ text }) {
+      return <div style={{ background:"#FBEAE6", border:`1px solid #E8C4BB`, color:COLORS.clayDark, padding:"12px 16px", borderRadius:12, margin:"0 0 20px", fontSize:14 }}>{text}</div>;
+    }
+
+    function Header({ view, setView }) {
+      return (
+        <div style={{ borderBottom:`1px solid ${COLORS.line}`, background:COLORS.paper2, marginBottom:32 }}>
+          <div style={{ maxWidth:880, margin:"0 auto", padding:"20px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:16, flexWrap:"wrap" }}>
+            <button onClick={() => setView("select")} style={{ all:"unset", cursor:"pointer", display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ fontSize:26 }}>🐾</span>
+              <span style={{ fontFamily:"'Fraunces', serif", fontWeight:700, fontSize:24, letterSpacing:"-0.02em" }}>
+                MeowMesh <span style={{ color:COLORS.clay }}>Tracker</span>
+              </span>
+            </button>
+            {view !== "select" &&
+              <button onClick={() => setView("select")} style={{ all:"unset", cursor:"pointer", fontSize:14, fontWeight:600, color:COLORS.inkSoft, padding:"8px 14px", borderRadius:999, border:`1px solid ${COLORS.line}`, background:COLORS.white }}>← Switch role</button>}
+          </div>
+        </div>
+      );
+    }
+
+    function RolePicker({ setView }) {
+      const roles = [
+        { id:"owner", emoji:"📊", title:"Owner", desc:"See everyone's progress at a glance." },
+        { id:"marketer", emoji:"📣", title:"Marketer", desc:"Log today's content, engagement & outreach." },
+        { id:"operations", emoji:"📦", title:"Operations", desc:"Log fulfilment, stock & product work." },
+      ];
+      return (
+        <div style={{ animation:"pop .3s ease" }}>
+          <p style={{ fontFamily:"'Fraunces', serif", fontSize:32, fontWeight:600, margin:"8px 0 6px", letterSpacing:"-0.02em" }}>Who's checking in?</p>
+          <p style={{ color:COLORS.inkSoft, margin:"0 0 28px", fontSize:16 }}>Pick your role to get started.</p>
+          <div style={{ display:"grid", gap:16 }}>
+            {roles.map((r) => (
+              <button key={r.id} onClick={() => setView(r.id)}
+                style={{ all:"unset", cursor:"pointer", display:"flex", alignItems:"center", gap:18, padding:"22px 24px", borderRadius:18, background:COLORS.white, border:`1px solid ${COLORS.line}`, transition:"transform .15s, box-shadow .15s" }}
+                onMouseEnter={(e)=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 10px 30px rgba(35,32,26,0.08)";}}
+                onMouseLeave={(e)=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
+                <span style={{ fontSize:34 }}>{r.emoji}</span>
+                <span style={{ flex:1 }}>
+                  <span style={{ display:"block", fontFamily:"'Fraunces', serif", fontWeight:600, fontSize:21 }}>{r.title}</span>
+                  <span style={{ display:"block", color:COLORS.inkSoft, fontSize:14.5, marginTop:2 }}>{r.desc}</span>
+                </span>
+                <span style={{ color:COLORS.clay, fontSize:22 }}>→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function EmployeeView({ person, reports, onSave }) {
+      const cfg = TASKS[person];
+      const today = todayStr();
+      const existing = reports[`${today}:${person}`];
+      const [daily, setDaily] = useState({});
+      const [weekly, setWeekly] = useState({});
+      const [notes, setNotes] = useState("");
+      const [blockers, setBlockers] = useState("");
+      const [saved, setSaved] = useState(false);
+      const [saving, setSaving] = useState(false);
+
+      useEffect(() => {
+        setDaily((existing && existing.daily) || {});
+        setWeekly((existing && existing.weekly) || {});
+        setNotes((existing && existing.notes) || "");
+        setBlockers((existing && existing.blockers) || "");
+        setSaved(false);
+      }, [person, existing]);
+
+      const toggle = (setter, obj, id) => { setter({ ...obj, [id]: !obj[id] }); setSaved(false); };
+      const doneCount = cfg.daily.filter((t) => daily[t.id]).length;
+
+      const submit = async () => {
+        setSaving(true);
+        const ok = await onSave({ date: today, person, daily, weekly, notes, blockers, updated_at: new Date().toISOString() });
+        setSaving(false);
+        if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
+      };
+
+      return (
+        <div style={{ animation:"pop .3s ease" }}>
+          <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", flexWrap:"wrap", gap:8 }}>
+            <p style={{ fontFamily:"'Fraunces', serif", fontSize:30, fontWeight:600, margin:"4px 0", letterSpacing:"-0.02em" }}>{cfg.label} — today</p>
+            <span style={{ color:COLORS.inkSoft, fontSize:15 }}>{prettyDate(today)}</span>
+          </div>
+          <div style={{ height:8, background:COLORS.paper2, borderRadius:999, overflow:"hidden", margin:"14px 0 28px" }}>
+            <div style={{ height:"100%", width:`${(doneCount/cfg.daily.length)*100}%`, background:COLORS.clay, transition:"width .3s" }} />
+          </div>
+          <Section title="Daily tasks" sub={`${doneCount}/${cfg.daily.length} done`}>
+            {cfg.daily.map((t) => <Check key={t.id} checked={!!daily[t.id]} onChange={() => toggle(setDaily, daily, t.id)} label={t.text} />)}
+          </Section>
+          <Section title="Weekly tasks" sub="check when worked on">
+            {cfg.weekly.map((t) => <Check key={t.id} checked={!!weekly[t.id]} onChange={() => toggle(setWeekly, weekly, t.id)} label={t.text} />)}
+          </Section>
+          <Section title="Notes — what got done">
+            <Textarea value={notes} onChange={(v)=>{setNotes(v);setSaved(false);}} placeholder="e.g. posted reel + 2 reviews, replied to 14 messages…" />
+          </Section>
+          <Section title="Blockers">
+            <Textarea value={blockers} onChange={(v)=>{setBlockers(v);setSaved(false);}} placeholder="Anything stopping you? (out of stock, waiting on supplier…)" />
+          </Section>
+          <button onClick={submit} disabled={saving}
+            style={{ all:"unset", cursor: saving?"default":"pointer", display:"block", textAlign:"center", width:"100%", padding:"16px", borderRadius:14, background: saved?COLORS.sage:COLORS.clay, color:"#fff", fontWeight:600, fontSize:16, marginTop:8, transition:"background .2s", opacity: saving?0.7:1 }}>
+            {saving ? "Saving…" : saved ? "✓ Saved — thanks!" : existing ? "Update today's report" : "Submit today's report"}
+          </button>
+        </div>
+      );
+    }
+
+    function OwnerView({ reports, loading, reload }) {
+      const [filter, setFilter] = useState("all");
+      const list = Object.values(reports).sort((a,b) => (a.date<b.date?1:a.date>b.date?-1:a.person.localeCompare(b.person)));
+      const filtered = filter === "all" ? list : list.filter((r) => r.person === filter);
+      const tabs = [["all","All"],["marketer","Marketer"],["operations","Operations"]];
+      return (
+        <div style={{ animation:"pop .3s ease" }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+            <p style={{ fontFamily:"'Fraunces', serif", fontSize:30, fontWeight:600, margin:"4px 0", letterSpacing:"-0.02em" }}>Team dashboard</p>
+            <button onClick={reload} style={{ all:"unset", cursor:"pointer", fontSize:13.5, fontWeight:600, color:COLORS.inkSoft, padding:"7px 13px", borderRadius:999, border:`1px solid ${COLORS.line}`, background:COLORS.white }}>⟳ Refresh</button>
+          </div>
+          <div style={{ display:"flex", gap:8, margin:"18px 0 24px" }}>
+            {tabs.map(([id,lbl]) => (
+              <button key={id} onClick={() => setFilter(id)}
+                style={{ all:"unset", cursor:"pointer", padding:"8px 16px", borderRadius:999, fontSize:14, fontWeight:600, background: filter===id?COLORS.ink:COLORS.white, color: filter===id?"#fff":COLORS.inkSoft, border:`1px solid ${filter===id?COLORS.ink:COLORS.line}` }}>{lbl}</button>
+            ))}
+          </div>
+          {loading && <Empty text="Loading…" />}
+          {!loading && filtered.length === 0 && <Empty text="No reports yet. Once your team submits, their updates show up here." />}
+          <div style={{ display:"grid", gap:14 }}>
+            {filtered.map((r) => <ReportCard key={`${r.date}:${r.person}`} report={r} />)}
+          </div>
+        </div>
+      );
+    }
+
+    function ReportCard({ report }) {
+      const cfg = TASKS[report.person];
+      const dailyDone = cfg.daily.filter((t) => report.daily && report.daily[t.id]).length;
+      const weeklyDone = cfg.weekly.filter((t) => report.weekly && report.weekly[t.id]).length;
+      const pct = Math.round((dailyDone/cfg.daily.length)*100);
+      const color = report.person === "marketer" ? COLORS.clay : COLORS.sage;
+      return (
+        <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, padding:"18px 20px" }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.06em", color:"#fff", background:color, padding:"3px 9px", borderRadius:6 }}>{cfg.label}</span>
+              <span style={{ fontSize:14.5, color:COLORS.inkSoft }}>{prettyDate(report.date)}</span>
+            </div>
+            <span style={{ fontFamily:"'Fraunces', serif", fontWeight:600, fontSize:18 }}>{pct}%</span>
+          </div>
+          <div style={{ display:"flex", gap:6, marginBottom:12, flexWrap:"wrap" }}>
+            {cfg.daily.map((t) => {
+              const on = report.daily && report.daily[t.id];
+              return <span key={t.id} style={{ fontSize:12.5, padding:"4px 9px", borderRadius:7, background: on?"#EAF1EC":COLORS.paper2, color: on?COLORS.sage:COLORS.inkSoft, border:`1px solid ${on?"#CFE0D4":COLORS.line}` }}>{on?"✓ ":"○ "}{t.text}</span>;
+            })}
+          </div>
+          {weeklyDone > 0 &&
+            <p style={{ margin:"0 0 8px", fontSize:13.5, color:COLORS.inkSoft }}>Weekly: {cfg.weekly.filter((t)=>report.weekly&&report.weekly[t.id]).map((t)=>t.text).join(" · ")}</p>}
+          {report.notes && <Line label="Notes" text={report.notes} />}
+          {report.blockers && <Line label="Blockers" text={report.blockers} warn />}
+        </div>
+      );
+    }
+
+    function Line({ label, text, warn }) {
+      return <p style={{ margin:"6px 0 0", fontSize:14, lineHeight:1.5 }}>
+        <span style={{ fontWeight:600, color: warn?COLORS.clayDark:COLORS.ink }}>{label}: </span>
+        <span style={{ color:COLORS.inkSoft }}>{text}</span></p>;
+    }
+    function Section({ title, sub, children }) {
+      return <div style={{ marginBottom:26 }}>
+        <div style={{ display:"flex", alignItems:"baseline", gap:10, marginBottom:12 }}>
+          <h3 style={{ fontFamily:"'Fraunces', serif", fontSize:18, fontWeight:600, margin:0 }}>{title}</h3>
+          {sub && <span style={{ fontSize:13, color:COLORS.inkSoft }}>{sub}</span>}
+        </div>
+        <div style={{ display:"grid", gap:8 }}>{children}</div></div>;
+    }
+    function Check({ checked, onChange, label }) {
+      return <button onClick={onChange}
+        style={{ all:"unset", cursor:"pointer", display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:12, background: checked?"#F1F6F2":COLORS.white, border:`1px solid ${checked?"#CFE0D4":COLORS.line}`, transition:"background .15s" }}>
+        <span style={{ width:22, height:22, borderRadius:7, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background: checked?COLORS.sage:"transparent", border:`2px solid ${checked?COLORS.sage:COLORS.line}`, color:"#fff", fontSize:14, fontWeight:700 }}>{checked?"✓":""}</span>
+        <span style={{ fontSize:15, color: checked?COLORS.inkSoft:COLORS.ink, textDecoration: checked?"line-through":"none" }}>{label}</span></button>;
+    }
+    function Textarea({ value, onChange, placeholder }) {
+      return <textarea value={value} onChange={(e)=>onChange(e.target.value)} placeholder={placeholder} rows={2}
+        style={{ width:"100%", resize:"vertical", padding:"12px 14px", borderRadius:12, border:`1px solid ${COLORS.line}`, background:COLORS.white, fontSize:15, color:COLORS.ink, outline:"none" }} />;
+    }
+    function Empty({ text }) {
+      return <div style={{ padding:"48px 24px", textAlign:"center", color:COLORS.inkSoft, background:COLORS.white, border:`1px dashed ${COLORS.line}`, borderRadius:16 }}>
+        <div style={{ fontSize:30, marginBottom:8 }}>🐈</div><p style={{ margin:0, fontSize:15 }}>{text}</p></div>;
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
