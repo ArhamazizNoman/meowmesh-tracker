@@ -1185,7 +1185,7 @@
           </div>
 
           <div style={{ display:"flex", marginBottom:28, borderRadius:10, overflow:"hidden", border:`1px solid ${COLORS.line}` }}>
-            {[["sales","📊  Sales & Cost"],["excel","📋  Excel Dashboard"]].map(([id,lbl]) => (
+            {[["sales","📊  Sales & Cost"],["excel","📈  Analytics"]].map(([id,lbl]) => (
               <button key={id} onClick={() => setDashTab(id)}
                 style={{ all:"unset", cursor:"pointer", flex:1, padding:"11px 16px", textAlign:"center", fontSize:14, fontWeight:600,
                   background: dashTab===id ? COLORS.ink : COLORS.white,
@@ -1266,205 +1266,285 @@
             </>
           )}
 
-          {dashTab === "excel" && <ExcelDashboard />}
+          {dashTab === "excel" && <MeowMeshDashboard />}
         </div>
       );
     }
 
-    const CHART_COLORS = ["#C8553D","#4F7060","#6B9AB8","#E8A838","#9B59B6","#E67E22","#27AE60","#2980B9"];
+    const MM_DATA = {
+      monthly: [
+        {m:"Aug-24",o:6,  rev:5555,  ad:4266, roas:1.30, aov:926,  cour:1076},
+        {m:"Sep-24",o:41, rev:41120, ad:5547, roas:7.41, aov:1003, cour:7981},
+        {m:"Oct-24",o:99, rev:90484, ad:21073,roas:4.29, aov:914,  cour:17565},
+        {m:"Nov-24",o:118,rev:112556,ad:6011, roas:18.73,aov:954,  cour:19966},
+        {m:"Dec-24",o:535,rev:529930,ad:62383,roas:8.49, aov:991,  cour:81959,cf:70041,  cfm:0.132},
+        {m:"Jan-25",o:401,rev:381902,ad:73891,roas:5.17, aov:952,  cour:63389,cf:-36086, cfm:-0.094},
+        {m:"Feb-25",o:276,rev:290023,ad:50256,roas:5.77, aov:1051, cour:43550,cf:77556,  cfm:0.267},
+        {m:"Mar-25",o:372,rev:494203,ad:73607,roas:6.71, aov:1329, cour:76162,cf:85598,  cfm:0.173},
+        {m:"Apr-25",o:303,rev:394290,ad:42378,roas:9.30, aov:1301, cour:58783,cf:157554, cfm:0.400},
+        {m:"May-25",o:221,rev:312224,ad:76568,roas:4.08, aov:1413, cour:44692,cf:35069,  cfm:0.112},
+        {m:"Jun-25",o:175,rev:367444,ad:68949,roas:5.33, aov:2100, cour:43174},
+        {m:"Jul-25",o:140,rev:274099,ad:79662,roas:3.44, aov:1958, cour:34981},
+        {m:"Aug-25",o:99, rev:167909,ad:65940,roas:2.55, aov:1696, cour:22409},
+        {m:"Sep-25",o:110,rev:181249,ad:48486,roas:3.74, aov:1648, cour:23292},
+        {m:"Oct-25",o:97, rev:141960,ad:29003,roas:4.89, aov:1464, cour:20230},
+        {m:"Nov-25",o:78, rev:120398,ad:45776,roas:2.63, aov:1544, cour:16124},
+        {m:"Dec-25",o:80, rev:175229,ad:46987,roas:3.73, aov:2190, cour:20362},
+        {m:"Jan-26",o:57, rev:116799,ad:41501,roas:2.81, aov:2049, cour:13818},
+        {m:"Feb-26",o:88, rev:181403,ad:50312,roas:3.61, aov:2061, cour:22664},
+        {m:"Mar-26",o:73, rev:151070,ad:25570,roas:5.91, aov:2069, cour:21761},
+        {m:"Apr-26",o:60, rev:145230,ad:null, roas:null, aov:2421, cour:18697},
+        {m:"May-26",o:31, rev:69800, ad:null, roas:null, aov:2252, cour:9298},
+        {m:"Jun-26",o:2,  rev:6700,  ad:null, roas:null, aov:3350, cour:537},
+      ],
+      costs: [
+        {cat:"Advertising (Meta)",       total:379083, share:0.188},
+        {cat:"Courier charges",           total:368535, share:0.183},
+        {cat:"Materials: Structure",      total:298598, share:0.148},
+        {cat:"Materials: Toys & hardware",total:217500, share:0.108},
+        {cat:"Materials: Fabric",         total:182277, share:0.091},
+        {cat:"Direct labour",             total:182032, share:0.090},
+        {cat:"Packaging",                 total:169308, share:0.084},
+        {cat:"Salaries & contractors",    total:94350,  share:0.047},
+        {cat:"Transport",                 total:43500,  share:0.022},
+        {cat:"Marketing misc",            total:30915,  share:0.015},
+        {cat:"Other / misc",              total:28822,  share:0.014},
+        {cat:"Rent & office",             total:17920,  share:0.009},
+      ],
+      pnl: {
+        months:["Dec-24","Jan-25","Feb-25","Mar-25","Apr-25","May-25"],
+        rows:[
+          {item:"Revenue",                         vals:[529930,381902,290023,494203,394290,312224],total:2402572,  bold:true},
+          {item:"Materials: Structure",             vals:[67815, 47420, 39890, 57653, 33000, 52820], total:298598},
+          {item:"Materials: Fabric",                vals:[111472,44850, 6985,  15590, 320,   3060],  total:182277},
+          {item:"Materials: Toys & hardware",       vals:[11555, 16235, 20160, 84455, 50015, 35080], total:217500},
+          {item:"Packaging",                        vals:[40520, 36460, 15960, 49163, 18100, 9105],  total:169308},
+          {item:"Direct labour",                    vals:[53690, 39252, 15500, 25700, 12680, 35210], total:182032},
+          {item:"Salaries & contractors",           vals:[9770,  67130, 0,     0,     11300, 6150],  total:94350},
+          {item:"Rent & office",                    vals:[0,     300,   0,     10280, 2520,  4820],  total:17920},
+          {item:"Transport",                        vals:[10930, 11185, 4980,  9060,  3365,  3980],  total:43500},
+          {item:"Marketing misc",                   vals:[4215,  10310, 10420, 2260,  1860,  1850],  total:30915},
+          {item:"Other / misc",                     vals:[5580,  7566,  4766,  4675,  2415,  3820],  total:28822},
+          {item:"Advertising (Meta)",               vals:[62383, 73891, 50256, 73607, 42378, 76568], total:379083},
+          {item:"Courier charges",                  vals:[81959, 63389, 43550, 76162, 58783, 44692], total:368535},
+          {item:"Total operating spend",            vals:[459889,417988,212467,408605,236736,277155],total:2012840, bold:true},
+          {item:"Net cash flow",                    vals:[70041,-36086,77556, 85598, 157554,35069],  total:389732,  bold:true,hi:true},
+          {item:"Net margin %",                     vals:[0.132,-0.094,0.267, 0.173, 0.400, 0.112], total:0.162,   bold:true,pct:true},
+        ],
+      },
+      capital:[
+        {src:"Noman (founder)",             amt:326578, note:"Cumulative contributions"},
+        {src:"Humayun (founder)",            amt:172524, note:"Cumulative contributions"},
+        {src:"Outside investor",             amt:100000, note:"External equity"},
+        {src:"Total capital in",             amt:599102, note:"",                        bold:true},
+        {src:"Founder salary drawn",         amt:360000, note:"~৳20,000 / month"},
+        {src:"Inventory + assets (latest)",  amt:265395, note:"Audit snapshot"},
+        {src:"Net cash flow (Dec-24–May-25)",amt:389732, note:"After courier"},
+      ],
+    };
 
-    function ExcelDashboard() {
-      const [wb, setWb] = useState(null);          // { sheetNames, data: { name: { headers, rows } } }
-      const [activeSheet, setActiveSheet] = useState(null);
-      const [chartKey, setChartKey] = useState(0); // force canvas remount on sheet change
-      const [chartType, setChartType] = useState("bar");
-      const [page, setPage] = useState(0);
-      const chartRef = useRef(null);
-      const chartInst = useRef(null);
-      const PAGE_SIZE = 15;
-
-      const handleFile = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const workbook = XLSX.read(ev.target.result, { type:"array", cellDates:true });
-          const data = {};
-          workbook.SheetNames.forEach(name => {
-            const ws = workbook.Sheets[name];
-            const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:"", raw:false });
-            if (raw.length < 1) return;
-            const headers = raw[0].map(h => String(h));
-            const rows = raw.slice(1).filter(r => r.some(c => c !== "" && c !== null));
-            data[name] = { headers, rows };
-          });
-          setWb({ sheetNames: workbook.SheetNames, data });
-          setActiveSheet(workbook.SheetNames[0]);
-          setChartKey(k => k+1);
-          setPage(0);
-        };
-        reader.readAsArrayBuffer(file);
-      };
-
-      const sheetData = wb && activeSheet ? wb.data[activeSheet] : null;
-
-      const isNumeric = (val) => val !== "" && !isNaN(parseFloat(val)) && isFinite(val);
-
-      const numColIdxs = sheetData
-        ? sheetData.headers.map((h,i) => i).filter(i => sheetData.rows.filter(r => isNumeric(r[i])).length > sheetData.rows.length * 0.5)
-        : [];
-      const labelColIdx = sheetData
-        ? sheetData.headers.findIndex((h,i) => !numColIdxs.includes(i))
-        : -1;
-
-      const kpis = numColIdxs.slice(0, 6).map(i => ({
-        label: sheetData.headers[i],
-        sum: sheetData.rows.reduce((s,r) => s + (parseFloat(r[i])||0), 0),
-        avg: sheetData.rows.length ? sheetData.rows.reduce((s,r) => s + (parseFloat(r[i])||0), 0) / sheetData.rows.filter(r => isNumeric(r[i])).length : 0,
-      }));
-
-      const chartLabels = sheetData
-        ? sheetData.rows.slice(0, 30).map((r,i) => labelColIdx >= 0 ? String(r[labelColIdx] || `Row ${i+1}`) : `Row ${i+1}`)
-        : [];
-
-      const chartDatasets = numColIdxs.slice(0, 5).map((ci, di) => ({
-        label: sheetData.headers[ci],
-        data: sheetData.rows.slice(0, 30).map(r => parseFloat(r[ci]) || 0),
-        backgroundColor: CHART_COLORS[di % CHART_COLORS.length] + (chartType === "line" ? "33" : "CC"),
-        borderColor: CHART_COLORS[di % CHART_COLORS.length],
-        borderWidth: 2,
-        borderRadius: chartType === "bar" ? 6 : 0,
-        fill: chartType === "line",
-        tension: 0.35,
-        pointRadius: chartType === "line" ? 4 : 0,
-      }));
-
+    function ChartWidget({ type, labels, datasets, options, height }) {
+      const ref = useRef(null);
       useEffect(() => {
-        if (!sheetData || !chartRef.current || chartDatasets.length === 0) return;
-        if (chartInst.current) { chartInst.current.destroy(); chartInst.current = null; }
-        chartInst.current = new Chart(chartRef.current, {
-          type: chartType,
-          data: { labels: chartLabels, datasets: chartDatasets },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: {
-              legend: { position:"top", labels:{ font:{ family:"DM Sans", size:12 }, color:"#23201A", boxWidth:12, padding:16 } },
-              tooltip: { bodyFont:{ family:"DM Sans" }, titleFont:{ family:"DM Sans", weight:"600" } },
-            },
-            scales: {
-              y: { beginAtZero:true, grid:{ color:"#E2D6C2" }, ticks:{ color:"#6B6255", font:{ family:"DM Sans" } } },
-              x: { grid:{ display:false }, ticks:{ color:"#6B6255", font:{ family:"DM Sans" }, maxRotation:45 } },
-            },
-          }
-        });
-        return () => { if (chartInst.current) { chartInst.current.destroy(); chartInst.current = null; } };
-      }, [chartKey, chartType]);
+        if (!ref.current) return;
+        const ch = new Chart(ref.current, { type, data:{ labels, datasets }, options:{ responsive:true, maintainAspectRatio:false, ...(options||{}) } });
+        return () => ch.destroy();
+      }, []);
+      return <div style={{ height:height||260, position:"relative" }}><canvas ref={ref}/></div>;
+    }
 
-      const pagedRows = sheetData ? sheetData.rows.slice(page*PAGE_SIZE, (page+1)*PAGE_SIZE) : [];
-      const totalPages = sheetData ? Math.ceil(sheetData.rows.length / PAGE_SIZE) : 0;
-
-      if (!wb) return (
-        <div style={{ textAlign:"center", padding:"40px 20px", background:COLORS.white, border:`2px dashed ${COLORS.line}`, borderRadius:18 }}>
-          <div style={{ fontSize:44, marginBottom:12 }}>📋</div>
-          <p style={{ fontFamily:"'Fraunces', serif", fontSize:20, fontWeight:600, margin:"0 0 6px" }}>Upload Excel File</p>
-          <p style={{ color:COLORS.inkSoft, fontSize:14, margin:"0 0 24px" }}>Upload your MeowMesh_DashBoard.xlsx to see live charts</p>
-          <label style={{ display:"inline-block", cursor:"pointer", padding:"12px 24px", borderRadius:12, background:COLORS.ink, color:"#fff", fontSize:14, fontWeight:700 }}>
-            Choose Excel File (.xlsx)
-            <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{ display:"none" }} />
-          </label>
+    function MeowMeshDashboard() {
+      const [tab, setTab] = useState("overview");
+      const D = MM_DATA;
+      const tk  = (n) => n==null ? "—" : "৳"+Math.round(n).toLocaleString();
+      const tkL = (n) => n==null ? "—" : n>=100000 ? "৳"+(n/100000).toFixed(1)+"L" : "৳"+Math.round(n).toLocaleString();
+      const CLRS = ["#C8553D","#4F7060","#6B9AB8","#E8A838","#9B59B6","#E67E22","#1ABC9C","#95A5A6","#F39C12","#8E44AD","#2ECC71","#3498DB"];
+      const months  = D.monthly.map(r=>r.m);
+      const withAd  = D.monthly.filter(r=>r.ad!=null);
+      const cfRows  = D.monthly.filter(r=>r.cf!=null);
+      const xSc = { grid:{display:false}, ticks:{color:COLORS.inkSoft,font:{family:"DM Sans",size:10},maxRotation:45} };
+      const ySc = (cb) => ({ beginAtZero:true, grid:{color:"#E2D6C2"}, ticks:{color:COLORS.inkSoft,font:{family:"DM Sans",size:10},...(cb?{callback:cb}:{})} });
+      const fmtMoney = (v) => v>=100000?"৳"+(v/100000).toFixed(0)+"L":v<0?"−৳"+Math.abs(v).toLocaleString():"৳"+v.toLocaleString();
+      const ChartCard = ({title, children}) => (
+        <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, padding:"16px 18px" }}>
+          {title && <p style={{ fontFamily:"'Fraunces',serif", fontSize:14, fontWeight:600, margin:"0 0 12px" }}>{title}</p>}
+          {children}
         </div>
       );
-
       return (
         <div>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:10, marginBottom:18 }}>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-              {wb.sheetNames.map(name => (
-                <button key={name} onClick={() => { setActiveSheet(name); setChartKey(k=>k+1); setPage(0); }}
-                  style={{ all:"unset", cursor:"pointer", padding:"7px 14px", borderRadius:8, fontSize:13, fontWeight:600,
-                    background: activeSheet===name ? COLORS.ink : COLORS.white,
-                    color: activeSheet===name ? "#fff" : COLORS.inkSoft,
-                    border:`1px solid ${activeSheet===name ? COLORS.ink : COLORS.line}` }}>{name}</button>
+          <div style={{ background:"#1C1916", borderRadius:16, padding:"18px 22px", marginBottom:18 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+              <span style={{fontSize:26}}>🐾</span>
+              <div>
+                <p style={{margin:0,fontFamily:"'Fraunces',serif",fontSize:20,fontWeight:700,color:"#fff"}}>MeowMesh Analytics</p>
+                <p style={{margin:0,fontSize:11,color:"rgba(255,255,255,0.45)"}}>Aug-24 → Jun-26 · BDT (৳) · Source: MeowMesh_Dashboard.xlsx</p>
+              </div>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))", gap:8 }}>
+              {[
+                {label:"Total Revenue",   val:tkL(4751577), sub:"Aug-24→Jun-26",    c:"#C8553D"},
+                {label:"Total Orders",    val:"3,462",      sub:"Aug-24→Jun-26",    c:"#4F7060"},
+                {label:"Blended ROAS",    val:"5.18×",      sub:"Revenue ÷ Ad spend",c:"#6B9AB8"},
+                {label:"Total Ad Spend",  val:tkL(918166),  sub:"All documented",   c:"#E8A838"},
+                {label:"Avg AOV",         val:tk(1372),     sub:"Per order avg",    c:"#9B59B6"},
+                {label:"Net Cash Flow",   val:tkL(389732),  sub:"Dec-24→May-25",    c:"#27AE60"},
+              ].map(k=>(
+                <div key={k.label} style={{ background:"rgba(255,255,255,0.07)", borderRadius:12, padding:"10px 12px", borderTop:`3px solid ${k.c}` }}>
+                  <p style={{margin:"0 0 3px",fontSize:9,color:"rgba(255,255,255,0.5)",textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{k.label}</p>
+                  <p style={{margin:"0 0 2px",fontFamily:"'Fraunces',serif",fontSize:16,fontWeight:700,color:"#fff"}}>{k.val}</p>
+                  <p style={{margin:0,fontSize:9,color:"rgba(255,255,255,0.38)"}}>{k.sub}</p>
+                </div>
               ))}
             </div>
-            <label style={{ cursor:"pointer", fontSize:12, fontWeight:600, color:COLORS.inkSoft, padding:"6px 12px", borderRadius:8, border:`1px solid ${COLORS.line}`, background:COLORS.white }}>
-              ↑ Replace file <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{ display:"none" }} />
-            </label>
           </div>
 
-          {kpis.length > 0 && (
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))", gap:10, marginBottom:20 }}>
-              {kpis.map((k, i) => (
-                <div key={k.label} style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:14, padding:"14px 16px", borderTop:`3px solid ${CHART_COLORS[i%CHART_COLORS.length]}` }}>
-                  <p style={{ margin:"0 0 4px", fontSize:11, color:COLORS.inkSoft, textTransform:"uppercase", letterSpacing:"0.05em", fontWeight:600, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{k.label}</p>
-                  <p style={{ margin:"0 0 2px", fontFamily:"'Fraunces', serif", fontSize:18, fontWeight:700, color:COLORS.ink }}>{k.sum % 1 === 0 ? k.sum.toLocaleString() : k.sum.toLocaleString(undefined,{maximumFractionDigits:2})}</p>
-                  <p style={{ margin:0, fontSize:11, color:COLORS.inkSoft }}>avg {k.avg % 1 === 0 ? Math.round(k.avg).toLocaleString() : k.avg.toLocaleString(undefined,{maximumFractionDigits:1})}</p>
-                </div>
-              ))}
-              <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:14, padding:"14px 16px", borderTop:`3px solid ${COLORS.inkSoft}` }}>
-                <p style={{ margin:"0 0 4px", fontSize:11, color:COLORS.inkSoft, textTransform:"uppercase", letterSpacing:"0.05em", fontWeight:600 }}>Total Rows</p>
-                <p style={{ margin:0, fontFamily:"'Fraunces', serif", fontSize:18, fontWeight:700, color:COLORS.ink }}>{sheetData.rows.length.toLocaleString()}</p>
+          <div style={{ display:"flex", marginBottom:20, borderRadius:10, overflow:"hidden", border:`1px solid ${COLORS.line}` }}>
+            {[["overview","📊 Overview"],["marketing","📣 Marketing"],["pnl","💰 P&L"],["capital","🏦 Capital"]].map(([id,lbl])=>(
+              <button key={id} onClick={()=>setTab(id)}
+                style={{ all:"unset", cursor:"pointer", flex:1, padding:"10px 8px", textAlign:"center", fontSize:12.5, fontWeight:600,
+                  background:tab===id?COLORS.ink:COLORS.white, color:tab===id?"#fff":COLORS.inkSoft, transition:"background .15s" }}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+
+          {tab==="overview" && (
+            <div style={{ display:"grid", gap:14 }}>
+              <ChartCard title="Revenue by Month (৳)">
+                <ChartWidget type="line" height={230} labels={months}
+                  datasets={[{label:"Revenue",data:D.monthly.map(r=>r.rev),borderColor:"#C8553D",backgroundColor:"#C8553D1A",fill:true,tension:0.35,pointRadius:3,borderWidth:2}]}
+                  options={{ plugins:{legend:{display:false}}, scales:{y:ySc(fmtMoney),x:xSc} }} />
+              </ChartCard>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+                <ChartCard title="Orders by Month">
+                  <ChartWidget type="bar" height={190} labels={months}
+                    datasets={[{label:"Orders",data:D.monthly.map(r=>r.o),backgroundColor:"#4F706099",borderColor:"#4F7060",borderWidth:1,borderRadius:4}]}
+                    options={{ plugins:{legend:{display:false}}, scales:{y:ySc(),x:xSc} }} />
+                </ChartCard>
+                <ChartCard title="AOV Trend (৳)">
+                  <ChartWidget type="line" height={190} labels={months}
+                    datasets={[{label:"AOV",data:D.monthly.map(r=>r.aov),borderColor:"#9B59B6",backgroundColor:"#9B59B61A",fill:true,tension:0.35,pointRadius:3,borderWidth:2}]}
+                    options={{ plugins:{legend:{display:false}}, scales:{y:ySc((v)=>"৳"+v.toLocaleString()),x:xSc} }} />
+                </ChartCard>
               </div>
             </div>
           )}
 
-          {chartDatasets.length > 0 && (
-            <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, padding:"18px 20px", marginBottom:20 }}>
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, flexWrap:"wrap", gap:8 }}>
-                <p style={{ fontFamily:"'Fraunces', serif", fontSize:16, fontWeight:600, margin:0 }}>Chart View {sheetData.rows.length > 30 ? "(first 30 rows)" : ""}</p>
-                <div style={{ display:"flex", borderRadius:8, overflow:"hidden", border:`1px solid ${COLORS.line}` }}>
-                  {[["bar","Bar"],["line","Line"]].map(([t,l]) => (
-                    <button key={t} onClick={() => { setChartType(t); setChartKey(k=>k+1); }}
-                      style={{ all:"unset", cursor:"pointer", padding:"6px 14px", fontSize:13, fontWeight:600,
-                        background: chartType===t ? COLORS.ink : COLORS.white,
-                        color: chartType===t ? "#fff" : COLORS.inkSoft }}>{l}</button>
-                  ))}
-                </div>
+          {tab==="marketing" && (
+            <div style={{ display:"grid", gap:14 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+                <ChartCard title="ROAS by Month">
+                  <ChartWidget type="line" height={190} labels={withAd.map(r=>r.m)}
+                    datasets={[{label:"ROAS",data:withAd.map(r=>r.roas),borderColor:"#6B9AB8",backgroundColor:"#6B9AB81A",fill:true,tension:0.35,pointRadius:4,borderWidth:2}]}
+                    options={{ plugins:{legend:{display:false}}, scales:{y:ySc((v)=>v+"×"),x:xSc} }} />
+                </ChartCard>
+                <ChartCard title="Ad Spend by Month (৳)">
+                  <ChartWidget type="bar" height={190} labels={withAd.map(r=>r.m)}
+                    datasets={[{label:"Ad Spend",data:withAd.map(r=>r.ad),backgroundColor:"#E8A83899",borderColor:"#E8A838",borderWidth:1,borderRadius:4}]}
+                    options={{ plugins:{legend:{display:false}}, scales:{y:ySc(fmtMoney),x:xSc} }} />
+                </ChartCard>
               </div>
-              <div style={{ height:320 }}>
-                <canvas key={chartKey} ref={chartRef} />
+              <ChartCard title="Revenue vs Ad Spend">
+                <ChartWidget type="bar" height={210} labels={withAd.map(r=>r.m)}
+                  datasets={[
+                    {label:"Revenue (৳)",  data:withAd.map(r=>r.rev),backgroundColor:"#C8553D99",borderColor:"#C8553D",borderWidth:1,borderRadius:4},
+                    {label:"Ad Spend (৳)", data:withAd.map(r=>r.ad), backgroundColor:"#6B9AB899",borderColor:"#6B9AB8",borderWidth:1,borderRadius:4},
+                  ]}
+                  options={{ scales:{y:ySc(fmtMoney),x:xSc}, plugins:{legend:{labels:{font:{family:"DM Sans",size:11},boxWidth:10}}} }} />
+              </ChartCard>
+            </div>
+          )}
+
+          {tab==="pnl" && (
+            <div style={{ display:"grid", gap:14 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"3fr 2fr", gap:14 }}>
+                <ChartCard title="Net Cash Flow (Dec-24 → May-25)">
+                  <ChartWidget type="bar" height={190} labels={cfRows.map(r=>r.m)}
+                    datasets={[{label:"Net Cash Flow",data:cfRows.map(r=>r.cf),
+                      backgroundColor:cfRows.map(r=>r.cf>=0?"#4F706099":"#C8553D99"),
+                      borderColor:cfRows.map(r=>r.cf>=0?"#4F7060":"#C8553D"),
+                      borderWidth:1,borderRadius:4}]}
+                    options={{ plugins:{legend:{display:false}}, scales:{y:ySc(fmtMoney),x:xSc} }} />
+                </ChartCard>
+                <ChartCard title="Cost Mix (Dec-24 → May-25)">
+                  <ChartWidget type="doughnut" height={190} labels={D.costs.map(c=>c.cat)}
+                    datasets={[{data:D.costs.map(c=>c.total),backgroundColor:CLRS,borderWidth:2,borderColor:COLORS.white}]}
+                    options={{ cutout:"55%", plugins:{legend:{position:"bottom",labels:{font:{family:"DM Sans",size:9},boxWidth:8,padding:5}}} }} />
+                </ChartCard>
+              </div>
+              <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, overflow:"hidden" }}>
+                <div style={{ overflowX:"auto" }}>
+                  <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+                    <thead>
+                      <tr style={{ background:COLORS.ink }}>
+                        <th style={{ padding:"9px 14px", textAlign:"left", color:"#fff", fontWeight:600, whiteSpace:"nowrap" }}>Line Item</th>
+                        {D.pnl.months.map(m=><th key={m} style={{ padding:"9px 11px", textAlign:"right", color:"#fff", fontWeight:600, whiteSpace:"nowrap" }}>{m}</th>)}
+                        <th style={{ padding:"9px 11px", textAlign:"right", color:"#fff", fontWeight:600 }}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {D.pnl.rows.map((row,ri)=>{
+                        const bg = row.hi ? (row.vals[0]>0?"#EAF1EC":"#FEF3EF") : row.bold ? COLORS.paper2 : ri%2===0?COLORS.white:COLORS.paper;
+                        return (
+                          <tr key={ri} style={{ background:bg }}>
+                            <td style={{ padding:"7px 14px", color:COLORS.ink, fontWeight:row.bold?700:400, borderBottom:`1px solid ${COLORS.line}`, whiteSpace:"nowrap" }}>{row.item}</td>
+                            {(row.vals||[]).map((v,vi)=>(
+                              <td key={vi} style={{ padding:"7px 11px", textAlign:"right", fontWeight:row.bold?700:400, borderBottom:`1px solid ${COLORS.line}`, whiteSpace:"nowrap",
+                                color:row.hi?(v<0?COLORS.clay:COLORS.sage):COLORS.ink }}>
+                                {v==null?"—":row.pct?(v*100).toFixed(1)+"%":v<0?"−৳"+Math.abs(v).toLocaleString():"৳"+v.toLocaleString()}
+                              </td>
+                            ))}
+                            <td style={{ padding:"7px 11px", textAlign:"right", fontWeight:700, borderBottom:`1px solid ${COLORS.line}`, whiteSpace:"nowrap",
+                              color:row.hi?(row.total<0?COLORS.clay:COLORS.sage):COLORS.ink }}>
+                              {row.total==null?"—":row.pct?(row.total*100).toFixed(1)+"%":row.total<0?"−৳"+Math.abs(row.total).toLocaleString():"৳"+row.total.toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
 
-          {sheetData && (
-            <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, overflow:"hidden", marginBottom:16 }}>
-              <div style={{ overflowX:"auto" }}>
-                <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-                  <thead>
-                    <tr style={{ background:COLORS.ink }}>
-                      {sheetData.headers.map((h,i) => (
-                        <th key={i} style={{ padding:"10px 14px", textAlign:"left", color:"#fff", fontWeight:600, whiteSpace:"nowrap", fontSize:12, letterSpacing:"0.03em" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
+          {tab==="capital" && (
+            <div style={{ display:"grid", gap:14 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
+                {[
+                  {label:"Total Capital In",  val:tk(599102), c:"#6B9AB8"},
+                  {label:"Salary Drawn",      val:tk(360000), c:"#E8A838"},
+                  {label:"Net Cash Flow",     val:tk(389732), c:"#4F7060"},
+                ].map(k=>(
+                  <div key={k.label} style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:14, padding:"16px 18px", borderTop:`3px solid ${k.c}` }}>
+                    <p style={{ margin:"0 0 6px", fontSize:11, color:COLORS.inkSoft, textTransform:"uppercase", letterSpacing:"0.05em", fontWeight:600 }}>{k.label}</p>
+                    <p style={{ margin:0, fontFamily:"'Fraunces',serif", fontSize:22, fontWeight:700, color:COLORS.ink }}>{k.val}</p>
+                  </div>
+                ))}
+              </div>
+              <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, overflow:"hidden" }}>
+                <div style={{ padding:"14px 18px", borderBottom:`1px solid ${COLORS.line}` }}>
+                  <p style={{ fontFamily:"'Fraunces',serif", fontSize:15, fontWeight:600, margin:0 }}>Capital & Funding (BDT)</p>
+                </div>
+                <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13.5 }}>
                   <tbody>
-                    {pagedRows.map((row, ri) => (
-                      <tr key={ri} style={{ background: ri%2===0 ? COLORS.white : COLORS.paper }}>
-                        {sheetData.headers.map((h,ci) => (
-                          <td key={ci} style={{ padding:"9px 14px", color:COLORS.ink, borderBottom:`1px solid ${COLORS.line}`, whiteSpace:"nowrap" }}>{String(row[ci] ?? "")}</td>
-                        ))}
+                    {D.capital.map((r,i)=>(
+                      <tr key={i} style={{ background:r.bold?COLORS.paper2:i%2===0?COLORS.white:COLORS.paper }}>
+                        <td style={{ padding:"12px 18px", color:COLORS.ink, fontWeight:r.bold?700:400, borderBottom:`1px solid ${COLORS.line}` }}>{r.src}</td>
+                        <td style={{ padding:"12px 18px", textAlign:"right", fontFamily:"'Fraunces',serif", fontWeight:700, fontSize:r.bold?17:14, color:r.bold?COLORS.sage:COLORS.ink, borderBottom:`1px solid ${COLORS.line}` }}>{tk(r.amt)}</td>
+                        <td style={{ padding:"12px 18px", color:COLORS.inkSoft, fontSize:12, borderBottom:`1px solid ${COLORS.line}` }}>{r.note}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {totalPages > 1 && (
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 16px", borderTop:`1px solid ${COLORS.line}` }}>
-                  <span style={{ fontSize:13, color:COLORS.inkSoft }}>Rows {page*PAGE_SIZE+1}–{Math.min((page+1)*PAGE_SIZE, sheetData.rows.length)} of {sheetData.rows.length}</span>
-                  <div style={{ display:"flex", gap:6 }}>
-                    <button onClick={() => setPage(p=>Math.max(0,p-1))} disabled={page===0}
-                      style={{ all:"unset", cursor: page===0?"default":"pointer", padding:"5px 12px", borderRadius:7, border:`1px solid ${COLORS.line}`, fontSize:13, fontWeight:600, color: page===0?COLORS.line:COLORS.ink, background:COLORS.white }}>← Prev</button>
-                    <button onClick={() => setPage(p=>Math.min(totalPages-1,p+1))} disabled={page===totalPages-1}
-                      style={{ all:"unset", cursor: page===totalPages-1?"default":"pointer", padding:"5px 12px", borderRadius:7, border:`1px solid ${COLORS.line}`, fontSize:13, fontWeight:600, color: page===totalPages-1?COLORS.line:COLORS.ink, background:COLORS.white }}>Next →</button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
       );
     }
+
 
     function CustomerReportView({ entries, setEntries, setSaved }) {
       const MAX = 30;
