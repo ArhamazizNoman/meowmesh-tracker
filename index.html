@@ -11,6 +11,10 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <!-- Supabase client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- SheetJS for Excel parsing -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <!-- Chart.js for PowerBI-like charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap');
@@ -38,7 +42,7 @@
   </script>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
 
     const COLORS = {
       paper: "#FBF6EC", paper2: "#F3EADB", ink: "#23201A", inkSoft: "#6B6255",
@@ -1136,6 +1140,7 @@
     function SalesDashView({ reports, onSave }) {
       const thisMonth = monthStr();
       const existing = reports[`${thisMonth}:salesdash`];
+      const [dashTab, setDashTab] = useState("sales");
 
       const [entries, setEntries] = useState([]);
       const [newLabel, setNewLabel] = useState("");
@@ -1154,7 +1159,7 @@
       const costs   = entries.filter(e => e.type === "cost").reduce((s,e) => s + (Number(e.amount)||0), 0);
       const profit  = revenue - costs;
 
-      const fmt = (n) => "RM " + n.toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 });
+      const fmt = (n) => "৳ " + n.toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 });
 
       const addEntry = () => {
         if (!newLabel.trim() || !newAmount) return;
@@ -1174,77 +1179,289 @@
 
       return (
         <div style={{ animation:"pop .3s ease" }}>
-          <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom:24 }}>
+          <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom:20 }}>
             <p style={{ fontFamily:"'Fraunces', serif", fontSize:30, fontWeight:600, margin:0, letterSpacing:"-0.02em" }}>Sales & Cost Dashboard</p>
             <span style={{ fontSize:15, color:COLORS.inkSoft }}>{prettyMonth()}</span>
           </div>
 
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:28 }}>
-            {[
-              { label:"Total Revenue", val:fmt(revenue), color:COLORS.sage },
-              { label:"Total Costs",   val:fmt(costs),   color:COLORS.clay },
-              { label:"Net Profit",    val:fmt(profit),  color: profit>=0?COLORS.sage:COLORS.clay },
-            ].map(s => (
-              <div key={s.label} style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:14, padding:"16px 18px" }}>
-                <p style={{ margin:"0 0 6px", fontSize:11, color:COLORS.inkSoft, textTransform:"uppercase", letterSpacing:"0.05em", fontWeight:600 }}>{s.label}</p>
-                <p style={{ margin:0, fontFamily:"'Fraunces', serif", fontSize:20, fontWeight:700, color:s.color }}>{s.val}</p>
-              </div>
+          <div style={{ display:"flex", marginBottom:28, borderRadius:10, overflow:"hidden", border:`1px solid ${COLORS.line}` }}>
+            {[["sales","📊  Sales & Cost"],["excel","📋  Excel Dashboard"]].map(([id,lbl]) => (
+              <button key={id} onClick={() => setDashTab(id)}
+                style={{ all:"unset", cursor:"pointer", flex:1, padding:"11px 16px", textAlign:"center", fontSize:14, fontWeight:600,
+                  background: dashTab===id ? COLORS.ink : COLORS.white,
+                  color: dashTab===id ? "#fff" : COLORS.inkSoft, transition:"background .15s" }}>
+                {lbl}
+              </button>
             ))}
           </div>
 
-          <div style={{ display:"grid", gap:20, marginBottom:24 }}>
-            {[["revenue","Revenue / Sales",COLORS.sage,"#EAF1EC","#CFE0D4"],["cost","Costs / Expenses",COLORS.clay,"#FEF3EF","#F5C9BB"]].map(([type, title, color, bg, border]) => {
-              const list = type === "revenue" ? revenueEntries : costEntries;
-              return (
-                <div key={type} style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, overflow:"hidden" }}>
-                  <div style={{ padding:"12px 18px", background:bg, borderBottom:`1px solid ${border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <span style={{ fontFamily:"'Fraunces', serif", fontSize:16, fontWeight:600, color }}>{title}</span>
-                    <span style={{ fontFamily:"'Fraunces', serif", fontWeight:700, fontSize:16, color }}>{fmt(list.reduce((s,e)=>s+(Number(e.amount)||0),0))}</span>
+          {dashTab === "sales" && (
+            <>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:28 }}>
+                {[
+                  { label:"Total Revenue", val:fmt(revenue), color:COLORS.sage },
+                  { label:"Total Costs",   val:fmt(costs),   color:COLORS.clay },
+                  { label:"Net Profit",    val:fmt(profit),  color: profit>=0?COLORS.sage:COLORS.clay },
+                ].map(s => (
+                  <div key={s.label} style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:14, padding:"16px 18px" }}>
+                    <p style={{ margin:"0 0 6px", fontSize:11, color:COLORS.inkSoft, textTransform:"uppercase", letterSpacing:"0.05em", fontWeight:600 }}>{s.label}</p>
+                    <p style={{ margin:0, fontFamily:"'Fraunces', serif", fontSize:20, fontWeight:700, color:s.color }}>{s.val}</p>
                   </div>
-                  {list.length === 0 && (
-                    <p style={{ margin:0, padding:"16px 18px", fontSize:14, color:COLORS.inkSoft }}>No entries yet.</p>
-                  )}
-                  {list.map((e, i) => (
-                    <div key={e.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 18px", borderTop: i>0?`1px solid ${COLORS.line}`:"none" }}>
-                      <span style={{ flex:1, fontSize:15, color:COLORS.ink }}>{e.label}</span>
-                      <span style={{ fontFamily:"'Fraunces', serif", fontWeight:600, fontSize:15, color }}>{fmt(Number(e.amount)||0)}</span>
-                      <button onClick={() => removeEntry(e.id)}
-                        style={{ all:"unset", cursor:"pointer", width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, color:COLORS.inkSoft, lineHeight:1, borderRadius:4 }}>×</button>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, padding:"18px 20px", marginBottom:20 }}>
-            <p style={{ fontFamily:"'Fraunces', serif", fontSize:16, fontWeight:600, margin:"0 0 14px" }}>Add Entry</p>
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-              <div style={{ display:"flex", borderRadius:10, overflow:"hidden", border:`1px solid ${COLORS.line}`, flexShrink:0 }}>
-                {[["revenue","Revenue"],["cost","Cost"]].map(([t,lbl]) => (
-                  <button key={t} onClick={() => setNewType(t)}
-                    style={{ all:"unset", cursor:"pointer", padding:"10px 16px", fontSize:13, fontWeight:600,
-                      background: newType===t ? COLORS.ink : COLORS.white,
-                      color: newType===t ? "#fff" : COLORS.inkSoft, transition:"background .15s" }}>{lbl}</button>
                 ))}
               </div>
-              <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") addEntry(); }}
-                placeholder="Label (e.g. Cat litter sales)"
-                style={{ flex:2, minWidth:140, padding:"10px 14px", borderRadius:10, border:`1px solid ${COLORS.line}`, fontSize:14, fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
-              <input type="number" min="0" value={newAmount} onChange={(e) => setNewAmount(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") addEntry(); }}
-                placeholder="Amount (RM)"
-                style={{ flex:1, minWidth:110, padding:"10px 14px", borderRadius:10, border:`1px solid ${COLORS.line}`, fontSize:14, fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
-              <button onClick={addEntry}
-                style={{ all:"unset", cursor:"pointer", padding:"10px 18px", borderRadius:10, background:COLORS.clay, color:"#fff", fontSize:14, fontWeight:700, flexShrink:0 }}>+ Add</button>
+
+              <div style={{ display:"grid", gap:20, marginBottom:24 }}>
+                {[["revenue","Revenue / Sales",COLORS.sage,"#EAF1EC","#CFE0D4"],["cost","Costs / Expenses",COLORS.clay,"#FEF3EF","#F5C9BB"]].map(([type, title, color, bg, border]) => {
+                  const list = type === "revenue" ? revenueEntries : costEntries;
+                  return (
+                    <div key={type} style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, overflow:"hidden" }}>
+                      <div style={{ padding:"12px 18px", background:bg, borderBottom:`1px solid ${border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <span style={{ fontFamily:"'Fraunces', serif", fontSize:16, fontWeight:600, color }}>{title}</span>
+                        <span style={{ fontFamily:"'Fraunces', serif", fontWeight:700, fontSize:16, color }}>{fmt(list.reduce((s,e)=>s+(Number(e.amount)||0),0))}</span>
+                      </div>
+                      {list.length === 0 && (
+                        <p style={{ margin:0, padding:"16px 18px", fontSize:14, color:COLORS.inkSoft }}>No entries yet.</p>
+                      )}
+                      {list.map((e, i) => (
+                        <div key={e.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 18px", borderTop: i>0?`1px solid ${COLORS.line}`:"none" }}>
+                          <span style={{ flex:1, fontSize:15, color:COLORS.ink }}>{e.label}</span>
+                          <span style={{ fontFamily:"'Fraunces', serif", fontWeight:600, fontSize:15, color }}>{fmt(Number(e.amount)||0)}</span>
+                          <button onClick={() => removeEntry(e.id)}
+                            style={{ all:"unset", cursor:"pointer", width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, color:COLORS.inkSoft, lineHeight:1, borderRadius:4 }}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, padding:"18px 20px", marginBottom:20 }}>
+                <p style={{ fontFamily:"'Fraunces', serif", fontSize:16, fontWeight:600, margin:"0 0 14px" }}>Add Entry</p>
+                <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                  <div style={{ display:"flex", borderRadius:10, overflow:"hidden", border:`1px solid ${COLORS.line}`, flexShrink:0 }}>
+                    {[["revenue","Revenue"],["cost","Cost"]].map(([t,lbl]) => (
+                      <button key={t} onClick={() => setNewType(t)}
+                        style={{ all:"unset", cursor:"pointer", padding:"10px 16px", fontSize:13, fontWeight:600,
+                          background: newType===t ? COLORS.ink : COLORS.white,
+                          color: newType===t ? "#fff" : COLORS.inkSoft, transition:"background .15s" }}>{lbl}</button>
+                    ))}
+                  </div>
+                  <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") addEntry(); }}
+                    placeholder="Label (e.g. Cat litter sales)"
+                    style={{ flex:2, minWidth:140, padding:"10px 14px", borderRadius:10, border:`1px solid ${COLORS.line}`, fontSize:14, fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
+                  <input type="number" min="0" value={newAmount} onChange={(e) => setNewAmount(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") addEntry(); }}
+                    placeholder="Amount (৳)"
+                    style={{ flex:1, minWidth:110, padding:"10px 14px", borderRadius:10, border:`1px solid ${COLORS.line}`, fontSize:14, fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
+                  <button onClick={addEntry}
+                    style={{ all:"unset", cursor:"pointer", padding:"10px 18px", borderRadius:10, background:COLORS.clay, color:"#fff", fontSize:14, fontWeight:700, flexShrink:0 }}>+ Add</button>
+                </div>
+              </div>
+
+              <button onClick={submit} disabled={saving}
+                style={{ all:"unset", cursor: saving?"default":"pointer", display:"block", textAlign:"center", width:"100%", padding:"16px", borderRadius:14, background: saved?COLORS.sage:COLORS.ink, color:"#fff", fontWeight:600, fontSize:16, marginTop:8, transition:"background .2s", opacity: saving?0.7:1 }}>
+                {saving ? "Saving…" : saved ? "✓ Saved!" : existing ? "Update this month" : "Save this month"}
+              </button>
+            </>
+          )}
+
+          {dashTab === "excel" && <ExcelDashboard />}
+        </div>
+      );
+    }
+
+    const CHART_COLORS = ["#C8553D","#4F7060","#6B9AB8","#E8A838","#9B59B6","#E67E22","#27AE60","#2980B9"];
+
+    function ExcelDashboard() {
+      const [wb, setWb] = useState(null);          // { sheetNames, data: { name: { headers, rows } } }
+      const [activeSheet, setActiveSheet] = useState(null);
+      const [chartKey, setChartKey] = useState(0); // force canvas remount on sheet change
+      const [chartType, setChartType] = useState("bar");
+      const [page, setPage] = useState(0);
+      const chartRef = useRef(null);
+      const chartInst = useRef(null);
+      const PAGE_SIZE = 15;
+
+      const handleFile = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const workbook = XLSX.read(ev.target.result, { type:"array", cellDates:true });
+          const data = {};
+          workbook.SheetNames.forEach(name => {
+            const ws = workbook.Sheets[name];
+            const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:"", raw:false });
+            if (raw.length < 1) return;
+            const headers = raw[0].map(h => String(h));
+            const rows = raw.slice(1).filter(r => r.some(c => c !== "" && c !== null));
+            data[name] = { headers, rows };
+          });
+          setWb({ sheetNames: workbook.SheetNames, data });
+          setActiveSheet(workbook.SheetNames[0]);
+          setChartKey(k => k+1);
+          setPage(0);
+        };
+        reader.readAsArrayBuffer(file);
+      };
+
+      const sheetData = wb && activeSheet ? wb.data[activeSheet] : null;
+
+      const isNumeric = (val) => val !== "" && !isNaN(parseFloat(val)) && isFinite(val);
+
+      const numColIdxs = sheetData
+        ? sheetData.headers.map((h,i) => i).filter(i => sheetData.rows.filter(r => isNumeric(r[i])).length > sheetData.rows.length * 0.5)
+        : [];
+      const labelColIdx = sheetData
+        ? sheetData.headers.findIndex((h,i) => !numColIdxs.includes(i))
+        : -1;
+
+      const kpis = numColIdxs.slice(0, 6).map(i => ({
+        label: sheetData.headers[i],
+        sum: sheetData.rows.reduce((s,r) => s + (parseFloat(r[i])||0), 0),
+        avg: sheetData.rows.length ? sheetData.rows.reduce((s,r) => s + (parseFloat(r[i])||0), 0) / sheetData.rows.filter(r => isNumeric(r[i])).length : 0,
+      }));
+
+      const chartLabels = sheetData
+        ? sheetData.rows.slice(0, 30).map((r,i) => labelColIdx >= 0 ? String(r[labelColIdx] || `Row ${i+1}`) : `Row ${i+1}`)
+        : [];
+
+      const chartDatasets = numColIdxs.slice(0, 5).map((ci, di) => ({
+        label: sheetData.headers[ci],
+        data: sheetData.rows.slice(0, 30).map(r => parseFloat(r[ci]) || 0),
+        backgroundColor: CHART_COLORS[di % CHART_COLORS.length] + (chartType === "line" ? "33" : "CC"),
+        borderColor: CHART_COLORS[di % CHART_COLORS.length],
+        borderWidth: 2,
+        borderRadius: chartType === "bar" ? 6 : 0,
+        fill: chartType === "line",
+        tension: 0.35,
+        pointRadius: chartType === "line" ? 4 : 0,
+      }));
+
+      useEffect(() => {
+        if (!sheetData || !chartRef.current || chartDatasets.length === 0) return;
+        if (chartInst.current) { chartInst.current.destroy(); chartInst.current = null; }
+        chartInst.current = new Chart(chartRef.current, {
+          type: chartType,
+          data: { labels: chartLabels, datasets: chartDatasets },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { position:"top", labels:{ font:{ family:"DM Sans", size:12 }, color:"#23201A", boxWidth:12, padding:16 } },
+              tooltip: { bodyFont:{ family:"DM Sans" }, titleFont:{ family:"DM Sans", weight:"600" } },
+            },
+            scales: {
+              y: { beginAtZero:true, grid:{ color:"#E2D6C2" }, ticks:{ color:"#6B6255", font:{ family:"DM Sans" } } },
+              x: { grid:{ display:false }, ticks:{ color:"#6B6255", font:{ family:"DM Sans" }, maxRotation:45 } },
+            },
+          }
+        });
+        return () => { if (chartInst.current) { chartInst.current.destroy(); chartInst.current = null; } };
+      }, [chartKey, chartType]);
+
+      const pagedRows = sheetData ? sheetData.rows.slice(page*PAGE_SIZE, (page+1)*PAGE_SIZE) : [];
+      const totalPages = sheetData ? Math.ceil(sheetData.rows.length / PAGE_SIZE) : 0;
+
+      if (!wb) return (
+        <div style={{ textAlign:"center", padding:"40px 20px", background:COLORS.white, border:`2px dashed ${COLORS.line}`, borderRadius:18 }}>
+          <div style={{ fontSize:44, marginBottom:12 }}>📋</div>
+          <p style={{ fontFamily:"'Fraunces', serif", fontSize:20, fontWeight:600, margin:"0 0 6px" }}>Upload Excel File</p>
+          <p style={{ color:COLORS.inkSoft, fontSize:14, margin:"0 0 24px" }}>Upload your MeowMesh_DashBoard.xlsx to see live charts</p>
+          <label style={{ display:"inline-block", cursor:"pointer", padding:"12px 24px", borderRadius:12, background:COLORS.ink, color:"#fff", fontSize:14, fontWeight:700 }}>
+            Choose Excel File (.xlsx)
+            <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{ display:"none" }} />
+          </label>
+        </div>
+      );
+
+      return (
+        <div>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:10, marginBottom:18 }}>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+              {wb.sheetNames.map(name => (
+                <button key={name} onClick={() => { setActiveSheet(name); setChartKey(k=>k+1); setPage(0); }}
+                  style={{ all:"unset", cursor:"pointer", padding:"7px 14px", borderRadius:8, fontSize:13, fontWeight:600,
+                    background: activeSheet===name ? COLORS.ink : COLORS.white,
+                    color: activeSheet===name ? "#fff" : COLORS.inkSoft,
+                    border:`1px solid ${activeSheet===name ? COLORS.ink : COLORS.line}` }}>{name}</button>
+              ))}
             </div>
+            <label style={{ cursor:"pointer", fontSize:12, fontWeight:600, color:COLORS.inkSoft, padding:"6px 12px", borderRadius:8, border:`1px solid ${COLORS.line}`, background:COLORS.white }}>
+              ↑ Replace file <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{ display:"none" }} />
+            </label>
           </div>
 
-          <button onClick={submit} disabled={saving}
-            style={{ all:"unset", cursor: saving?"default":"pointer", display:"block", textAlign:"center", width:"100%", padding:"16px", borderRadius:14, background: saved?COLORS.sage:COLORS.ink, color:"#fff", fontWeight:600, fontSize:16, marginTop:8, transition:"background .2s", opacity: saving?0.7:1 }}>
-            {saving ? "Saving…" : saved ? "✓ Saved!" : existing ? "Update this month" : "Save this month"}
-          </button>
+          {kpis.length > 0 && (
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))", gap:10, marginBottom:20 }}>
+              {kpis.map((k, i) => (
+                <div key={k.label} style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:14, padding:"14px 16px", borderTop:`3px solid ${CHART_COLORS[i%CHART_COLORS.length]}` }}>
+                  <p style={{ margin:"0 0 4px", fontSize:11, color:COLORS.inkSoft, textTransform:"uppercase", letterSpacing:"0.05em", fontWeight:600, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{k.label}</p>
+                  <p style={{ margin:"0 0 2px", fontFamily:"'Fraunces', serif", fontSize:18, fontWeight:700, color:COLORS.ink }}>{k.sum % 1 === 0 ? k.sum.toLocaleString() : k.sum.toLocaleString(undefined,{maximumFractionDigits:2})}</p>
+                  <p style={{ margin:0, fontSize:11, color:COLORS.inkSoft }}>avg {k.avg % 1 === 0 ? Math.round(k.avg).toLocaleString() : k.avg.toLocaleString(undefined,{maximumFractionDigits:1})}</p>
+                </div>
+              ))}
+              <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:14, padding:"14px 16px", borderTop:`3px solid ${COLORS.inkSoft}` }}>
+                <p style={{ margin:"0 0 4px", fontSize:11, color:COLORS.inkSoft, textTransform:"uppercase", letterSpacing:"0.05em", fontWeight:600 }}>Total Rows</p>
+                <p style={{ margin:0, fontFamily:"'Fraunces', serif", fontSize:18, fontWeight:700, color:COLORS.ink }}>{sheetData.rows.length.toLocaleString()}</p>
+              </div>
+            </div>
+          )}
+
+          {chartDatasets.length > 0 && (
+            <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, padding:"18px 20px", marginBottom:20 }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, flexWrap:"wrap", gap:8 }}>
+                <p style={{ fontFamily:"'Fraunces', serif", fontSize:16, fontWeight:600, margin:0 }}>Chart View {sheetData.rows.length > 30 ? "(first 30 rows)" : ""}</p>
+                <div style={{ display:"flex", borderRadius:8, overflow:"hidden", border:`1px solid ${COLORS.line}` }}>
+                  {[["bar","Bar"],["line","Line"]].map(([t,l]) => (
+                    <button key={t} onClick={() => { setChartType(t); setChartKey(k=>k+1); }}
+                      style={{ all:"unset", cursor:"pointer", padding:"6px 14px", fontSize:13, fontWeight:600,
+                        background: chartType===t ? COLORS.ink : COLORS.white,
+                        color: chartType===t ? "#fff" : COLORS.inkSoft }}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ height:320 }}>
+                <canvas key={chartKey} ref={chartRef} />
+              </div>
+            </div>
+          )}
+
+          {sheetData && (
+            <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, overflow:"hidden", marginBottom:16 }}>
+              <div style={{ overflowX:"auto" }}>
+                <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+                  <thead>
+                    <tr style={{ background:COLORS.ink }}>
+                      {sheetData.headers.map((h,i) => (
+                        <th key={i} style={{ padding:"10px 14px", textAlign:"left", color:"#fff", fontWeight:600, whiteSpace:"nowrap", fontSize:12, letterSpacing:"0.03em" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedRows.map((row, ri) => (
+                      <tr key={ri} style={{ background: ri%2===0 ? COLORS.white : COLORS.paper }}>
+                        {sheetData.headers.map((h,ci) => (
+                          <td key={ci} style={{ padding:"9px 14px", color:COLORS.ink, borderBottom:`1px solid ${COLORS.line}`, whiteSpace:"nowrap" }}>{String(row[ci] ?? "")}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {totalPages > 1 && (
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 16px", borderTop:`1px solid ${COLORS.line}` }}>
+                  <span style={{ fontSize:13, color:COLORS.inkSoft }}>Rows {page*PAGE_SIZE+1}–{Math.min((page+1)*PAGE_SIZE, sheetData.rows.length)} of {sheetData.rows.length}</span>
+                  <div style={{ display:"flex", gap:6 }}>
+                    <button onClick={() => setPage(p=>Math.max(0,p-1))} disabled={page===0}
+                      style={{ all:"unset", cursor: page===0?"default":"pointer", padding:"5px 12px", borderRadius:7, border:`1px solid ${COLORS.line}`, fontSize:13, fontWeight:600, color: page===0?COLORS.line:COLORS.ink, background:COLORS.white }}>← Prev</button>
+                    <button onClick={() => setPage(p=>Math.min(totalPages-1,p+1))} disabled={page===totalPages-1}
+                      style={{ all:"unset", cursor: page===totalPages-1?"default":"pointer", padding:"5px 12px", borderRadius:7, border:`1px solid ${COLORS.line}`, fontSize:13, fontWeight:600, color: page===totalPages-1?COLORS.line:COLORS.ink, background:COLORS.white }}>Next →</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       );
     }
