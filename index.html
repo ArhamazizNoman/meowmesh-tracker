@@ -279,6 +279,7 @@
       const [newWeeklyText, setNewWeeklyText] = useState("");
       const [notes, setNotes] = useState("");
       const [blockers, setBlockers] = useState("");
+      const [customerReports, setCustomerReports] = useState([]);
       const [saved, setSaved] = useState(false);
       const [saving, setSaving] = useState(false);
 
@@ -294,6 +295,7 @@
         setWeeklyLabels(w["__labels"] || {});
         setNotes((existing && existing.notes) || "");
         setBlockers((existing && existing.blockers) || "");
+        setCustomerReports(d["__customerReports"] || []);
         setSaved(false);
       }, [person, existing && existing.date, weeklySource && weeklySource.date]);
 
@@ -331,7 +333,7 @@
 
       const submit = async () => {
         setSaving(true);
-        const dailySave = { ...daily, "__custom": customTasks, "__labels": labels, "__dueCompleted": dueCompleted };
+        const dailySave = { ...daily, "__custom": customTasks, "__labels": labels, "__dueCompleted": dueCompleted, "__customerReports": customerReports };
         const weeklySave = { "__progress": weeklyProgress, "__labels": weeklyLabels, "__customProgress": customWeeklyTasks };
         const ok = await onSave({ date: today, person, daily: dailySave, weekly: weeklySave, notes, blockers, updated_at: new Date().toISOString() });
         setSaving(false);
@@ -375,7 +377,7 @@
             </div>
           )}
           <div style={{ display:"flex", marginBottom:28, borderRadius:10, overflow:"hidden", border:`1px solid ${COLORS.line}` }}>
-            {[["checklist",`✓  Checklist`],["manual","✏  Manual Entry"]].map(([id,lbl]) => (
+            {[["checklist",`✓  Checklist`],["manual","✏  Manual Entry"],...(person==="marketer"?[["customerreport","📞  Customer Report"]]:[])].map(([id,lbl]) => (
               <button key={id} onClick={() => setTab(id)}
                 style={{ all:"unset", cursor:"pointer", flex:1, padding:"11px 16px", textAlign:"center", fontSize:14, fontWeight:600,
                   background: tab===id ? COLORS.ink : COLORS.white,
@@ -437,6 +439,9 @@
           {tab === "manual" && (
             <ManualView customTasks={customTasks} setCustomTasks={setCustomTasks}
               newTaskText={newTaskText} setNewTaskText={setNewTaskText} setSaved={setSaved} />
+          )}
+          {tab === "customerreport" && person === "marketer" && (
+            <CustomerReportView entries={customerReports} setEntries={setCustomerReports} setSaved={setSaved} />
           )}
           {tab === "checklist" && (
             <>
@@ -1056,6 +1061,75 @@
     function Empty({ text }) {
       return <div style={{ padding:"48px 24px", textAlign:"center", color:COLORS.inkSoft, background:COLORS.white, border:`1px dashed ${COLORS.line}`, borderRadius:16 }}>
         <div style={{ fontSize:30, marginBottom:8 }}>🐈</div><p style={{ margin:0, fontSize:15 }}>{text}</p></div>;
+    }
+
+    function CustomerReportView({ entries, setEntries, setSaved }) {
+      const MAX = 30;
+      const topic = "Litter";
+      const filled = entries.filter(e => e.review && e.review.trim()).length;
+
+      const addEntry = () => {
+        if (entries.length >= MAX) return;
+        setEntries(p => [...p, { id: Date.now().toString(), customer: "", review: "" }]);
+        setSaved(false);
+      };
+      const updateEntry = (id, field, val) => {
+        setEntries(p => p.map(e => e.id === id ? {...e, [field]: val} : e));
+        setSaved(false);
+      };
+      const removeEntry = (id) => {
+        setEntries(p => p.filter(e => e.id !== id));
+        setSaved(false);
+      };
+
+      return (
+        <div>
+          <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, padding:"16px 18px", marginBottom:20 }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom:6 }}>
+              <div>
+                <p style={{ fontFamily:"'Fraunces', serif", fontSize:18, fontWeight:600, margin:"0 0 2px" }}>Customer Feedback Report</p>
+                <p style={{ margin:0, fontSize:13, color:COLORS.inkSoft }}>Topic: <span style={{ fontWeight:600, color:COLORS.clay }}>{topic}</span> · Call each customer and log their review or suggestion</p>
+              </div>
+              <span style={{ fontFamily:"'Fraunces', serif", fontSize:22, fontWeight:700, color: filled===MAX?COLORS.sage:COLORS.clay }}>{filled}<span style={{ fontSize:14, fontWeight:500, color:COLORS.inkSoft }}>/{MAX}</span></span>
+            </div>
+            <div style={{ height:6, background:COLORS.paper2, borderRadius:999, overflow:"hidden", marginTop:10 }}>
+              <div style={{ height:"100%", width:`${(entries.length/MAX)*100}%`, background: filled===MAX?COLORS.sage:COLORS.clay, transition:"width .3s" }} />
+            </div>
+          </div>
+
+          <div style={{ display:"grid", gap:10, marginBottom:14 }}>
+            {entries.map((e, i) => {
+              const hasFeedback = e.review && e.review.trim();
+              return (
+                <div key={e.id} style={{ padding:"14px 16px", borderRadius:14, background: hasFeedback?"#F1F6F2":COLORS.white, border:`1px solid ${hasFeedback?"#CFE0D4":COLORS.line}` }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:COLORS.inkSoft, background:COLORS.paper2, padding:"2px 7px", borderRadius:6, flexShrink:0 }}>#{i+1}</span>
+                    <input value={e.customer} placeholder="Customer name or phone…"
+                      onChange={ev => updateEntry(e.id, "customer", ev.target.value)}
+                      style={{ flex:1, padding:"7px 10px", borderRadius:8, border:`1px solid ${COLORS.line}`, fontSize:14, fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
+                    <button onClick={() => removeEntry(e.id)}
+                      style={{ all:"unset", cursor:"pointer", width:26, height:26, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, color:COLORS.inkSoft, lineHeight:1, borderRadius:6 }}>×</button>
+                  </div>
+                  <textarea value={e.review} placeholder="What did they say about litter? Any review or suggestion…" rows={2}
+                    onChange={ev => updateEntry(e.id, "review", ev.target.value)}
+                    style={{ width:"100%", resize:"vertical", padding:"9px 11px", borderRadius:9, border:`1px solid ${COLORS.line}`, fontSize:14, color:COLORS.ink, fontFamily:"inherit", background:COLORS.white, outline:"none" }} />
+                </div>
+              );
+            })}
+          </div>
+
+          {entries.length < MAX ? (
+            <button onClick={addEntry}
+              style={{ all:"unset", cursor:"pointer", display:"block", width:"100%", padding:"13px 18px", borderRadius:12, border:`2px dashed ${COLORS.line}`, textAlign:"center", fontSize:14, fontWeight:600, color:COLORS.inkSoft, background:COLORS.white, boxSizing:"border-box" }}>
+              + Add Customer · {entries.length}/{MAX}
+            </button>
+          ) : (
+            <div style={{ textAlign:"center", fontSize:14, color:COLORS.sage, fontWeight:700, padding:"14px", background:"#EAF1EC", borderRadius:12, border:`1px solid #CFE0D4` }}>
+              All 30 customers added!
+            </div>
+          )}
+        </div>
+      );
     }
 
     ReactDOM.createRoot(document.getElementById("root")).render(<App />);
