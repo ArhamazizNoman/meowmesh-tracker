@@ -734,6 +734,27 @@
           })()}
           {report.notes && <Line label="Notes" text={report.notes} />}
           {report.blockers && <Line label="Blockers" text={report.blockers} warn />}
+          {(() => {
+            const cr = report.daily && report.daily["__customerReports"];
+            if (!cr || !cr.length) return null;
+            const filled = cr.filter(e => e.review && e.review.trim()).length;
+            return (
+              <div style={{ marginTop:10, padding:"10px 12px", background:COLORS.paper2, borderRadius:12 }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                  <p style={{ margin:0, fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", color:COLORS.inkSoft }}>Customer Report · Litter</p>
+                  <span style={{ fontSize:12, fontWeight:700, color: filled===30?COLORS.sage:COLORS.clay }}>{filled}/{cr.length} filled</span>
+                </div>
+                <div style={{ display:"grid", gap:6 }}>
+                  {cr.filter(e => e.review && e.review.trim()).map((e, i) => (
+                    <div key={e.id} style={{ background:COLORS.white, borderRadius:8, padding:"8px 10px", border:`1px solid ${COLORS.line}` }}>
+                      <p style={{ margin:"0 0 3px", fontSize:12, fontWeight:600, color:COLORS.ink }}>{e.customer || `Customer ${i+1}`}</p>
+                      <p style={{ margin:0, fontSize:13, color:COLORS.inkSoft, lineHeight:1.5 }}>{e.review}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       );
     }
