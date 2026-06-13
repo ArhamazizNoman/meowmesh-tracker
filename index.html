@@ -123,11 +123,14 @@
       && window.SUPABASE_ANON_KEY && window.SUPABASE_ANON_KEY.indexOf("PASTE_") === -1;
     const sb = CONFIGURED ? supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY) : null;
 
+    const SALES_PIN = "8520";
+
     function App() {
       const [view, setView] = useState("select");
       const [reports, setReports] = useState({});
       const [loading, setLoading] = useState(true);
       const [error, setError] = useState("");
+      const [pinModal, setPinModal] = useState(false);
 
       const loadReports = async () => {
         if (!sb) { setLoading(false); return; }
@@ -157,11 +160,13 @@
           <Header view={view} setView={setView} />
           <div style={{ maxWidth:880, margin:"0 auto", padding:"0 20px 64px" }}>
             {error && <Banner text={"Connection issue: " + error} />}
-            {view === "select" && <RolePicker setView={setView} />}
+            {view === "select" && <RolePicker setView={setView} onSalesDash={() => setPinModal(true)} />}
             {(view === "marketer" || view === "operations") &&
               <EmployeeView person={view} reports={reports} onSave={saveReport} />}
             {view === "owner" && <OwnerView reports={reports} loading={loading} reload={loadReports} onSave={saveReport} />}
+            {view === "salesdash" && <SalesDashView reports={reports} onSave={saveReport} />}
           </div>
+          {pinModal && <PinModal onSuccess={() => { setView("salesdash"); setPinModal(false); }} onClose={() => setPinModal(false)} />}
         </div>
       );
     }
@@ -204,7 +209,7 @@
       );
     }
 
-    function RolePicker({ setView }) {
+    function RolePicker({ setView, onSalesDash }) {
       const roles = [
         { id:"owner", emoji:"📊", title:"Owner", desc:"See everyone's progress at a glance." },
         { id:"marketer", emoji:"📣", title:"Marketer", desc:"Log today's content, engagement & outreach." },
@@ -228,6 +233,19 @@
                 <span style={{ color:COLORS.clay, fontSize:22 }}>→</span>
               </button>
             ))}
+          </div>
+          <div style={{ marginTop:28, borderTop:`1px solid ${COLORS.line}`, paddingTop:24 }}>
+            <button onClick={onSalesDash}
+              style={{ all:"unset", cursor:"pointer", display:"flex", alignItems:"center", gap:18, padding:"22px 24px", borderRadius:18, background:"#1C1916", border:`1px solid #1C1916`, width:"100%", boxSizing:"border-box", transition:"transform .15s, box-shadow .15s" }}
+              onMouseEnter={(e)=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 10px 30px rgba(35,32,26,0.2)";}}
+              onMouseLeave={(e)=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
+              <span style={{ fontSize:34 }}>📈</span>
+              <span style={{ flex:1 }}>
+                <span style={{ display:"block", fontFamily:"'Fraunces', serif", fontWeight:600, fontSize:21, color:"#fff" }}>Sales & Cost Dashboard</span>
+                <span style={{ display:"block", fontSize:14.5, marginTop:2, color:"rgba(255,255,255,0.55)" }}>Revenue, expenses & profit overview · PIN protected</span>
+              </span>
+              <span style={{ fontSize:20 }}>🔒</span>
+            </button>
           </div>
         </div>
       );
@@ -464,7 +482,7 @@
     function OwnerView({ reports, loading, reload, onSave }) {
       const [ownerTab, setOwnerTab] = useState("team");
       const [filter, setFilter] = useState("all");
-      const teamReports = Object.values(reports).filter(r => r.person !== "owner");
+      const teamReports = Object.values(reports).filter(r => r.person !== "owner" && r.person !== "salesdash");
       const list = teamReports.sort((a,b) => (a.date<b.date?1:a.date>b.date?-1:a.person.localeCompare(b.person)));
       const filtered = filter === "all" ? list : list.filter((r) => r.person === filter);
       const filterTabs = [["all","All"],["marketer","Marketer"],["operations","Operations"]];
@@ -1082,6 +1100,153 @@
     function Empty({ text }) {
       return <div style={{ padding:"48px 24px", textAlign:"center", color:COLORS.inkSoft, background:COLORS.white, border:`1px dashed ${COLORS.line}`, borderRadius:16 }}>
         <div style={{ fontSize:30, marginBottom:8 }}>🐈</div><p style={{ margin:0, fontSize:15 }}>{text}</p></div>;
+    }
+
+    function PinModal({ onSuccess, onClose }) {
+      const [pin, setPin] = useState("");
+      const [err, setErr] = useState(false);
+      const check = () => {
+        if (pin === SALES_PIN) { onSuccess(); }
+        else { setErr(true); setPin(""); setTimeout(() => setErr(false), 1800); }
+      };
+      return (
+        <div style={{ position:"fixed", inset:0, background:"rgba(35,32,26,0.55)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:24 }}
+          onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+          <div style={{ background:COLORS.white, borderRadius:20, padding:"32px 28px", width:"100%", maxWidth:340, boxShadow:"0 20px 60px rgba(35,32,26,0.25)", animation:"pop .2s ease" }}>
+            <div style={{ fontSize:32, marginBottom:10 }}>🔒</div>
+            <p style={{ fontFamily:"'Fraunces', serif", fontSize:22, fontWeight:600, margin:"0 0 6px" }}>Enter PIN</p>
+            <p style={{ fontSize:14, color:COLORS.inkSoft, margin:"0 0 20px" }}>Sales & Cost Dashboard is PIN protected.</p>
+            <input type="password" inputMode="numeric" value={pin} autoFocus
+              onChange={(e) => { setPin(e.target.value); setErr(false); }}
+              onKeyDown={(e) => { if (e.key === "Enter") check(); }}
+              placeholder="••••"
+              style={{ width:"100%", padding:"13px 16px", borderRadius:12, border:`2px solid ${err?COLORS.clay:COLORS.line}`, fontSize:22, textAlign:"center", letterSpacing:"0.3em", fontFamily:"inherit", color:COLORS.ink, outline:"none", boxSizing:"border-box", transition:"border-color .15s", background: err?"#FEF3EF":COLORS.white }} />
+            {err && <p style={{ margin:"8px 0 0", fontSize:13, color:COLORS.clay, fontWeight:600, textAlign:"center" }}>Wrong PIN — try again</p>}
+            <div style={{ display:"flex", gap:10, marginTop:18 }}>
+              <button onClick={onClose}
+                style={{ all:"unset", cursor:"pointer", flex:1, padding:"12px", borderRadius:12, border:`1px solid ${COLORS.line}`, textAlign:"center", fontSize:14, fontWeight:600, color:COLORS.inkSoft }}>Cancel</button>
+              <button onClick={check}
+                style={{ all:"unset", cursor:"pointer", flex:2, padding:"12px", borderRadius:12, background:COLORS.ink, textAlign:"center", fontSize:14, fontWeight:600, color:"#fff" }}>Unlock</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function SalesDashView({ reports, onSave }) {
+      const thisMonth = monthStr();
+      const existing = reports[`${thisMonth}:salesdash`];
+
+      const [entries, setEntries] = useState([]);
+      const [newLabel, setNewLabel] = useState("");
+      const [newAmount, setNewAmount] = useState("");
+      const [newType, setNewType] = useState("revenue");
+      const [saved, setSaved] = useState(false);
+      const [saving, setSaving] = useState(false);
+
+      useEffect(() => {
+        const d = (existing && existing.daily) || {};
+        setEntries(d.entries || []);
+        setSaved(false);
+      }, [existing && existing.date]);
+
+      const revenue = entries.filter(e => e.type === "revenue").reduce((s,e) => s + (Number(e.amount)||0), 0);
+      const costs   = entries.filter(e => e.type === "cost").reduce((s,e) => s + (Number(e.amount)||0), 0);
+      const profit  = revenue - costs;
+
+      const fmt = (n) => "RM " + n.toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 });
+
+      const addEntry = () => {
+        if (!newLabel.trim() || !newAmount) return;
+        setEntries(p => [...p, { id: Date.now().toString(), label: newLabel.trim(), amount: parseFloat(newAmount), type: newType }]);
+        setNewLabel(""); setNewAmount(""); setSaved(false);
+      };
+      const removeEntry = (id) => { setEntries(p => p.filter(e => e.id !== id)); setSaved(false); };
+      const submit = async () => {
+        setSaving(true);
+        const ok = await onSave({ date: thisMonth, person:"salesdash", daily:{ entries }, weekly:{}, notes:"", blockers:"", updated_at: new Date().toISOString() });
+        setSaving(false);
+        if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
+      };
+
+      const revenueEntries = entries.filter(e => e.type === "revenue");
+      const costEntries    = entries.filter(e => e.type === "cost");
+
+      return (
+        <div style={{ animation:"pop .3s ease" }}>
+          <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom:24 }}>
+            <p style={{ fontFamily:"'Fraunces', serif", fontSize:30, fontWeight:600, margin:0, letterSpacing:"-0.02em" }}>Sales & Cost Dashboard</p>
+            <span style={{ fontSize:15, color:COLORS.inkSoft }}>{prettyMonth()}</span>
+          </div>
+
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12, marginBottom:28 }}>
+            {[
+              { label:"Total Revenue", val:fmt(revenue), color:COLORS.sage },
+              { label:"Total Costs",   val:fmt(costs),   color:COLORS.clay },
+              { label:"Net Profit",    val:fmt(profit),  color: profit>=0?COLORS.sage:COLORS.clay },
+            ].map(s => (
+              <div key={s.label} style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:14, padding:"16px 18px" }}>
+                <p style={{ margin:"0 0 6px", fontSize:11, color:COLORS.inkSoft, textTransform:"uppercase", letterSpacing:"0.05em", fontWeight:600 }}>{s.label}</p>
+                <p style={{ margin:0, fontFamily:"'Fraunces', serif", fontSize:20, fontWeight:700, color:s.color }}>{s.val}</p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display:"grid", gap:20, marginBottom:24 }}>
+            {[["revenue","Revenue / Sales",COLORS.sage,"#EAF1EC","#CFE0D4"],["cost","Costs / Expenses",COLORS.clay,"#FEF3EF","#F5C9BB"]].map(([type, title, color, bg, border]) => {
+              const list = type === "revenue" ? revenueEntries : costEntries;
+              return (
+                <div key={type} style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, overflow:"hidden" }}>
+                  <div style={{ padding:"12px 18px", background:bg, borderBottom:`1px solid ${border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <span style={{ fontFamily:"'Fraunces', serif", fontSize:16, fontWeight:600, color }}>{title}</span>
+                    <span style={{ fontFamily:"'Fraunces', serif", fontWeight:700, fontSize:16, color }}>{fmt(list.reduce((s,e)=>s+(Number(e.amount)||0),0))}</span>
+                  </div>
+                  {list.length === 0 && (
+                    <p style={{ margin:0, padding:"16px 18px", fontSize:14, color:COLORS.inkSoft }}>No entries yet.</p>
+                  )}
+                  {list.map((e, i) => (
+                    <div key={e.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 18px", borderTop: i>0?`1px solid ${COLORS.line}`:"none" }}>
+                      <span style={{ flex:1, fontSize:15, color:COLORS.ink }}>{e.label}</span>
+                      <span style={{ fontFamily:"'Fraunces', serif", fontWeight:600, fontSize:15, color }}>{fmt(Number(e.amount)||0)}</span>
+                      <button onClick={() => removeEntry(e.id)}
+                        style={{ all:"unset", cursor:"pointer", width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, color:COLORS.inkSoft, lineHeight:1, borderRadius:4 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ background:COLORS.white, border:`1px solid ${COLORS.line}`, borderRadius:16, padding:"18px 20px", marginBottom:20 }}>
+            <p style={{ fontFamily:"'Fraunces', serif", fontSize:16, fontWeight:600, margin:"0 0 14px" }}>Add Entry</p>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              <div style={{ display:"flex", borderRadius:10, overflow:"hidden", border:`1px solid ${COLORS.line}`, flexShrink:0 }}>
+                {[["revenue","Revenue"],["cost","Cost"]].map(([t,lbl]) => (
+                  <button key={t} onClick={() => setNewType(t)}
+                    style={{ all:"unset", cursor:"pointer", padding:"10px 16px", fontSize:13, fontWeight:600,
+                      background: newType===t ? COLORS.ink : COLORS.white,
+                      color: newType===t ? "#fff" : COLORS.inkSoft, transition:"background .15s" }}>{lbl}</button>
+                ))}
+              </div>
+              <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addEntry(); }}
+                placeholder="Label (e.g. Cat litter sales)"
+                style={{ flex:2, minWidth:140, padding:"10px 14px", borderRadius:10, border:`1px solid ${COLORS.line}`, fontSize:14, fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
+              <input type="number" min="0" value={newAmount} onChange={(e) => setNewAmount(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addEntry(); }}
+                placeholder="Amount (RM)"
+                style={{ flex:1, minWidth:110, padding:"10px 14px", borderRadius:10, border:`1px solid ${COLORS.line}`, fontSize:14, fontFamily:"inherit", color:COLORS.ink, background:COLORS.white, outline:"none" }} />
+              <button onClick={addEntry}
+                style={{ all:"unset", cursor:"pointer", padding:"10px 18px", borderRadius:10, background:COLORS.clay, color:"#fff", fontSize:14, fontWeight:700, flexShrink:0 }}>+ Add</button>
+            </div>
+          </div>
+
+          <button onClick={submit} disabled={saving}
+            style={{ all:"unset", cursor: saving?"default":"pointer", display:"block", textAlign:"center", width:"100%", padding:"16px", borderRadius:14, background: saved?COLORS.sage:COLORS.ink, color:"#fff", fontWeight:600, fontSize:16, marginTop:8, transition:"background .2s", opacity: saving?0.7:1 }}>
+            {saving ? "Saving…" : saved ? "✓ Saved!" : existing ? "Update this month" : "Save this month"}
+          </button>
+        </div>
+      );
     }
 
     function CustomerReportView({ entries, setEntries, setSaved }) {
