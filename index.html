@@ -11,8 +11,6 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <!-- Supabase client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- SheetJS for Excel parsing -->
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <!-- Chart.js for PowerBI-like charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
@@ -125,7 +123,8 @@
     // ---- Supabase connection ----
     const CONFIGURED = window.SUPABASE_URL && window.SUPABASE_URL.indexOf("PASTE_") === -1
       && window.SUPABASE_ANON_KEY && window.SUPABASE_ANON_KEY.indexOf("PASTE_") === -1;
-    const sb = CONFIGURED ? supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY) : null;
+    let sb = null;
+    try { sb = CONFIGURED && typeof supabase !== "undefined" ? supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY) : null; } catch(e) { console.error("Supabase init failed:", e); }
 
     const SALES_PIN = "8520";
 
@@ -1615,7 +1614,11 @@
       );
     }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    try {
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    } catch(e) {
+      document.getElementById("root").innerHTML = `<div style="font-family:sans-serif;padding:40px;color:#C8553D"><b>App failed to start:</b><br><pre style="margin-top:12px;font-size:13px;white-space:pre-wrap">${e}</pre></div>`;
+    }
   </script>
 </body>
 </html>
