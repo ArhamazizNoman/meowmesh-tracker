@@ -37,9 +37,16 @@
   <!-- ============================================================= -->
   <script>
     window.SUPABASE_URL = "https://dicanelropavoaqisebh.supabase.co";    window.SUPABASE_ANON_KEY = "sb_publishable_dO4YNs6kZZhzIKQQ2Q8UuQ_BLSe2OaW";
+    window.onerror = function(msg, src, line, col, err) {
+      document.getElementById("root").innerHTML =
+        '<div style="font-family:sans-serif;padding:40px;color:#C8553D"><b>JS Error:</b><br><pre style="margin-top:10px;font-size:13px;white-space:pre-wrap">' +
+        msg + '\n\nFile: ' + src + '\nLine: ' + line + '</pre></div>';
+    };
+    document.getElementById("root").innerHTML = '<div style="font-family:sans-serif;padding:40px;color:#888">Loading scripts…</div>';
   </script>
 
   <script type="text/babel">
+    document.getElementById("root").innerHTML = '<div style="font-family:sans-serif;padding:40px;color:#888">Babel compiled OK, starting React…</div>';
     const { useState, useEffect, useRef } = React;
 
     const COLORS = {
