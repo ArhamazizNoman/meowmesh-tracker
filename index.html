@@ -9,6 +9,13 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>
+    // Force classic JSX runtime so Babel doesn't emit import statements
+    // (newer @babel/standalone defaults to automatic runtime, which breaks UMD React)
+    Babel.registerPreset("react-classic", {
+      presets: [[Babel.availablePresets["react"], { runtime: "classic" }]]
+    });
+  </script>
   <!-- Supabase client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Chart.js for PowerBI-like charts -->
@@ -37,16 +44,9 @@
   <!-- ============================================================= -->
   <script>
     window.SUPABASE_URL = "https://dicanelropavoaqisebh.supabase.co";    window.SUPABASE_ANON_KEY = "sb_publishable_dO4YNs6kZZhzIKQQ2Q8UuQ_BLSe2OaW";
-    window.onerror = function(msg, src, line, col, err) {
-      document.getElementById("root").innerHTML =
-        '<div style="font-family:sans-serif;padding:40px;color:#C8553D"><b>JS Error:</b><br><pre style="margin-top:10px;font-size:13px;white-space:pre-wrap">' +
-        msg + '\n\nFile: ' + src + '\nLine: ' + line + '</pre></div>';
-    };
-    document.getElementById("root").innerHTML = '<div style="font-family:sans-serif;padding:40px;color:#888">Loading scripts…</div>';
   </script>
 
-  <script type="text/babel">
-    document.getElementById("root").innerHTML = '<div style="font-family:sans-serif;padding:40px;color:#888">Babel compiled OK, starting React…</div>';
+  <script type="text/babel" data-presets="react-classic">
     const { useState, useEffect, useRef } = React;
 
     const COLORS = {
