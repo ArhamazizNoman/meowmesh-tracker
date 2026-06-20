@@ -382,8 +382,8 @@ function render(D) {
         ${(() => {
           const cities = o.cities || [];
           if (!cities.length) return `<div style="font-size:13px;color:#6B6255">No city data</div>`;
-          const max = Math.max(...cities.map((c:any)=>c.count), 1);
-          return cities.map((c:any) => `
+          const max = Math.max(...cities.map((c)=>c.count), 1);
+          return cities.map((c) => `
           <div class="bar-row">
             <div class="bar-header">
               <span style="font-size:13px;color:#23201A">${c.name}</span>
@@ -405,11 +405,11 @@ function render(D) {
           const labels = ['12a','1','2','3','4','5','6','7','8','9','10','11','12p','1','2','3','4','5','6','7','8','9','10','11'];
           return `
           <div style="display:grid;grid-template-columns:repeat(24,1fr);gap:2px;align-items:end;height:52px;margin-bottom:4px">
-            ${hrs.map((n:number,i:number) => `
+            ${hrs.map((n,i) => `
             <div title="${labels[i]}: ${n} orders" style="background:${n===0?'#F3EADB':n/max>0.7?'#C8553D':n/max>0.3?'#E8956B':'#F5C9BB'};border-radius:2px 2px 0 0;height:${n===0?4:Math.max(6,Math.round(n/max*48))}px"></div>`).join("")}
           </div>
           <div style="display:grid;grid-template-columns:repeat(24,1fr);gap:2px">
-            ${labels.map((l:string,i:number)=>(i%4===0)?`<span style="font-size:7.5px;color:#9B9286;text-align:center;grid-column:span 1">${l}</span>`:`<span></span>`).join("")}
+            ${labels.map((l,i)=>(i%4===0)?`<span style="font-size:7.5px;color:#9B9286;text-align:center;grid-column:span 1">${l}</span>`:`<span></span>`).join("")}
           </div>`;
         })()}
       </div>
@@ -753,3 +753,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
