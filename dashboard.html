@@ -389,26 +389,47 @@ const SUPABASE_URL     = "https://dicanelropavoaqisebh.supabase.co";
 const SUPABASE_ANON    = "sb_publishable_dO4YNs6kZZhzIKQQ2Q8UuQ_BLSe2OaW";
 const EDGE_FN_URL      = SUPABASE_URL + "/functions/v1/fetch-dashboard";
 
-async function initDashboard() {
-  // Show loading state
+async function initDashboard({ forceRefresh = false } = {}) {
+  const btn  = document.getElementById("btnRefresh");
   const badge = document.getElementById("statusBadge");
   const txt   = document.getElementById("statusText");
-  if (badge) { badge.className = "status-badge sample"; }
-  if (txt)   { txt.textContent = "Loading…"; }
 
-  // If extension already injected data, use it
-  if (typeof window.MEOWMESH_DATA !== "undefined" && window.MEOWMESH_DATA) {
+  const setStatus = (cls, label) => {
+    if (badge) badge.className = "status-badge " + cls;
+    if (txt)   txt.textContent = label;
+  };
+
+  // Extension-injected data takes priority
+  if (!forceRefresh && typeof window.MEOWMESH_DATA !== "undefined" && window.MEOWMESH_DATA) {
     render(window.MEOWMESH_DATA);
     return;
   }
 
-  try {
-    // Try Supabase cache first (fast)
-    const cached = await fetchCached();
-    if (cached) { render(cached); }
+  if (forceRefresh) {
+    // Refresh: call edge function directly, show spinner on button
+    if (btn) { btn.textContent = "⟳ Fetching…"; btn.disabled = true; }
+    setStatus("sample", "Refreshing…");
+    try {
+      const fresh = await fetchFresh();
+      if (fresh) { render(fresh); }
+      else       { setStatus("sample", "Refresh failed — showing cached"); }
+    } catch (e) {
+      setStatus("sample", "Error: " + e.message);
+    } finally {
+      if (btn) { btn.textContent = "⟳ Refresh"; btn.disabled = false; }
+    }
+    return;
+  }
 
-    // Always trigger a fresh fetch in background (edge function)
-    fetchFresh().then(fresh => { if (fresh) render(fresh); }).catch(() => {});
+  // Page load: show cache instantly, then refresh in background
+  setStatus("sample", "Loading…");
+  try {
+    const cached = await fetchCached();
+    if (cached) render(cached);
+    // Background refresh
+    fetchFresh()
+      .then(fresh => { if (fresh) render(fresh); })
+      .catch(() => {});
   } catch (e) {
     render(SAMPLE_DATA);
   }
@@ -428,15 +449,18 @@ async function fetchFresh() {
   const res = await fetch(EDGE_FN_URL, {
     headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` }
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Edge function ${res.status}: ${txt.slice(0,80)}`);
+  }
   return await res.json();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   initDashboard();
   document.getElementById("btnRefresh")?.addEventListener("click", () => {
-    window.MEOWMESH_DATA = undefined;
-    initDashboard();
+    window.MEOWMESH_DATA = null;
+    initDashboard({ forceRefresh: true });
   });
 });
 </script>
