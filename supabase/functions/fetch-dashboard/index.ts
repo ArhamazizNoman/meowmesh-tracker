@@ -31,9 +31,14 @@ Deno.serve(async (req) => {
       metaAccountId: Deno.env.get("META_ACCOUNT_ID")!,
     };
 
-    const [wc, sf, meta] = await Promise.allSettled([
-      fetchWooCommerce(cfg, from, to),
-      fetchSteadfast(cfg),
+    // WC first → consignment IDs → Steadfast; Meta runs in parallel
+    const wc = await Promise.allSettled([fetchWooCommerce(cfg, from, to)]).then(r => r[0]);
+    const consignmentIds: string[] = wc.status === "fulfilled"
+      ? (wc.value.consignmentIds || [])
+      : [];
+
+    const [sf, meta] = await Promise.allSettled([
+      fetchSteadfast(cfg, consignmentIds),
       fetchMeta(cfg, from, to),
     ]);
 
@@ -173,6 +178,15 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
     hours,
     dailySales: Object.entries(dailyMap).map(([date,revenue])=>({date,revenue:Math.round(revenue)})).sort((a,b)=>a.date.localeCompare(b.date)),
     newOrders, returningOrders,
+    // Consignment IDs from Steadfast WC plugin meta (_steadfast_consignment_id)
+    consignmentIds: [...new Set(
+      [...todayOrders, ...deliveredOrders]
+        .flatMap((o:any) => (o.meta_data||[])
+          .filter((m:any) => m.key === "_steadfast_consignment_id" && m.value)
+          .map((m:any) => String(m.value).trim())
+        )
+        .filter(Boolean)
+    )],
   };
 }
 
@@ -193,15 +207,68 @@ function normalizeChannel(r: string) {
 
 // ── Steadfast ─────────────────────────────────────────────────────────────────
 
-async function fetchSteadfast({ sfKey, sfSecret }: Record<string,string>) {
+async function fetchSteadfast({ sfKey, sfSecret }: Record<string,string>, consignmentIds: string[]) {
   const hdrs = { "Api-Key": sfKey, "Secret-Key": sfSecret, "Content-Type": "application/json" };
-  const res  = await fetch("https://portal.packzy.com/api/v1/get_balance", { headers: hdrs });
-  if (!res.ok) throw new Error(`Steadfast ${res.status}`);
-  const d = await res.json();
+
+  // Always fetch balance
+  const balRes = await fetch("https://portal.packzy.com/api/v1/get_balance", { headers: hdrs });
+  if (!balRes.ok) throw new Error(`Steadfast ${balRes.status}`);
+  const balData = await balRes.json();
+  const balanceAvailable = Math.round(balData.current_balance ?? balData.data?.current_balance ?? 0);
+
+  // If no consignment IDs (plugin not installed), return with zeros
+  if (!consignmentIds.length) {
+    return {
+      deliveredToday: { parcels: 0, cod: 0 },
+      payout: { shipping: 0, codFee: 0, returns: 0, netInHand: 0 },
+      balanceAvailable,
+      pluginInstalled: false,
+    };
+  }
+
+  // Batch status check — Steadfast accepts up to 500 IDs per call
+  const CHUNK = 500;
+  const parcels: any[] = [];
+  for (let i = 0; i < consignmentIds.length; i += CHUNK) {
+    const chunk = consignmentIds.slice(i, i + CHUNK);
+    const res = await fetch("https://portal.packzy.com/api/v1/status_by_cids", {
+      method: "POST",
+      headers: hdrs,
+      body: JSON.stringify({ consignment_ids: chunk }),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      const items = d.data || d || [];
+      if (Array.isArray(items)) parcels.push(...items);
+    }
+  }
+
+  // Count delivered parcels and sum amounts
+  const delivered = parcels.filter((p:any) =>
+    ["delivered","partial_delivered"].includes((p.delivery_status||p.status||"").toLowerCase())
+  );
+  const grossCOD    = delivered.reduce((s:number, p:any) => s + (parseFloat(p.cod_amount) || 0), 0);
+  const shipping    = delivered.reduce((s:number, p:any) => s + (parseFloat(p.charge) || parseFloat(p.delivery_charge) || 0), 0);
+  const codFee      = grossCOD * 0.01;
+  const netInHand   = grossCOD - shipping - codFee;
+
+  // Returned parcels
+  const returned    = parcels.filter((p:any) =>
+    ["cancelled","unknown","hold"].includes((p.delivery_status||p.status||"").toLowerCase())
+  );
+  const returnedCOD = returned.reduce((s:number, p:any) => s + (parseFloat(p.cod_amount) || 0), 0);
+
   return {
-    deliveredToday: { parcels:0, cod:0 },
-    payout: { shipping:0, codFee:0, returns:0, netInHand:0 },
-    balanceAvailable: Math.round(d.current_balance ?? d.data?.current_balance ?? 0),
+    deliveredToday: { parcels: delivered.length, cod: Math.round(grossCOD) },
+    payout: {
+      shipping:   Math.round(shipping),
+      codFee:     Math.round(codFee),
+      returns:    Math.round(returnedCOD),
+      netInHand:  Math.round(netInHand),
+    },
+    balanceAvailable,
+    pluginInstalled: true,
+    totalParcels: parcels.length,
   };
 }
 
