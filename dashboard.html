@@ -293,7 +293,7 @@ function render(D) {
       </div>
     </div>
 
-    <div class="row row-3 section-gap">
+    <div class="row row-2 section-gap">
 
       <!-- Products -->
       <div class="card">
@@ -304,23 +304,6 @@ function render(D) {
             <span class="item-name">${p.name}</span>
             <span class="item-sub" style="color:#6B6255">×${p.qty}</span>
             <span class="item-val">${tk(p.revenue)}</span>
-          </div>`).join("")}
-        </div>
-      </div>
-
-      <!-- Channels -->
-      <div class="card">
-        <h3 style="font-size:15px;margin-bottom:14px">By Channel</h3>
-        <div>
-          ${o.channels.map(c => `
-          <div class="bar-row">
-            <div class="bar-header">
-              <span style="font-size:13px;color:#23201A">${c.name}</span>
-              <span style="font-size:12px;color:#6B6255">${c.orders} orders · ${tk(c.revenue)}</span>
-            </div>
-            <div class="bar-track">
-              <div class="bar-fill" style="width:${pct(c.revenue, maxChanRev)}%;background:#C8553D"></div>
-            </div>
           </div>`).join("")}
         </div>
       </div>
