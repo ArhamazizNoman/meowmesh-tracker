@@ -114,6 +114,31 @@
   </div>
 </div>
 
+<!-- ── DATE RANGE BAR ──────────────────────────────────────────────────────── -->
+<div id="dateBar" style="background:#F3EADB;border-bottom:1px solid #E2D6C2;padding:10px 20px;">
+  <div style="max-width:960px;margin:0 auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div style="display:flex;border:1px solid #E2D6C2;border-radius:8px;overflow:hidden;background:#fff;">
+      <button class="preset-btn active" data-preset="today">Today</button>
+      <button class="preset-btn" data-preset="yesterday">Yesterday</button>
+      <button class="preset-btn" data-preset="week">This Week</button>
+      <button class="preset-btn" data-preset="lastweek">Last Week</button>
+      <button class="preset-btn" data-preset="month">This Month</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-left:4px;">
+      <input type="date" id="dateFrom" style="padding:6px 10px;border:1px solid #E2D6C2;border-radius:8px;font-size:12px;font-family:inherit;color:#23201A;background:#fff;outline:none;" />
+      <span style="font-size:12px;color:#6B6255;">→</span>
+      <input type="date" id="dateTo"   style="padding:6px 10px;border:1px solid #E2D6C2;border-radius:8px;font-size:12px;font-family:inherit;color:#23201A;background:#fff;outline:none;" />
+      <button id="btnApply" style="all:unset;cursor:pointer;padding:6px 14px;border-radius:8px;background:#C8553D;color:#fff;font-size:12px;font-weight:600;">Apply</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .preset-btn { all:unset; cursor:pointer; padding:7px 13px; font-size:12px; font-weight:600; color:#6B6255; background:#fff; transition:background .12s; white-space:nowrap; }
+  .preset-btn.active { background:#23201A; color:#fff; }
+  .preset-btn:hover:not(.active) { background:#F3EADB; }
+</style>
+
 <div class="page" id="page">
   <!-- rendered by JS -->
 </div>
@@ -387,51 +412,72 @@ function render(D) {
 
 const SUPABASE_URL     = "https://dicanelropavoaqisebh.supabase.co";
 const SUPABASE_ANON    = "sb_publishable_dO4YNs6kZZhzIKQQ2Q8UuQ_BLSe2OaW";
-const EDGE_FN_URL      = SUPABASE_URL + "/functions/v1/fetch-dashboard";
+const EDGE_FN_URL = SUPABASE_URL + "/functions/v1/fetch-dashboard";
+
+// ── Date range state ──────────────────────────────────────────────────────────
+
+function bdtToday() {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" }));
+}
+function fmt(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function startOfWeek(d) { const r = new Date(d); r.setDate(r.getDate()-r.getDay()); return r; }
+function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+
+let currentRange = { from: fmt(bdtToday()), to: fmt(bdtToday()) };
+
+function applyPreset(preset) {
+  const t = bdtToday();
+  const presets = {
+    today:    { from: fmt(t),                    to: fmt(t) },
+    yesterday:{ from: fmt(addDays(t,-1)),        to: fmt(addDays(t,-1)) },
+    week:     { from: fmt(startOfWeek(t)),       to: fmt(t) },
+    lastweek: { from: fmt(startOfWeek(addDays(t,-7))), to: fmt(addDays(startOfWeek(t),-1)) },
+    month:    { from: fmt(startOfMonth(t)),      to: fmt(t) },
+  };
+  currentRange = presets[preset] || presets.today;
+  document.getElementById("dateFrom").value = currentRange.from;
+  document.getElementById("dateTo").value   = currentRange.to;
+  document.querySelectorAll(".preset-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.preset === preset);
+  });
+}
+
+// ── Dashboard init ────────────────────────────────────────────────────────────
 
 async function initDashboard({ forceRefresh = false } = {}) {
-  const btn  = document.getElementById("btnRefresh");
+  const btn   = document.getElementById("btnRefresh");
   const badge = document.getElementById("statusBadge");
   const txt   = document.getElementById("statusText");
-
   const setStatus = (cls, label) => {
     if (badge) badge.className = "status-badge " + cls;
     if (txt)   txt.textContent = label;
   };
 
-  // Extension-injected data takes priority
   if (!forceRefresh && typeof window.MEOWMESH_DATA !== "undefined" && window.MEOWMESH_DATA) {
-    render(window.MEOWMESH_DATA);
-    return;
+    render(window.MEOWMESH_DATA); return;
   }
 
-  if (forceRefresh) {
-    // Refresh: call edge function directly, show spinner on button
-    if (btn) { btn.textContent = "⟳ Fetching…"; btn.disabled = true; }
-    setStatus("sample", "Refreshing…");
-    try {
-      const fresh = await fetchFresh();
-      if (fresh) { render(fresh); }
-      else       { setStatus("sample", "Refresh failed — showing cached"); }
-    } catch (e) {
-      setStatus("sample", "Error: " + e.message);
-    } finally {
-      if (btn) { btn.textContent = "⟳ Refresh"; btn.disabled = false; }
-    }
-    return;
-  }
-
-  // Page load: show cache instantly, then refresh in background
+  if (btn) { btn.textContent = "⟳ Fetching…"; btn.disabled = true; }
   setStatus("sample", "Loading…");
+
+  // Use cache only for today (historical always fetches fresh)
+  const isToday = currentRange.from === fmt(bdtToday()) && currentRange.to === fmt(bdtToday());
+  if (!forceRefresh && isToday) {
+    const cached = await fetchCached().catch(() => null);
+    if (cached) { render(cached); if (btn) { btn.textContent = "⟳ Refresh"; btn.disabled = false; } }
+  }
+
   try {
-    const cached = await fetchCached();
-    if (cached) render(cached);
-    // Background refresh
-    fetchFresh()
-      .then(fresh => { if (fresh) render(fresh); })
-      .catch(() => {});
+    const fresh = await fetchFresh(currentRange.from, currentRange.to);
+    if (fresh) render(fresh);
+    else setStatus("sample", "No data returned");
   } catch (e) {
-    render(SAMPLE_DATA);
+    setStatus("sample", "Error: " + e.message.slice(0, 60));
+  } finally {
+    if (btn) { btn.textContent = "⟳ Refresh"; btn.disabled = false; }
   }
 }
 
@@ -445,23 +491,51 @@ async function fetchCached() {
   return rows?.[0]?.data || null;
 }
 
-async function fetchFresh() {
-  const res = await fetch(EDGE_FN_URL, {
+async function fetchFresh(from, to) {
+  const url = `${EDGE_FN_URL}?from=${from}&to=${to}`;
+  const res = await fetch(url, {
     headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` }
   });
   if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`Edge function ${res.status}: ${txt.slice(0,80)}`);
+    const t = await res.text().catch(() => "");
+    throw new Error(`${res.status}: ${t.slice(0,80)}`);
   }
   return await res.json();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  initDashboard();
+  // Set defaults
+  const t = bdtToday();
+  document.getElementById("dateFrom").value = fmt(t);
+  document.getElementById("dateTo").value   = fmt(t);
+
+  // Preset buttons
+  document.querySelectorAll(".preset-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      applyPreset(btn.dataset.preset);
+      window.MEOWMESH_DATA = null;
+      initDashboard({ forceRefresh: true });
+    });
+  });
+
+  // Custom date apply
+  document.getElementById("btnApply")?.addEventListener("click", () => {
+    const from = document.getElementById("dateFrom").value;
+    const to   = document.getElementById("dateTo").value;
+    if (!from || !to) return;
+    currentRange = { from, to };
+    document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+    window.MEOWMESH_DATA = null;
+    initDashboard({ forceRefresh: true });
+  });
+
+  // Refresh button
   document.getElementById("btnRefresh")?.addEventListener("click", () => {
     window.MEOWMESH_DATA = null;
     initDashboard({ forceRefresh: true });
   });
+
+  initDashboard();
 });
 </script>
 

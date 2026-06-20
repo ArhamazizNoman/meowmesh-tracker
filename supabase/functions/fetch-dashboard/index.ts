@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS = {
@@ -6,7 +5,7 @@ const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
@@ -14,6 +13,13 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    const url    = new URL(req.url);
+    const bdtNow = nowBDT();
+    const todayStr = fmtDate(bdtNow);
+    const from   = url.searchParams.get("from") || todayStr;
+    const to     = url.searchParams.get("to")   || todayStr;
+    const isToday = from === todayStr && to === todayStr;
 
     const cfg = {
       wcUrl:         Deno.env.get("WC_URL")!,
@@ -26,17 +32,17 @@ serve(async (req) => {
     };
 
     const [wc, sf, meta] = await Promise.allSettled([
-      fetchWooCommerce(cfg),
+      fetchWooCommerce(cfg, from, to),
       fetchSteadfast(cfg),
-      fetchMeta(cfg),
+      fetchMeta(cfg, from, to),
     ]);
 
     const now    = new Date();
-    const nowBdt = nowBDT();
     const data = {
       meta: {
-        date: nowBdt.toLocaleDateString("en-GB", { weekday:"short", day:"numeric", month:"short", year:"numeric" }),
-        generatedAt: nowBdt.toLocaleTimeString("en-GB", { hour:"2-digit", minute:"2-digit" }) + " BDT",
+        date: bdtNow.toLocaleDateString("en-GB", { weekday:"short", day:"numeric", month:"short", year:"numeric" }),
+        generatedAt: bdtNow.toLocaleTimeString("en-GB", { hour:"2-digit", minute:"2-digit" }) + " BDT",
+        dateRange: from === to ? from : `${from} → ${to}`,
         live: true,
         currency: "৳",
         errors: {
@@ -50,8 +56,10 @@ serve(async (req) => {
       ads:       meta.status === "fulfilled" ? meta.value : defaultAds(),
     };
 
-    // Upsert snapshot into Supabase (single row, id=1)
-    await sb.from("dashboard_snapshots").upsert({ id: 1, data, updated_at: now.toISOString() });
+    // Only cache today's snapshot
+    if (isToday) {
+      await sb.from("dashboard_snapshots").upsert({ id: 1, data, updated_at: now.toISOString() });
+    }
 
     return new Response(JSON.stringify(data), {
       headers: { ...CORS, "Content-Type": "application/json" },
@@ -66,15 +74,16 @@ serve(async (req) => {
 
 // ── WooCommerce ───────────────────────────────────────────────────────────────
 
-async function fetchWooCommerce({ wcUrl, wcKey, wcSecret }: Record<string,string>) {
+async function fetchWooCommerce({ wcUrl, wcKey, wcSecret }: Record<string,string>, from: string, to: string) {
   const base  = wcUrl.replace(/\/$/, "");
   const auth  = btoa(`${wcKey}:${wcSecret}`);
   const hdrs  = { Authorization: `Basic ${auth}` };
-  const after = todayISO();
+  const after  = dateToISO(from, 0);
+  const before = dateToISO(to,   1); // exclusive end = next day midnight
 
   const [r1, r2] = await Promise.all([
-    fetch(`${base}/wp-json/wc/v3/orders?after=${encodeURIComponent(after)}&per_page=100&status=any`, { headers: hdrs }),
-    fetch(`${base}/wp-json/wc/v3/orders?modified_after=${encodeURIComponent(after)}&per_page=100&status=completed,wc-delivered`, { headers: hdrs }),
+    fetch(`${base}/wp-json/wc/v3/orders?after=${encodeURIComponent(after)}&before=${encodeURIComponent(before)}&per_page=100&status=any`, { headers: hdrs }),
+    fetch(`${base}/wp-json/wc/v3/orders?modified_after=${encodeURIComponent(after)}&modified_before=${encodeURIComponent(before)}&per_page=100&status=completed,wc-delivered`, { headers: hdrs }),
   ]);
 
   if (!r1.ok) throw new Error(`WooCommerce ${r1.status}`);
@@ -154,10 +163,8 @@ async function fetchSteadfast({ sfKey, sfSecret }: Record<string,string>) {
 
 // ── Meta Ads ──────────────────────────────────────────────────────────────────
 
-async function fetchMeta({ metaToken, metaAccountId }: Record<string,string>) {
-  const bdt   = nowBDT();
-  const today = `${bdt.getFullYear()}-${String(bdt.getMonth()+1).padStart(2,"0")}-${String(bdt.getDate()).padStart(2,"0")}`;
-  const timeRange = encodeURIComponent(JSON.stringify({ since: today, until: today }));
+async function fetchMeta({ metaToken, metaAccountId }: Record<string,string>, from: string, to: string) {
+  const timeRange = encodeURIComponent(JSON.stringify({ since: from, until: to }));
   const base      = `https://graph.facebook.com/v19.0/act_${metaAccountId}/insights`;
   const token     = `access_token=${encodeURIComponent(metaToken)}`;
 
@@ -188,11 +195,15 @@ function nowBDT() {
   return new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
 }
 
-function todayISO() {
-  // Midnight today in BDT, converted to UTC ISO string for WooCommerce
-  const bdt = nowBDT();
-  bdt.setHours(0, 0, 0, 0);
-  // BDT is UTC+6, so subtract 6 hours to get UTC equivalent
+function fmtDate(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+// Convert YYYY-MM-DD (BDT) + dayOffset to UTC ISO for WooCommerce
+function dateToISO(dateStr: string, dayOffset: number) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  // Build BDT midnight then subtract 6h for UTC
+  const bdt = new Date(y, m - 1, d + dayOffset, 0, 0, 0, 0);
   const utc = new Date(bdt.getTime() - 6 * 60 * 60 * 1000);
   return utc.toISOString();
 }
