@@ -243,9 +243,12 @@ function render(D) {
   document.getElementById("dateLine").textContent = `${D.meta.date} · Generated ${D.meta.generatedAt}`;
   const badge = document.getElementById("statusBadge");
   const text  = document.getElementById("statusText");
+  const errs = D.meta.errors || {};
+  const errSources = Object.entries(errs).filter(([,v])=>v).map(([k])=>k);
   if (D.meta.live) {
-    badge.className = "status-badge live";
-    text.textContent = "Live";
+    badge.className = errSources.length ? "status-badge sample" : "status-badge live";
+    text.textContent = errSources.length ? `⚠ ${errSources.join(", ")} error` : "Live";
+    badge.title = errSources.map(k => `${k}: ${errs[k]}`).join("\n") || "";
   } else {
     badge.className = "status-badge sample";
     text.textContent = "Sample data";
