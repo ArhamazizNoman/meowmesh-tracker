@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MeowMesh Live Data</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: #FBF6EC; color: #23201A;
+      width: 320px; min-height: 200px;
+      font-size: 13px;
+    }
+    .header {
+      background: #F3EADB; border-bottom: 1px solid #E2D6C2;
+      padding: 12px 16px; display: flex; align-items: center; gap: 8px;
+    }
+    .header h1 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+    .header span.clay { color: #C8553D; }
+    .body { padding: 14px 16px; }
+
+    .tabs { display: flex; border: 1px solid #E2D6C2; border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+    .tab  { flex: 1; padding: 7px; text-align: center; font-size: 12px; font-weight: 600;
+            background: #fff; color: #6B6255; cursor: pointer; border: none; transition: background .12s; }
+    .tab.active { background: #23201A; color: #fff; }
+
+    .section { margin-bottom: 12px; }
+    .section-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                     letter-spacing: 0.07em; color: #6B6255; margin-bottom: 6px; }
+    label { display: block; font-size: 11px; color: #6B6255; margin-bottom: 3px; margin-top: 7px; }
+    input[type=text], input[type=password], input[type=url] {
+      width: 100%; padding: 7px 10px; border-radius: 8px;
+      border: 1px solid #E2D6C2; background: #fff;
+      font-size: 12px; color: #23201A; outline: none;
+      font-family: inherit; transition: border-color .15s;
+    }
+    input:focus { border-color: #C8553D; }
+
+    .btn {
+      all: unset; cursor: pointer; display: block; width: 100%; text-align: center;
+      padding: 10px; border-radius: 10px; font-size: 13px; font-weight: 600;
+      transition: background .15s, opacity .15s;
+    }
+    .btn-primary { background: #C8553D; color: #fff; }
+    .btn-primary:hover { background: #A8422F; }
+    .btn-save    { background: #23201A; color: #fff; }
+    .btn-save:hover { background: #3a342a; }
+    .btn:disabled { opacity: 0.55; cursor: default; }
+
+    .status-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 10px; border-radius: 8px; font-size: 12px; font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .status-idle    { background: #F3EADB; color: #6B6255; }
+    .status-loading { background: #DBEAFE; color: #1E40AF; }
+    .status-ok      { background: #EAF1EC; color: #3D6B4F; }
+    .status-err     { background: #FEF3EF; color: #A8422F; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .dot-idle    { background: #aaa; }
+    .dot-loading { background: #3B82F6; animation: pulse .8s infinite; }
+    .dot-ok      { background: #4F7060; }
+    .dot-err     { background: #C8553D; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    .error-detail { font-size: 11px; color: #A8422F; margin-top: 4px; line-height: 1.4;
+                    background: #FEF3EF; border-radius: 6px; padding: 6px 8px; }
+    .api-status { display: grid; gap: 4px; margin-top: 8px; }
+    .api-row { display: flex; justify-content: space-between; font-size: 11px;
+               padding: 4px 8px; border-radius: 6px; background: #fff; border: 1px solid #E2D6C2; }
+    .api-row .ok  { color: #4F7060; font-weight: 700; }
+    .api-row .err { color: #C8553D; font-weight: 700; }
+
+    .hint { font-size: 10px; color: #aaa; margin-top: 4px; line-height: 1.5; }
+    hr { border: none; border-top: 1px solid #E2D6C2; margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span style="font-size:18px">🐾</span>
+    <h1>MeowMesh <span class="clay">Live</span></h1>
+  </div>
+
+  <div class="body">
+    <div class="tabs">
+      <button class="tab active" id="tabFetch">Fetch</button>
+      <button class="tab"        id="tabCreds">Settings</button>
+    </div>
+
+    <!-- ── FETCH TAB ─────────────────────────────────────────────────── -->
+    <div id="paneFetch">
+      <div class="status-row status-idle" id="statusRow">
+        <div class="dot dot-idle" id="statusDot"></div>
+        <span id="statusText">Ready — open dashboard then click Fetch</span>
+      </div>
+
+      <button class="btn btn-primary" id="btnFetch">⟳ Fetch live data &amp; inject</button>
+
+      <div class="api-status" id="apiStatus" style="display:none"></div>
+    </div>
+
+    <!-- ── SETTINGS TAB ──────────────────────────────────────────────── -->
+    <div id="paneCreds" style="display:none">
+
+      <div class="section">
+        <div class="section-label">WooCommerce</div>
+        <label>Store URL (e.g. https://yoursite.com)</label>
+        <input type="url"      id="wcUrl"    placeholder="https://yoursite.com" />
+        <label>Consumer Key</label>
+        <input type="password" id="wcKey"    placeholder="ck_…" />
+        <label>Consumer Secret</label>
+        <input type="password" id="wcSecret" placeholder="cs_…" />
+        <p class="hint">WooCommerce → Settings → Advanced → REST API → Add key (Read access)</p>
+      </div>
+
+      <hr />
+
+      <div class="section">
+        <div class="section-label">Steadfast</div>
+        <label>API Key</label>
+        <input type="password" id="sfKey"    placeholder="Steadfast API key" />
+        <label>Secret Key</label>
+        <input type="password" id="sfSecret" placeholder="Steadfast secret key" />
+        <p class="hint">Steadfast portal → API Credentials</p>
+      </div>
+
+      <hr />
+
+      <div class="section">
+        <div class="section-label">Meta Ads</div>
+        <label>Ad Account ID (without act_)</label>
+        <input type="text"     id="metaAccountId" placeholder="123456789" />
+        <label>Access Token</label>
+        <input type="password" id="metaToken"      placeholder="EAABwz…" />
+        <p class="hint">Meta Business Suite → System Users → Generate token (ads_read scope)</p>
+      </div>
+
+      <button class="btn btn-save" id="btnSave" style="margin-top:4px">Save credentials</button>
+      <div id="saveMsg" style="display:none;text-align:center;font-size:12px;color:#4F7060;margin-top:6px;font-weight:600">✓ Saved</div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
