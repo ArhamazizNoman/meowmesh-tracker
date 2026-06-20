@@ -291,6 +291,11 @@ function render(D) {
         <div class="kpi-val">${o.itemCount}</div>
         <div class="kpi-sub">${(o.itemCount / totalOrders).toFixed(1)} per order</div>
       </div>
+      <div class="kpi" style="border-top-color:#EF4444">
+        <div class="kpi-label">Cancelled / Failed</div>
+        <div class="kpi-val" style="color:${(o.cancelCount||0)>0?'#C8553D':'#23201A'}">${o.cancelCount||0}</div>
+        <div class="kpi-sub">${totalOrders > 0 ? Math.round((o.cancelCount||0)/(totalOrders+(o.cancelCount||0))*100) : 0}% loss rate</div>
+      </div>
     </div>
 
     <div class="row row-2 section-gap">
@@ -367,6 +372,48 @@ function render(D) {
         })()}
       </div>
     </div>` : ""}
+
+    <!-- District + Hours row -->
+    <div class="row row-2 section-gap">
+
+      <!-- District/City breakdown -->
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:14px">Top Cities</h3>
+        ${(() => {
+          const cities = o.cities || [];
+          if (!cities.length) return `<div style="font-size:13px;color:#6B6255">No city data</div>`;
+          const max = Math.max(...cities.map((c:any)=>c.count), 1);
+          return cities.map((c:any) => `
+          <div class="bar-row">
+            <div class="bar-header">
+              <span style="font-size:13px;color:#23201A">${c.name}</span>
+              <span style="font-size:12px;color:#6B6255">${c.count} orders</span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${Math.round(c.count/max*100)}%;background:#6B9AB8"></div>
+            </div>
+          </div>`).join("");
+        })()}
+      </div>
+
+      <!-- Peak hours heatmap -->
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:14px">Peak Hours <span style="font-size:11px;font-weight:400;color:#6B6255;font-family:'DM Sans',sans-serif">BDT</span></h3>
+        ${(() => {
+          const hrs = o.hours || new Array(24).fill(0);
+          const max = Math.max(...hrs, 1);
+          const labels = ['12a','1','2','3','4','5','6','7','8','9','10','11','12p','1','2','3','4','5','6','7','8','9','10','11'];
+          return `
+          <div style="display:grid;grid-template-columns:repeat(24,1fr);gap:2px;align-items:end;height:52px;margin-bottom:4px">
+            ${hrs.map((n:number,i:number) => `
+            <div title="${labels[i]}: ${n} orders" style="background:${n===0?'#F3EADB':n/max>0.7?'#C8553D':n/max>0.3?'#E8956B':'#F5C9BB'};border-radius:2px 2px 0 0;height:${n===0?4:Math.max(6,Math.round(n/max*48))}px"></div>`).join("")}
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(24,1fr);gap:2px">
+            ${labels.map((l:string,i:number)=>(i%4===0)?`<span style="font-size:7.5px;color:#9B9286;text-align:center;grid-column:span 1">${l}</span>`:`<span></span>`).join("")}
+          </div>`;
+        })()}
+      </div>
+    </div>
 
     <!-- ── STEADFAST ───────────────────────────────────────── -->
     <p class="section-title">Steadfast — Today</p>
@@ -452,21 +499,66 @@ function render(D) {
     <!-- ── ADS ────────────────────────────────────────────── -->
     <p class="section-title">Meta Ads — Today</p>
 
+    <!-- Meta top KPIs -->
+    <div class="kpi-grid" style="margin-bottom:20px;grid-template-columns:repeat(5,1fr)">
+      <div class="kpi" style="border-top-color:#E8A838">
+        <div class="kpi-label">Spend</div>
+        <div class="kpi-val">${usd(ads.spendToday)}</div>
+        <div class="kpi-sub">USD</div>
+      </div>
+      <div class="kpi" style="border-top-color:#6B9AB8">
+        <div class="kpi-label">Impressions</div>
+        <div class="kpi-val">${(ads.impressions||0).toLocaleString("en-IN")}</div>
+        <div class="kpi-sub">CPM ${usd(ads.cpm||0)}</div>
+      </div>
+      <div class="kpi" style="border-top-color:#4F7060">
+        <div class="kpi-label">CTR</div>
+        <div class="kpi-val">${((ads.ctr||0)).toFixed(2)}%</div>
+        <div class="kpi-sub">${(ads.clicks||0).toLocaleString()} clicks</div>
+      </div>
+      <div class="kpi" style="border-top-color:#A78BFA">
+        <div class="kpi-label">Frequency</div>
+        <div class="kpi-val" style="color:${(ads.frequency||0)>3?'#C8553D':'#23201A'}">${(ads.frequency||0).toFixed(2)}</div>
+        <div class="kpi-sub">${(ads.frequency||0)>3?'⚠ fatigue risk':'avg views/person'}</div>
+      </div>
+      <div class="kpi" style="border-top-color:#C8553D">
+        <div class="kpi-label">ROAS</div>
+        <div class="kpi-val">${ads.spendToday > 0 ? (totalRevenue / ads.spendToday).toFixed(1) + "×" : "—"}</div>
+        <div class="kpi-sub">revenue ÷ spend</div>
+      </div>
+    </div>
+
     <div class="row row-2 section-gap">
 
-      <!-- Spend KPI -->
-      <div class="card" style="display:flex;flex-direction:column;gap:16px">
-        <div>
-          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#6B6255;margin-bottom:6px">Total Ad Spend Today</div>
-          <div style="font-family:'Fraunces',serif;font-size:38px;font-weight:700;color:#E8A838">${usd(ads.spendToday)}</div>
-        </div>
-        <div style="padding-top:12px;border-top:1px solid #F3EADB">
-          <div style="font-size:12px;color:#6B6255">Implied ROAS (vs gross orders)</div>
-          <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:#23201A;margin-top:2px">
-            ${ads.spendToday > 0 ? (totalRevenue / ads.spendToday).toFixed(2) + "×" : "—"}
-          </div>
-          <div style="font-size:10px;color:#6B6255;margin-top:2px">Gross orders ÷ ad spend · not adjusted for FB attribution</div>
-        </div>
+      <!-- Funnel: Link clicks → Purchases -->
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:16px">Funnel</h3>
+        ${(() => {
+          const steps = [
+            { label:"Impressions", val: ads.impressions||0, color:"#6B9AB8" },
+            { label:"Link Clicks", val: ads.linkClicks||0, color:"#4F7060" },
+            { label:"Purchases",   val: ads.purchases||0,  color:"#C8553D" },
+          ];
+          const max = Math.max(steps[0].val, 1);
+          return steps.map((s,i) => {
+            const pct = Math.max(8, Math.round(s.val/max*100));
+            const conv = i > 0 && steps[i-1].val > 0 ? (s.val/steps[i-1].val*100).toFixed(1)+"%" : "";
+            return `
+            <div style="margin-bottom:10px">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+                <span style="color:#6B6255">${s.label}</span>
+                <span style="font-weight:700;color:#23201A">${s.val.toLocaleString("en-IN")}${conv?` <span style="font-weight:400;color:#6B6255;font-size:11px">↑${conv}</span>`:""}</span>
+              </div>
+              <div style="height:8px;background:#F3EADB;border-radius:999px;overflow:hidden">
+                <div style="width:${pct}%;height:100%;background:${s.color};border-radius:999px"></div>
+              </div>
+            </div>`;
+          }).join("") + (ads.purchases > 0 ? `
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid #F3EADB;display:flex;justify-content:space-between;font-size:13px">
+            <span style="color:#6B6255">Cost per purchase</span>
+            <span style="font-weight:700;font-family:'Fraunces',serif">${usd(ads.costPerPurchase||0)}</span>
+          </div>` : "");
+        })()}
       </div>
 
       <!-- Campaigns -->

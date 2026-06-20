@@ -98,6 +98,8 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
   const channelMap: Record<string,{orders:number,revenue:number}> = {};
   const stageMap:   Record<string,{orders:number,amount:number}>  = {};
   const sourceMap:  Record<string,number> = {};
+  const cityMap:    Record<string,number> = {};
+  const hours:      number[] = new Array(24).fill(0);
 
   for (const o of todayOrders) {
     totalSales += parseFloat(o.total) || 0;
@@ -119,15 +121,25 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
       getMeta("_wc_order_attribution_origin") ||
       getMeta("_wc_order_attribution_utm_source") ||
       getMeta("_wc_order_attribution_source_type") ||
-      o.created_via ||
-      "unknown";
-    const rawSrc = String(origin).trim();
-    sourceMap[rawSrc] = (sourceMap[rawSrc] || 0) + 1;
+      o.created_via || "unknown";
+    sourceMap[String(origin).trim()] = (sourceMap[String(origin).trim()] || 0) + 1;
 
     const stage = mapStage(o.status);
     if (!stageMap[stage]) stageMap[stage] = { orders:0, amount:0 };
     stageMap[stage].orders++;
     stageMap[stage].amount += parseFloat(o.total) || 0;
+
+    // City breakdown
+    const city = (o.billing?.city || "Unknown").trim();
+    cityMap[city] = (cityMap[city] || 0) + 1;
+
+    // Hour of day in BDT (date_created_gmt + 6h)
+    const gmt = o.date_created_gmt || o.date_created || "";
+    if (gmt) {
+      const utcMs = new Date(gmt.endsWith("Z") ? gmt : gmt + "Z").getTime();
+      const bdtHour = new Date(utcMs + 6 * 3600000).getUTCHours();
+      hours[bdtHour]++;
+    }
   }
 
   const todayIds = new Set(todayOrders.map((o:any)=>o.id));
@@ -137,12 +149,18 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
   }
   stageMap["Delivered"] = del;
 
+  const cancelled = stageMap["Cancelled"] || { orders:0, amount:0 };
+
   return {
     totalSales: Math.round(totalSales), orderCount, itemCount,
+    cancelCount: cancelled.orders,
+    cancelAmount: Math.round(cancelled.amount),
     products: Object.entries(productMap).map(([name,v])=>({name,qty:v.qty,revenue:Math.round(v.revenue)})).sort((a,b)=>b.revenue-a.revenue),
     channels: Object.entries(channelMap).map(([name,v])=>({name,orders:v.orders,revenue:Math.round(v.revenue)})).sort((a,b)=>b.orders-a.orders),
-    stages: ["Pending","Processing","In Courier","Delivered"].filter(s=>stageMap[s]).map(s=>({name:s,...stageMap[s],amount:Math.round(stageMap[s].amount)})),
+    stages: ["Pending","Processing","In Courier","Delivered","Cancelled"].filter(s=>stageMap[s]).map(s=>({name:s,...stageMap[s],amount:Math.round(stageMap[s].amount)})),
     sources: Object.entries(sourceMap).map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count),
+    cities: Object.entries(cityMap).map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count).slice(0,10),
+    hours,
   };
 }
 
@@ -150,7 +168,8 @@ function mapStage(s: string) {
   s = (s||"").toLowerCase();
   if (["completed","delivered","wc-delivered"].includes(s)) return "Delivered";
   if (["shipped","in-courier","wc-in-courier","out-for-delivery"].includes(s)) return "In Courier";
-  if (["pending","failed","cancelled"].includes(s)) return "Pending";
+  if (["cancelled","failed","refunded"].includes(s)) return "Cancelled";
+  if (s === "pending") return "Pending";
   return "Processing";
 }
 function normalizeChannel(r: string) {
@@ -181,8 +200,9 @@ async function fetchMeta({ metaToken, metaAccountId }: Record<string,string>, fr
   const base      = `https://graph.facebook.com/v19.0/act_${metaAccountId}/insights`;
   const token     = `access_token=${encodeURIComponent(metaToken)}`;
 
+  const fields = "spend,impressions,clicks,cpm,ctr,frequency,actions";
   const [r1, r2] = await Promise.all([
-    fetch(`${base}?fields=spend&time_range=${timeRange}&${token}`),
+    fetch(`${base}?fields=${fields}&time_range=${timeRange}&${token}`),
     fetch(`${base}?fields=campaign_name,spend&level=campaign&time_range=${timeRange}&${token}`),
   ]);
 
@@ -190,9 +210,24 @@ async function fetchMeta({ metaToken, metaAccountId }: Record<string,string>, fr
   const d1 = await r1.json();
   if (d1.error) throw new Error(`Meta: ${d1.error.message}`);
 
+  const ins = d1.data?.[0] || {};
+  const actions = ins.actions || [];
+  const getAction = (type: string) => parseFloat(actions.find((a:any)=>a.action_type===type)?.value || "0");
+  const spend = parseFloat(ins.spend || "0");
+  const purchases = getAction("purchase") || getAction("omni_purchase");
+  const linkClicks = getAction("link_click");
+
   const d2 = r2.ok ? await r2.json() : { data: [] };
   return {
-    spendToday: parseFloat(d1.data?.[0]?.spend || "0"),
+    spendToday:      spend,
+    impressions:     parseInt(ins.impressions || "0"),
+    clicks:          parseInt(ins.clicks || "0"),
+    cpm:             parseFloat(ins.cpm || "0"),
+    ctr:             parseFloat(ins.ctr || "0"),
+    frequency:       parseFloat(ins.frequency || "0"),
+    linkClicks,
+    purchases,
+    costPerPurchase: purchases > 0 ? spend / purchases : 0,
     campaigns: (d2.data||[])
       .map((c:any)=>({ name: c.campaign_name, spend: parseFloat(c.spend)||0 }))
       .filter((c:any)=>c.spend>0)
