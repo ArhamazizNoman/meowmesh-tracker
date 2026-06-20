@@ -100,6 +100,8 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
   const sourceMap:  Record<string,number> = {};
   const cityMap:    Record<string,number> = {};
   const hours:      number[] = new Array(24).fill(0);
+  const dailyMap:   Record<string,number> = {};
+  let newOrders = 0, returningOrders = 0;
 
   for (const o of todayOrders) {
     totalSales += parseFloat(o.total) || 0;
@@ -139,7 +141,15 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
       const utcMs = new Date(gmt.endsWith("Z") ? gmt : gmt + "Z").getTime();
       const bdtHour = new Date(utcMs + 6 * 3600000).getUTCHours();
       hours[bdtHour]++;
+      // Daily sales in BDT date
+      const bdtDate = new Date(utcMs + 6 * 3600000);
+      const dk = `${bdtDate.getUTCFullYear()}-${String(bdtDate.getUTCMonth()+1).padStart(2,"0")}-${String(bdtDate.getUTCDate()).padStart(2,"0")}`;
+      dailyMap[dk] = (dailyMap[dk] || 0) + (parseFloat(o.total) || 0);
     }
+
+    // New vs returning (customer_id=0 means guest/new)
+    if (!o.customer_id || o.customer_id === 0) newOrders++;
+    else returningOrders++;
   }
 
   const todayIds = new Set(todayOrders.map((o:any)=>o.id));
@@ -161,6 +171,8 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
     sources: Object.entries(sourceMap).map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count),
     cities: Object.entries(cityMap).map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count).slice(0,10),
     hours,
+    dailySales: Object.entries(dailyMap).map(([date,revenue])=>({date,revenue:Math.round(revenue)})).sort((a,b)=>a.date.localeCompare(b.date)),
+    newOrders, returningOrders,
   };
 }
 

@@ -173,6 +173,18 @@
     </div>
   </div>
 </div>
+<!-- Monthly goal bar -->
+<div style="background:#162B22;border-bottom:1px solid #2D5442;padding:5px 20px 7px">
+  <div style="max-width:960px;margin:0 auto">
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:#4F8C6A;margin-bottom:4px">
+      <span>Monthly Revenue Goal</span>
+      <span><span id="mk-goal-current" style="color:#E8F5EE;font-weight:700">—</span> <span style="color:#4F8C6A">/ ৳3,00,000</span> &nbsp;·&nbsp; <span id="mk-goal-pct" style="color:#7EB89A;font-weight:700">—</span></span>
+    </div>
+    <div style="height:5px;background:#2D5442;border-radius:999px;overflow:hidden">
+      <div id="mk-goal-bar" style="height:100%;background:linear-gradient(90deg,#4F8C6A,#7EB89A);border-radius:999px;width:0%;transition:width 0.6s ease"></div>
+    </div>
+  </div>
+</div>
 
 <div class="page" id="page">
   <!-- rendered by JS -->
@@ -277,7 +289,10 @@ function render(D) {
 
     <div class="kpi-grid" style="margin-bottom:20px">
       <div class="kpi" style="border-top-color:#C8553D">
-        <div class="kpi-label">Total Sales</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div class="kpi-label">Total Sales</div>
+          <svg id="sparkline-svg" width="72" height="22" viewBox="0 0 72 22" style="opacity:0.75;margin-top:1px"></svg>
+        </div>
         <div class="kpi-val">${tk(totalRevenue)}</div>
         <div class="kpi-sub">${totalOrders} orders · ${o.itemCount} items</div>
       </div>
@@ -373,7 +388,40 @@ function render(D) {
       </div>
     </div>` : ""}
 
-    <!-- Hours row -->
+    <!-- New vs Returning + Hours row -->
+    <div class="row row-2 section-gap">
+
+      <!-- New vs Returning -->
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:16px">New vs Returning</h3>
+        ${(() => {
+          const nw  = o.newOrders      || 0;
+          const ret = o.returningOrders || 0;
+          const tot = nw + ret || 1;
+          const nwPct  = Math.round(nw  / tot * 100);
+          const retPct = Math.round(ret / tot * 100);
+          return `
+          <div style="display:flex;gap:12px;margin-bottom:14px">
+            <div style="flex:1;background:#FEF3EF;border-radius:10px;padding:12px;text-align:center">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#C8553D;margin-bottom:4px">New</div>
+              <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:700;color:#C8553D">${nw}</div>
+              <div style="font-size:11px;color:#6B6255;margin-top:2px">${nwPct}% of orders</div>
+            </div>
+            <div style="flex:1;background:#EAF1EC;border-radius:10px;padding:12px;text-align:center">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#4F7060;margin-bottom:4px">Returning</div>
+              <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:700;color:#4F7060">${ret}</div>
+              <div style="font-size:11px;color:#6B6255;margin-top:2px">${retPct}% of orders</div>
+            </div>
+          </div>
+          <div style="height:8px;border-radius:999px;overflow:hidden;display:flex;gap:2px">
+            <div style="width:${nwPct}%;background:#C8553D;border-radius:999px 0 0 999px"></div>
+            <div style="flex:1;background:#4F7060;border-radius:0 999px 999px 0"></div>
+          </div>
+          <div style="font-size:10px;color:#9B9286;margin-top:6px">New = guest checkout · Returning = has account</div>`;
+        })()}
+      </div>
+
+      <!-- Peak hours heatmap -->
     <div class="section-gap">
 
       <!-- Peak hours heatmap -->
@@ -393,6 +441,7 @@ function render(D) {
           </div>`;
         })()}
       </div>
+    </div>
 
     <!-- ── STEADFAST ───────────────────────────────────────── -->
     <p class="section-title">Steadfast — Today</p>
@@ -665,6 +714,8 @@ async function fetchFresh(from, to) {
 
 const BDT_PER_USD = 110; // approximate exchange rate for ROAS calculation
 
+const MONTH_GOAL = 300000;
+
 async function loadMonthStrip() {
   const t    = bdtToday();
   const from = fmt(new Date(t.getFullYear(), t.getMonth(), 1));
@@ -673,24 +724,53 @@ async function loadMonthStrip() {
     const data = await fetchFresh(from, to);
     const sales   = data?.orders?.totalSales  || 0;
     const orders  = data?.orders?.orderCount  || 0;
-    const spend   = data?.ads?.spendToday     || 0; // cumulative month spend
+    const spend   = data?.ads?.spendToday     || 0;
     const roas    = spend > 0 ? (sales / (spend * BDT_PER_USD)) : null;
 
     document.getElementById("mk-orders").textContent  = orders.toLocaleString("en-IN");
     document.getElementById("mk-revenue").textContent = tk(sales);
     document.getElementById("mk-spend").textContent   = usd(spend);
     document.getElementById("mk-roas").textContent    = roas !== null ? roas.toFixed(2) + "x" : "N/A";
+    ["mk-orders","mk-revenue","mk-spend","mk-roas"].forEach(id =>
+      document.getElementById(id)?.classList.remove("mkpi-loading")
+    );
 
-    // Remove loading dim
-    ["mk-orders","mk-revenue","mk-spend","mk-roas"].forEach(id => {
-      document.getElementById(id)?.classList.remove("mkpi-loading");
-    });
+    // Goal bar
+    const pct = Math.min(100, Math.round(sales / MONTH_GOAL * 100));
+    const goalBar = document.getElementById("mk-goal-bar");
+    const goalPct = document.getElementById("mk-goal-pct");
+    const goalCur = document.getElementById("mk-goal-current");
+    if (goalBar) goalBar.style.width = pct + "%";
+    if (goalPct) goalPct.textContent = pct + "%";
+    if (goalCur) goalCur.textContent = tk(sales);
+    if (goalBar && pct >= 100) goalBar.style.background = "linear-gradient(90deg,#4F7060,#7EB89A)";
   } catch (e) {
     ["mk-orders","mk-revenue","mk-spend","mk-roas"].forEach(id => {
       const el = document.getElementById(id);
       if (el) { el.textContent = "Err"; el.title = e.message; }
     });
   }
+}
+
+// ── 7-day sparkline ───────────────────────────────────────────────────────────
+
+async function loadSparkline() {
+  const t = bdtToday();
+  try {
+    const data = await fetchFresh(fmt(addDays(t, -6)), fmt(t));
+    const daily = data?.orders?.dailySales || [];
+    if (!daily.length) return;
+    const el = document.getElementById("sparkline-svg");
+    if (!el) return;
+    const W = 72, H = 22;
+    const vals = daily.map(d => d.revenue);
+    const max = Math.max(...vals, 1);
+    const n = vals.length;
+    const pts = vals.map((v, i) =>
+      `${Math.round(i / Math.max(n-1,1) * W)},${Math.round(H - (v/max) * (H-2) - 1)}`
+    ).join(" ");
+    el.innerHTML = `<polyline points="${pts}" fill="none" stroke="#C8553D" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>`;
+  } catch(e) {}
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -727,6 +807,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initDashboard();
   loadMonthStrip();
+  loadSparkline();
 });
 </script>
 
