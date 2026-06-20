@@ -114,7 +114,14 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
     channelMap[ch].orders++;
     channelMap[ch].revenue += parseFloat(o.total) || 0;
 
-    const rawSrc = (o.created_via || "unknown").toLowerCase().trim();
+    const getMeta = (key: string) => (o.meta_data||[]).find((m:any)=>m.key===key)?.value;
+    const origin =
+      getMeta("_wc_order_attribution_origin") ||
+      getMeta("_wc_order_attribution_utm_source") ||
+      getMeta("_wc_order_attribution_source_type") ||
+      o.created_via ||
+      "unknown";
+    const rawSrc = String(origin).trim();
     sourceMap[rawSrc] = (sourceMap[rawSrc] || 0) + 1;
 
     const stage = mapStage(o.status);
