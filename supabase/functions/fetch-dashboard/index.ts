@@ -31,11 +31,12 @@ serve(async (req) => {
       fetchMeta(cfg),
     ]);
 
-    const now = new Date();
+    const now    = new Date();
+    const nowBdt = nowBDT();
     const data = {
       meta: {
-        date: now.toLocaleDateString("en-GB", { weekday:"short", day:"numeric", month:"short", year:"numeric" }),
-        generatedAt: now.toLocaleTimeString("en-GB", { hour:"2-digit", minute:"2-digit" }),
+        date: nowBdt.toLocaleDateString("en-GB", { weekday:"short", day:"numeric", month:"short", year:"numeric" }),
+        generatedAt: nowBdt.toLocaleTimeString("en-GB", { hour:"2-digit", minute:"2-digit" }) + " BDT",
         live: true,
         currency: "৳",
         errors: {
@@ -154,7 +155,8 @@ async function fetchSteadfast({ sfKey, sfSecret }: Record<string,string>) {
 // ── Meta Ads ──────────────────────────────────────────────────────────────────
 
 async function fetchMeta({ metaToken, metaAccountId }: Record<string,string>) {
-  const today     = new Date().toISOString().split("T")[0];
+  const bdt   = nowBDT();
+  const today = `${bdt.getFullYear()}-${String(bdt.getMonth()+1).padStart(2,"0")}-${String(bdt.getDate()).padStart(2,"0")}`;
   const timeRange = encodeURIComponent(JSON.stringify({ since: today, until: today }));
   const base      = `https://graph.facebook.com/v19.0/act_${metaAccountId}/insights`;
   const token     = `access_token=${encodeURIComponent(metaToken)}`;
@@ -180,8 +182,19 @@ async function fetchMeta({ metaToken, metaAccountId }: Record<string,string>) {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+const TZ = "Asia/Dhaka"; // BDT = UTC+6
+
+function nowBDT() {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
+}
+
 function todayISO() {
-  const d = new Date(); d.setHours(0,0,0,0); return d.toISOString();
+  // Midnight today in BDT, converted to UTC ISO string for WooCommerce
+  const bdt = nowBDT();
+  bdt.setHours(0, 0, 0, 0);
+  // BDT is UTC+6, so subtract 6 hours to get UTC equivalent
+  const utc = new Date(bdt.getTime() - 6 * 60 * 60 * 1000);
+  return utc.toISOString();
 }
 function defaultOrders() {
   return { totalSales:0, orderCount:0, itemCount:0, products:[], channels:[], stages:[] };
