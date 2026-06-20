@@ -264,10 +264,21 @@
 
     function EmployeeView({ person, reports, onSave }) {
       const cfg = TASKS[person];
-      const today = todayStr();
-      const todayDow = new Date().getDay();
+      const realToday = todayStr();
+      const [weekOffset, setWeekOffset] = useState(0);
+      const [selectedDate, setSelectedDate] = useState(realToday);
+
+      const today = weekOffset === 0 ? realToday : selectedDate;
+      const todayDow = (() => { const [y,m,d] = today.split("-").map(Number); return new Date(y,m-1,d).getDay(); })();
       const weekStart = getWeekStart(today);
       const existing = reports[`${today}:${person}`];
+
+      const prevWeekStart = (() => {
+        const [y,m,d] = getWeekStart(realToday).split("-").map(Number);
+        const dt = new Date(y, m-1, d-7);
+        return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+      })();
+      const prevWeekDays = getWeekDays(prevWeekStart);
 
       const weeklySource = (() => {
         const wr = Object.values(reports)
@@ -326,7 +337,7 @@
         setBlockers((existing && existing.blockers) || "");
         setCustomerReports(d["__customerReports"] || []);
         setSaved(false);
-      }, [person, existing && existing.date, weeklySource && weeklySource.date]);
+      }, [person, today, weeklySource && weeklySource.date]);
 
       const updateDaily = (id, val) => { setDaily(p => ({ ...p, [id]: val })); setSaved(false); };
       const completeDue = (task) => { setDueCompleted(p => [...p, { id: task.id, text: task.text, fromDate: task.fromDate }]); setSaved(false); };
@@ -351,7 +362,7 @@
       const streak = (() => {
         let count = 0;
         const dt = new Date();
-        if (!reports[`${today}:${person}`]) dt.setDate(dt.getDate() - 1);
+        if (!reports[`${realToday}:${person}`]) dt.setDate(dt.getDate() - 1);
         while (true) {
           const s = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
           if (reports[`${s}:${person}`]) { count++; dt.setDate(dt.getDate() - 1); }
@@ -372,9 +383,35 @@
       return (
         <div style={{ animation:"pop .3s ease" }}>
           <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", flexWrap:"wrap", gap:8 }}>
-            <p style={{ fontFamily:"'Fraunces', serif", fontSize:30, fontWeight:600, margin:"4px 0", letterSpacing:"-0.02em" }}>{cfg.label} — today</p>
+            <p style={{ fontFamily:"'Fraunces', serif", fontSize:30, fontWeight:600, margin:"4px 0", letterSpacing:"-0.02em" }}>{cfg.label} — {weekOffset === -1 ? "last week" : "today"}</p>
             <span style={{ color:COLORS.inkSoft, fontSize:15 }}>{prettyDate(today)}</span>
           </div>
+          {person === "marketer" && (
+            <div style={{ display:"flex", gap:8, margin:"10px 0 4px" }}>
+              <button onClick={() => { setWeekOffset(0); setSelectedDate(realToday); setSaved(false); }}
+                style={{ all:"unset", cursor:"pointer", padding:"7px 14px", borderRadius:999, fontSize:13, fontWeight:600, border:`1px solid ${weekOffset===0?COLORS.ink:COLORS.line}`, background:weekOffset===0?COLORS.ink:COLORS.white, color:weekOffset===0?"#fff":COLORS.inkSoft }}>
+                This week
+              </button>
+              <button onClick={() => { setWeekOffset(-1); setSelectedDate(prevWeekDays[1]); setSaved(false); }}
+                style={{ all:"unset", cursor:"pointer", padding:"7px 14px", borderRadius:999, fontSize:13, fontWeight:600, border:`1px solid ${weekOffset===-1?COLORS.ink:COLORS.line}`, background:weekOffset===-1?COLORS.ink:COLORS.white, color:weekOffset===-1?"#fff":COLORS.inkSoft }}>
+                ← Last week
+              </button>
+            </div>
+          )}
+          {weekOffset === -1 && (
+            <div style={{ display:"flex", gap:4, margin:"6px 0 8px", flexWrap:"wrap" }}>
+              {prevWeekDays.map((date, i) => (
+                <button key={date} onClick={() => { setSelectedDate(date); setSaved(false); }}
+                  style={{ all:"unset", cursor:"pointer", padding:"6px 10px", borderRadius:8, fontSize:12.5, fontWeight:600, textAlign:"center", minWidth:40,
+                    border:`1px solid ${date===today?COLORS.clay:COLORS.line}`,
+                    background:date===today?COLORS.clay:COLORS.white,
+                    color:date===today?"#fff":COLORS.inkSoft }}>
+                  <span style={{ display:"block" }}>{FULL_DAYS[i]}</span>
+                  <span style={{ display:"block", fontSize:11, fontWeight:400 }}>{parseInt(date.split("-")[2])}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {streak > 0 && (
             <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"6px 14px", borderRadius:999, background:"#FEF3EF", border:`1px solid ${COLORS.clay}`, margin:"10px 0 4px" }}>
               <span style={{ fontSize:15 }}>🔥</span>
@@ -484,7 +521,9 @@
           )}
           <button onClick={submit} disabled={saving}
             style={{ all:"unset", cursor: saving?"default":"pointer", display:"block", textAlign:"center", width:"100%", padding:"16px", borderRadius:14, background: saved?COLORS.sage:COLORS.clay, color:"#fff", fontWeight:600, fontSize:16, marginTop:8, transition:"background .2s", opacity: saving?0.7:1 }}>
-            {saving ? "Saving…" : saved ? "✓ Saved — thanks!" : existing ? "Update today's report" : "Submit today's report"}
+            {saving ? "Saving…" : saved ? "✓ Saved — thanks!" : existing
+              ? (weekOffset === -1 ? `Update ${prettyDate(today)}` : "Update today's report")
+              : (weekOffset === -1 ? `Submit for ${prettyDate(today)}` : "Submit today's report")}
           </button>
         </div>
       );
