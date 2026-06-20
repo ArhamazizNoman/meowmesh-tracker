@@ -31,15 +31,20 @@ Deno.serve(async (req) => {
       metaAccountId: Deno.env.get("META_ACCOUNT_ID")!,
     };
 
-    // WC first → consignment IDs → Steadfast; Meta runs in parallel
-    const wc = await Promise.allSettled([fetchWooCommerce(cfg, from, to)]).then(r => r[0]);
-    const consignmentIds: string[] = wc.status === "fulfilled"
-      ? (wc.value.consignmentIds || [])
-      : [];
-
-    const [sf, meta] = await Promise.allSettled([
-      fetchSteadfast(cfg, consignmentIds),
+    // Fetch WC + consignment IDs in parallel with Meta
+    const [wcRes, sfIds, meta] = await Promise.allSettled([
+      fetchWooCommerce(cfg, from, to),
+      fetchConsignmentIds(cfg.wcUrl),
       fetchMeta(cfg, from, to),
+    ]);
+
+    const wc = wcRes;
+    const consignmentIds: string[] = sfIds.status === "fulfilled"
+      ? sfIds.value
+      : (wc.status === "fulfilled" ? (wc.value.consignmentIds || []) : []);
+
+    const [sf] = await Promise.allSettled([
+      fetchSteadfast(cfg, consignmentIds),
     ]);
 
     const now    = new Date();
@@ -182,7 +187,7 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
     consignmentIds: [...new Set(
       [...todayOrders, ...deliveredOrders]
         .flatMap((o:any) => (o.meta_data||[])
-          .filter((m:any) => m.key === "_steadfast_consignment_id" && m.value)
+          .filter((m:any) => (m.key === "steadfast_consignment_id" || m.key === "_steadfast_consignment_id") && m.value)
           .map((m:any) => String(m.value).trim())
         )
         .filter(Boolean)
@@ -203,6 +208,16 @@ function normalizeChannel(r: string) {
   if (r.includes("facebook")||r.includes("fb")||r==="admin") return "Facebook";
   if (r.includes("reseller")||r.includes("wholesale")) return "Reseller";
   return "Website";
+}
+
+// ── Consignment IDs via custom WP endpoint ────────────────────────────────────
+
+async function fetchConsignmentIds(wcUrl: string): Promise<string[]> {
+  const base = wcUrl.replace(/\/$/, "");
+  const res  = await fetch(`${base}/wp-json/meowmesh/v1/steadfast-ids?days=30`);
+  if (!res.ok) return [];
+  const rows: any[] = await res.json();
+  return rows.map((r: any) => String(r.consignment_id).trim()).filter(Boolean);
 }
 
 // ── Steadfast ─────────────────────────────────────────────────────────────────
