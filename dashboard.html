@@ -373,28 +373,8 @@ function render(D) {
       </div>
     </div>` : ""}
 
-    <!-- District + Hours row -->
-    <div class="row row-2 section-gap">
-
-      <!-- District/City breakdown -->
-      <div class="card">
-        <h3 style="font-size:15px;margin-bottom:14px">Top Cities</h3>
-        ${(() => {
-          const cities = o.cities || [];
-          if (!cities.length) return `<div style="font-size:13px;color:#6B6255">No city data</div>`;
-          const max = Math.max(...cities.map((c)=>c.count), 1);
-          return cities.map((c) => `
-          <div class="bar-row">
-            <div class="bar-header">
-              <span style="font-size:13px;color:#23201A">${c.name}</span>
-              <span style="font-size:12px;color:#6B6255">${c.count} orders</span>
-            </div>
-            <div class="bar-track">
-              <div class="bar-fill" style="width:${Math.round(c.count/max*100)}%;background:#6B9AB8"></div>
-            </div>
-          </div>`).join("");
-        })()}
-      </div>
+    <!-- Hours row -->
+    <div class="section-gap">
 
       <!-- Peak hours heatmap -->
       <div class="card">
@@ -413,7 +393,6 @@ function render(D) {
           </div>`;
         })()}
       </div>
-    </div>
 
     <!-- ── STEADFAST ───────────────────────────────────────── -->
     <p class="section-title">Steadfast — Today</p>
