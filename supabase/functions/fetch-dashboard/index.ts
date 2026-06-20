@@ -97,6 +97,7 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
   const productMap: Record<string,{qty:number,revenue:number}> = {};
   const channelMap: Record<string,{orders:number,revenue:number}> = {};
   const stageMap:   Record<string,{orders:number,amount:number}>  = {};
+  const sourceMap:  Record<string,number> = {};
 
   for (const o of todayOrders) {
     totalSales += parseFloat(o.total) || 0;
@@ -107,11 +108,14 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
       productMap[item.name].qty     += item.quantity || 0;
       productMap[item.name].revenue += parseFloat(item.total) || 0;
     }
-    const src = (o.meta_data||[]).find((m:any)=>m.key==="_order_source")?.value || o.created_via || "website";
+    const src = (o.meta_data||[]).find((m:any)=>m.key==="_order_source")?.value || o.created_via || "unknown";
     const ch  = normalizeChannel(src);
     if (!channelMap[ch]) channelMap[ch] = { orders:0, revenue:0 };
     channelMap[ch].orders++;
     channelMap[ch].revenue += parseFloat(o.total) || 0;
+
+    const rawSrc = (o.created_via || "unknown").toLowerCase().trim();
+    sourceMap[rawSrc] = (sourceMap[rawSrc] || 0) + 1;
 
     const stage = mapStage(o.status);
     if (!stageMap[stage]) stageMap[stage] = { orders:0, amount:0 };
@@ -130,7 +134,8 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
     totalSales: Math.round(totalSales), orderCount, itemCount,
     products: Object.entries(productMap).map(([name,v])=>({name,qty:v.qty,revenue:Math.round(v.revenue)})).sort((a,b)=>b.revenue-a.revenue),
     channels: Object.entries(channelMap).map(([name,v])=>({name,orders:v.orders,revenue:Math.round(v.revenue)})).sort((a,b)=>b.orders-a.orders),
-    stages: ["Processing","In Courier","Delivered"].filter(s=>stageMap[s]).map(s=>({name:s,...stageMap[s],amount:Math.round(stageMap[s].amount)})),
+    stages: ["Pending","Processing","In Courier","Delivered"].filter(s=>stageMap[s]).map(s=>({name:s,...stageMap[s],amount:Math.round(stageMap[s].amount)})),
+    sources: Object.entries(sourceMap).map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count),
   };
 }
 
