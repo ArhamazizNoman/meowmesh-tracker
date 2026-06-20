@@ -138,6 +138,7 @@ function mapStage(s: string) {
   s = (s||"").toLowerCase();
   if (["completed","delivered","wc-delivered"].includes(s)) return "Delivered";
   if (["shipped","in-courier","wc-in-courier","out-for-delivery"].includes(s)) return "In Courier";
+  if (["pending","failed","cancelled"].includes(s)) return "Pending";
   return "Processing";
 }
 function normalizeChannel(r: string) {

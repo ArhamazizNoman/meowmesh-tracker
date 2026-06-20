@@ -343,6 +343,30 @@ function render(D) {
     <!-- ── STEADFAST ───────────────────────────────────────── -->
     <p class="section-title">Steadfast — Today</p>
 
+    ${(() => {
+      const proc    = o.stages.find(s => s.name === "Processing") || { orders:0, amount:0 };
+      const pend    = o.stages.find(s => s.name === "Pending")    || { orders:0, amount:0 };
+      const courier = o.stages.find(s => s.name === "In Courier") || { orders:0, amount:0 };
+      return `
+    <div class="kpi-grid" style="margin-bottom:20px;grid-template-columns:repeat(3,1fr)">
+      <div class="kpi" style="border-top-color:#F59E0B">
+        <div class="kpi-label">In Processing</div>
+        <div class="kpi-val">${proc.orders}</div>
+        <div class="kpi-sub">${tk(proc.amount)} at stake</div>
+      </div>
+      <div class="kpi" style="border-top-color:#6B9AB8">
+        <div class="kpi-label">In Courier</div>
+        <div class="kpi-val">${courier.orders}</div>
+        <div class="kpi-sub">${tk(courier.amount)} at stake</div>
+      </div>
+      <div class="kpi" style="border-top-color:#9CA3AF">
+        <div class="kpi-label">Pending Payment</div>
+        <div class="kpi-val">${pend.orders}</div>
+        <div class="kpi-sub">${tk(pend.amount)} unconfirmed</div>
+      </div>
+    </div>`;
+    })()}
+
     <div class="row row-3 section-gap">
 
       <!-- Delivered today -->
