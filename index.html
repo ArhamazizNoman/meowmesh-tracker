@@ -257,6 +257,18 @@
               </span>
               <span style={{ fontSize:20 }}>🔒</span>
             </button>
+          <div style={{ marginTop:12 }}>
+            <a href="./dashboard" target="_blank" rel="noopener"
+              style={{ textDecoration:"none", display:"flex", alignItems:"center", gap:18, padding:"22px 24px", borderRadius:18, background:"#1E3A2F", border:`1px solid #2D5442`, width:"100%", boxSizing:"border-box", transition:"transform .15s, box-shadow .15s", cursor:"pointer" }}
+              onMouseEnter={(e)=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 10px 30px rgba(35,32,26,0.2)";}}
+              onMouseLeave={(e)=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
+              <span style={{ fontSize:34 }}>🐾</span>
+              <span style={{ flex:1 }}>
+                <span style={{ display:"block", fontFamily:"'Fraunces', serif", fontWeight:600, fontSize:21, color:"#fff" }}>Daily Ops Dashboard</span>
+                <span style={{ display:"block", fontSize:14.5, marginTop:2, color:"rgba(255,255,255,0.55)" }}>Live orders · Steadfast · Meta Ads · opens new tab</span>
+              </span>
+              <span style={{ fontSize:20, color:"rgba(255,255,255,0.6)" }}>↗</span>
+            </a>
           </div>
         </div>
       );
