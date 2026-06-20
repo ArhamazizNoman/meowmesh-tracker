@@ -89,9 +89,19 @@
     .camp-name { flex: 1; font-size: 13px; color: #23201A; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .camp-amt  { font-size: 13px; font-weight: 600; color: #23201A; white-space: nowrap; }
 
+    /* Month strip */
+    .month-strip { background:#1E3A2F;border-bottom:2px solid #2D5442;padding:10px 20px; }
+    .month-strip-inner { max-width:960px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#2D5442;border-radius:12px;overflow:hidden; }
+    .mkpi { background:#1E3A2F;padding:10px 16px;text-align:center; }
+    .mkpi-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#7EB89A;margin-bottom:3px; }
+    .mkpi-val { font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:#fff;line-height:1.1; }
+    .mkpi-sub { font-size:10px;color:#7EB89A;margin-top:2px; }
+    .mkpi-loading { color:#4F7060; }
+
     @media (max-width: 620px) {
       .row-2, .row-3 { grid-template-columns: 1fr; }
       .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .month-strip-inner { grid-template-columns: repeat(2,1fr); }
     }
   </style>
 </head>
@@ -138,6 +148,32 @@
   .preset-btn.active { background:#23201A; color:#fff; }
   .preset-btn:hover:not(.active) { background:#F3EADB; }
 </style>
+
+<!-- ── THIS MONTH KPI STRIP ────────────────────────────────────────────────── -->
+<div class="month-strip">
+  <div class="month-strip-inner">
+    <div class="mkpi">
+      <div class="mkpi-label">📦 This Month Sales</div>
+      <div class="mkpi-val mkpi-loading" id="mk-orders">—</div>
+      <div class="mkpi-sub" id="mk-orders-sub">orders</div>
+    </div>
+    <div class="mkpi">
+      <div class="mkpi-label">💰 Revenue</div>
+      <div class="mkpi-val mkpi-loading" id="mk-revenue">—</div>
+      <div class="mkpi-sub" id="mk-revenue-sub">collected</div>
+    </div>
+    <div class="mkpi">
+      <div class="mkpi-label">📣 Ads Spend</div>
+      <div class="mkpi-val mkpi-loading" id="mk-spend">—</div>
+      <div class="mkpi-sub">USD this month</div>
+    </div>
+    <div class="mkpi">
+      <div class="mkpi-label">📈 ROAS</div>
+      <div class="mkpi-val mkpi-loading" id="mk-roas">—</div>
+      <div class="mkpi-sub">revenue ÷ spend ×rate</div>
+    </div>
+  </div>
+</div>
 
 <div class="page" id="page">
   <!-- rendered by JS -->
@@ -503,6 +539,40 @@ async function fetchFresh(from, to) {
   return await res.json();
 }
 
+// ── This Month KPI strip (always shows month totals, independent of date range) ─
+
+const BDT_PER_USD = 110; // approximate exchange rate for ROAS calculation
+
+async function loadMonthStrip() {
+  const t    = bdtToday();
+  const from = fmt(new Date(t.getFullYear(), t.getMonth(), 1));
+  const to   = fmt(t);
+  try {
+    const data = await fetchFresh(from, to);
+    const sales   = data?.orders?.totalSales  || 0;
+    const orders  = data?.orders?.orderCount  || 0;
+    const spend   = data?.ads?.spendToday     || 0; // cumulative month spend
+    const roas    = spend > 0 ? (sales / (spend * BDT_PER_USD)) : null;
+
+    document.getElementById("mk-orders").textContent   = orders.toLocaleString("en-IN");
+    document.getElementById("mk-orders-sub").textContent = `orders · ` + tk(sales);
+    document.getElementById("mk-revenue").textContent  = tk(sales);
+    document.getElementById("mk-revenue-sub").textContent = orders + " orders";
+    document.getElementById("mk-spend").textContent    = usd(spend);
+    document.getElementById("mk-roas").textContent     = roas !== null ? roas.toFixed(2) + "x" : "N/A";
+
+    // Remove loading dim
+    ["mk-orders","mk-revenue","mk-spend","mk-roas"].forEach(id => {
+      document.getElementById(id)?.classList.remove("mkpi-loading");
+    });
+  } catch (e) {
+    ["mk-orders","mk-revenue","mk-spend","mk-roas"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = "Err"; el.title = e.message; }
+    });
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   // Set defaults
   const t = bdtToday();
@@ -536,6 +606,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   initDashboard();
+  loadMonthStrip();
 });
 </script>
 
