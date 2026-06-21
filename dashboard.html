@@ -312,6 +312,21 @@ function render(D) {
         <div class="kpi-val" style="color:${(o.cancelCount||0)>0?'#C8553D':'#23201A'}">${o.cancelCount||0}</div>
         <div class="kpi-sub">${totalOrders > 0 ? Math.round((o.cancelCount||0)/(totalOrders+(o.cancelCount||0))*100) : 0}% loss rate</div>
       </div>
+      ${(() => {
+        const spendBDT = (ads.spendToday || 0) * BDT_PER_USD;
+        if (!spendBDT) return `<div class="kpi" style="border-top-color:#7C6F5B">
+          <div class="kpi-label">ROI</div>
+          <div class="kpi-val" style="color:#6B6255">—</div>
+          <div class="kpi-sub">no ad spend</div>
+        </div>`;
+        const roi = ((totalRevenue - spendBDT) / spendBDT) * 100;
+        const color = roi >= 0 ? '#4F7060' : '#C8553D';
+        return `<div class="kpi" style="border-top-color:${color}">
+          <div class="kpi-label">ROI</div>
+          <div class="kpi-val" style="color:${color}">${roi >= 0 ? '+' : ''}${Math.round(roi)}%</div>
+          <div class="kpi-sub">${tk(totalRevenue - spendBDT)} net after spend</div>
+        </div>`;
+      })()}
     </div>
 
     <div class="row row-2 section-gap">
