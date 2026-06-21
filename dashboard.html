@@ -319,11 +319,11 @@ function render(D) {
           <div class="kpi-val" style="color:#6B6255">—</div>
           <div class="kpi-sub">no ad spend</div>
         </div>`;
-        const roi = ((totalRevenue - spendBDT) / spendBDT) * 100;
-        const color = roi >= 0 ? '#4F7060' : '#C8553D';
+        const roi = totalRevenue / spendBDT;
+        const color = roi >= 1 ? '#4F7060' : '#C8553D';
         return `<div class="kpi" style="border-top-color:${color}">
           <div class="kpi-label">ROI</div>
-          <div class="kpi-val" style="color:${color}">${roi >= 0 ? '+' : ''}${Math.round(roi)}%</div>
+          <div class="kpi-val" style="color:${color}">${roi.toFixed(2)}×</div>
           <div class="kpi-sub">${tk(totalRevenue - spendBDT)} net after spend</div>
         </div>`;
       })()}
