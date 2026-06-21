@@ -321,10 +321,17 @@ function render(D) {
         </div>`;
         const roi = totalRevenue / spendBDT;
         const color = roi >= 1 ? '#4F7060' : '#C8553D';
+        const adsPct = (spendBDT / totalRevenue) * 100;
+        const adsPctColor = adsPct > 20 ? '#C8553D' : adsPct > 10 ? '#E8A838' : '#4F7060';
         return `<div class="kpi" style="border-top-color:${color}">
           <div class="kpi-label">ROI</div>
           <div class="kpi-val" style="color:${color}">${roi.toFixed(2)}×</div>
           <div class="kpi-sub">${tk(totalRevenue - spendBDT)} net after spend</div>
+        </div>
+        <div class="kpi" style="border-top-color:${adsPctColor}">
+          <div class="kpi-label">Ad Cost % of Sales</div>
+          <div class="kpi-val" style="color:${adsPctColor}">${adsPct.toFixed(1)}%</div>
+          <div class="kpi-sub">${tk(spendBDT)} of ${tk(totalRevenue)}</div>
         </div>`;
       })()}
     </div>
