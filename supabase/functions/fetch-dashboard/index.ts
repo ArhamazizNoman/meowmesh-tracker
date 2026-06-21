@@ -100,21 +100,33 @@ Deno.serve(async (req) => {
 
 // ── WooCommerce ───────────────────────────────────────────────────────────────
 
+async function wcFetchAllPages(url: string, hdrs: Record<string,string>): Promise<any[]> {
+  const all: any[] = [];
+  let page = 1;
+  while (true) {
+    const res = await fetch(`${url}&page=${page}`, { headers: hdrs });
+    if (!res.ok) { if (page === 1) throw new Error(`WooCommerce ${res.status}`); break; }
+    const batch = parseWpJson(await res.text());
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    all.push(...batch);
+    if (batch.length < 100) break; // last page
+    page++;
+  }
+  return all;
+}
+
 async function fetchWooCommerce({ wcUrl, wcKey, wcSecret }: Record<string,string>, from: string, to: string) {
   const base  = wcUrl.replace(/\/$/, "");
   const auth  = btoa(`${wcKey}:${wcSecret}`);
   const hdrs  = { Authorization: `Basic ${auth}` };
-  const after  = dateToISO(from, 0);
-  const before = dateToISO(to,   1); // exclusive end = next day midnight
+  const after  = encodeURIComponent(dateToISO(from, 0));
+  const before = encodeURIComponent(dateToISO(to,   1));
 
-  const [r1, r2] = await Promise.all([
-    fetch(`${base}/wp-json/wc/v3/orders?after=${encodeURIComponent(after)}&before=${encodeURIComponent(before)}&per_page=100&status=any`, { headers: hdrs }),
-    fetch(`${base}/wp-json/wc/v3/orders?modified_after=${encodeURIComponent(after)}&modified_before=${encodeURIComponent(before)}&per_page=100&status=completed,wc-delivered`, { headers: hdrs }),
+  const [orders, delivered] = await Promise.all([
+    wcFetchAllPages(`${base}/wp-json/wc/v3/orders?after=${after}&before=${before}&per_page=100&status=any`, hdrs),
+    wcFetchAllPages(`${base}/wp-json/wc/v3/orders?modified_after=${after}&modified_before=${before}&per_page=100&status=completed,wc-delivered`, hdrs).catch(() => []),
   ]);
 
-  if (!r1.ok) throw new Error(`WooCommerce ${r1.status}`);
-  const orders    = parseWpJson(await r1.text());
-  const delivered = r2.ok ? parseWpJson(await r2.text()) : [];
   return processOrders(orders, delivered);
 }
 
@@ -322,7 +334,10 @@ async function fetchMeta({ metaToken, metaAccountId }: Record<string,string>, fr
     fetch(`${base}?fields=campaign_name,spend&level=campaign&time_range=${timeRange}&${token}`),
   ]);
 
-  if (!r1.ok) throw new Error(`Meta ${r1.status}`);
+  if (!r1.ok) {
+    const errBody = await r1.text();
+    throw new Error(`Meta ${r1.status}: ${errBody.slice(0, 300)}`);
+  }
   const d1 = await r1.json();
   if (d1.error) throw new Error(`Meta: ${d1.error.message}`);
 
