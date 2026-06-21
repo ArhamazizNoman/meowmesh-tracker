@@ -166,6 +166,7 @@
     <div class="mkpi">
       <span class="mkpi-label">Ads Spend</span>
       <span class="mkpi-val mkpi-loading" id="mk-spend">—</span>
+      <span class="mkpi-sub" id="mk-spend-usd" style="font-size:11px;opacity:0.6"></span>
     </div>
     <div class="mkpi">
       <span class="mkpi-label">ROAS</span>
@@ -532,8 +533,8 @@ function render(D) {
     <div class="kpi-grid" style="margin-bottom:20px;grid-template-columns:repeat(5,1fr)">
       <div class="kpi" style="border-top-color:#E8A838">
         <div class="kpi-label">Spend</div>
-        <div class="kpi-val">${tk(ads.spendToday * BDT_PER_USD)}</div>
-        <div class="kpi-sub">${usd(ads.spendToday)} USD</div>
+        <div class="kpi-val">${usd(ads.spendToday)}</div>
+        <div class="kpi-sub">USD</div>
       </div>
       <div class="kpi" style="border-top-color:#6B9AB8">
         <div class="kpi-label">Impressions</div>
@@ -731,6 +732,8 @@ async function loadMonthStrip() {
     document.getElementById("mk-orders").textContent  = orders.toLocaleString("en-IN");
     document.getElementById("mk-revenue").textContent = tk(sales);
     document.getElementById("mk-spend").textContent   = tk(spend * BDT_PER_USD);
+    const spendUsdEl = document.getElementById("mk-spend-usd");
+    if (spendUsdEl) spendUsdEl.textContent = usd(spend) + " USD";
     document.getElementById("mk-roas").textContent    = roas !== null ? roas.toFixed(2) + "x" : "N/A";
     ["mk-orders","mk-revenue","mk-spend","mk-roas"].forEach(id =>
       document.getElementById(id)?.classList.remove("mkpi-loading")
