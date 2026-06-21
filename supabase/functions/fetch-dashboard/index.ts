@@ -1,5 +1,23 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Strip PHP junk prepended before valid JSON (WPCode cache bug).
+// PHP snippet always ends with }); — find last }); then scan for [ or {.
+function parseWpJson(text: string): any {
+  try { return JSON.parse(text); } catch { /* has prefix */ }
+  // Find where PHP code ends (last }); before the JSON)
+  const phpEnd = text.search(/\}\);\s*[\[{]/);
+  if (phpEnd >= 0) {
+    const jsonStart = text.slice(phpEnd).search(/[\[{]/);
+    return JSON.parse(text.slice(phpEnd + jsonStart));
+  }
+  // Fallback: find first [ or { that yields valid JSON
+  for (const ch of ["\n[", "\n{"]) {
+    const i = text.lastIndexOf(ch);
+    if (i >= 0) { try { return JSON.parse(text.slice(i + 1)); } catch { /* try next */ } }
+  }
+  throw new Error("No JSON found in WP response");
+}
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -39,12 +57,10 @@ Deno.serve(async (req) => {
     ]);
 
     const wc = wcRes;
-    const consignmentIds: string[] = sfIds.status === "fulfilled"
-      ? sfIds.value
-      : (wc.status === "fulfilled" ? (wc.value.consignmentIds || []) : []);
+    const cidRows: CidRow[] = sfIds.status === "fulfilled" ? sfIds.value : [];
 
     const [sf] = await Promise.allSettled([
-      fetchSteadfast(cfg, consignmentIds),
+      fetchSteadfast(cfg, cidRows),
     ]);
 
     const now    = new Date();
@@ -97,8 +113,8 @@ async function fetchWooCommerce({ wcUrl, wcKey, wcSecret }: Record<string,string
   ]);
 
   if (!r1.ok) throw new Error(`WooCommerce ${r1.status}`);
-  const orders    = await r1.json();
-  const delivered = r2.ok ? await r2.json() : [];
+  const orders    = parseWpJson(await r1.text());
+  const delivered = r2.ok ? parseWpJson(await r2.text()) : [];
   return processOrders(orders, delivered);
 }
 
@@ -212,27 +228,38 @@ function normalizeChannel(r: string) {
 
 // ── Consignment IDs via custom WP endpoint ────────────────────────────────────
 
-async function fetchConsignmentIds(wcUrl: string): Promise<string[]> {
+type CidRow = { consignment_id: string; cod_amount: number };
+
+async function fetchConsignmentIds(wcUrl: string): Promise<CidRow[]> {
   const base = wcUrl.replace(/\/$/, "");
   const res  = await fetch(`${base}/wp-json/meowmesh/v1/steadfast-ids?days=30`);
   if (!res.ok) return [];
-  const rows: any[] = await res.json();
-  return rows.map((r: any) => String(r.consignment_id).trim()).filter(Boolean);
+  const rows: any[] = parseWpJson(await res.text());
+  return rows
+    .filter((r: any) => r.consignment_id)
+    .map((r: any) => ({
+      consignment_id: String(r.consignment_id).trim(),
+      cod_amount: parseFloat(r.cod_amount) || 0,
+    }));
 }
 
 // ── Steadfast ─────────────────────────────────────────────────────────────────
 
-async function fetchSteadfast({ sfKey, sfSecret }: Record<string,string>, consignmentIds: string[]) {
-  const hdrs = { "Api-Key": sfKey, "Secret-Key": sfSecret, "Content-Type": "application/json" };
+async function fetchSteadfast({ sfKey, sfSecret }: Record<string,string>, cidRows: CidRow[]) {
+  const hdrs = { "Api-Key": sfKey, "Secret-Key": sfSecret };
 
   // Always fetch balance
-  const balRes = await fetch("https://portal.packzy.com/api/v1/get_balance", { headers: hdrs });
-  if (!balRes.ok) throw new Error(`Steadfast ${balRes.status}`);
-  const balData = await balRes.json();
+  const balHdrs = { "Api-Key": sfKey, "Secret-Key": sfSecret };
+  const balRes = await fetch("https://portal.packzy.com/api/v1/get_balance", { headers: balHdrs });
+  const balRaw = await balRes.text();
+  console.log("SF balance status:", balRes.status, "body:", balRaw.slice(0, 200));
+  if (!balRes.ok) throw new Error(`Steadfast balance ${balRes.status}: ${balRaw.slice(0,100)}`);
+  let balData: any;
+  try { balData = JSON.parse(balRaw); } catch(e) { throw new Error(`SF balance 200 but HTML: ${balRaw.slice(0,200)}`); }
   const balanceAvailable = Math.round(balData.current_balance ?? balData.data?.current_balance ?? 0);
 
   // If no consignment IDs (plugin not installed), return with zeros
-  if (!consignmentIds.length) {
+  if (!cidRows.length) {
     return {
       deliveredToday: { parcels: 0, cod: 0 },
       payout: { shipping: 0, codFee: 0, returns: 0, netInHand: 0 },
@@ -241,37 +268,32 @@ async function fetchSteadfast({ sfKey, sfSecret }: Record<string,string>, consig
     };
   }
 
-  // Batch status check — Steadfast accepts up to 500 IDs per call
-  const CHUNK = 500;
-  const parcels: any[] = [];
-  for (let i = 0; i < consignmentIds.length; i += CHUNK) {
-    const chunk = consignmentIds.slice(i, i + CHUNK);
-    const res = await fetch("https://portal.packzy.com/api/v1/status_by_cids", {
-      method: "POST",
-      headers: hdrs,
-      body: JSON.stringify({ consignment_ids: chunk }),
-    });
-    if (res.ok) {
+  // GET /status_by_cid/{id} per consignment — Steadfast has no bulk endpoint
+  // Build a map cid → cod_amount from WooCommerce order data
+  const codMap = new Map<string, number>(cidRows.map(r => [r.consignment_id, r.cod_amount]));
+
+  type ParcelStatus = { consignment_id: string; delivery_status: string };
+  const statuses: ParcelStatus[] = [];
+  await Promise.all(cidRows.map(async ({ consignment_id: cid }) => {
+    try {
+      const res = await fetch(`https://portal.packzy.com/api/v1/status_by_cid/${cid}`, { headers: hdrs });
+      if (!res.ok) return;
       const d = await res.json();
-      const items = d.data || d || [];
-      if (Array.isArray(items)) parcels.push(...items);
-    }
-  }
+      const ds = (d?.consignment?.delivery_status || d?.delivery_status || "").toLowerCase();
+      if (ds) statuses.push({ consignment_id: cid, delivery_status: ds });
+    } catch(_) { /* ignore per-ID errors */ }
+  }));
 
-  // Count delivered parcels and sum amounts
-  const delivered = parcels.filter((p:any) =>
-    ["delivered","partial_delivered"].includes((p.delivery_status||p.status||"").toLowerCase())
-  );
-  const grossCOD    = delivered.reduce((s:number, p:any) => s + (parseFloat(p.cod_amount) || 0), 0);
-  const shipping    = delivered.reduce((s:number, p:any) => s + (parseFloat(p.charge) || parseFloat(p.delivery_charge) || 0), 0);
-  const codFee      = grossCOD * 0.01;
-  const netInHand   = grossCOD - shipping - codFee;
+  const DELIVERY_CHARGE = 120; // ৳ flat rate per parcel
 
-  // Returned parcels
-  const returned    = parcels.filter((p:any) =>
-    ["cancelled","unknown","hold"].includes((p.delivery_status||p.status||"").toLowerCase())
-  );
-  const returnedCOD = returned.reduce((s:number, p:any) => s + (parseFloat(p.cod_amount) || 0), 0);
+  const delivered = statuses.filter(p => ["delivered","partial_delivered"].includes(p.delivery_status));
+  const grossCOD  = delivered.reduce((s, p) => s + (codMap.get(p.consignment_id) || 0), 0);
+  const shipping  = delivered.length * DELIVERY_CHARGE;
+  const codFee    = grossCOD * 0.01;
+  const netInHand = grossCOD - shipping - codFee;
+
+  const returned    = statuses.filter(p => ["cancelled","hold","unknown"].includes(p.delivery_status));
+  const returnedCOD = returned.reduce((s, p) => s + (codMap.get(p.consignment_id) || 0), 0);
 
   return {
     deliveredToday: { parcels: delivered.length, cod: Math.round(grossCOD) },
@@ -283,7 +305,7 @@ async function fetchSteadfast({ sfKey, sfSecret }: Record<string,string>, consig
     },
     balanceAvailable,
     pluginInstalled: true,
-    totalParcels: parcels.length,
+    totalParcels: statuses.length,
   };
 }
 
