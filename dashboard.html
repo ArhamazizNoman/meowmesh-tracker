@@ -713,7 +713,7 @@ async function fetchFresh(from, to) {
 
 // ── This Month KPI strip (always shows month totals, independent of date range) ─
 
-const BDT_PER_USD = 110; // approximate exchange rate for ROAS calculation
+const BDT_PER_USD = 140; // 1 USD = 140 BDT
 
 const MONTH_GOAL = 300000;
 
@@ -730,7 +730,7 @@ async function loadMonthStrip() {
 
     document.getElementById("mk-orders").textContent  = orders.toLocaleString("en-IN");
     document.getElementById("mk-revenue").textContent = tk(sales);
-    document.getElementById("mk-spend").textContent   = usd(spend);
+    document.getElementById("mk-spend").textContent   = tk(spend * BDT_PER_USD);
     document.getElementById("mk-roas").textContent    = roas !== null ? roas.toFixed(2) + "x" : "N/A";
     ["mk-orders","mk-revenue","mk-spend","mk-roas"].forEach(id =>
       document.getElementById(id)?.classList.remove("mkpi-loading")
