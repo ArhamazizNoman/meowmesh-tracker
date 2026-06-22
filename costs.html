@@ -177,10 +177,13 @@
 </div>
 
 <script>
-const STORAGE_KEY = 'meowmesh_costs_v2';
 const API_URL = 'https://dicanelropavoaqisebh.supabase.co/functions/v1/fetch-dashboard';
 const API_KEY = 'sb_publishable_dO4YNs6kZZhzIKQQ2Q8UuQ_BLSe2OaW';
 const BDT_PER_USD = 140;
+
+const SB_URL  = 'https://dicanelropavoaqisebh.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpY2FuZWxyb3Bhdm9hcWlzZWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5ODExMDYsImV4cCI6MjA5NjU1NzEwNn0.EwDW8At3lgaRN0M3pJr1zwCFyu5jwyX2OwB9JPRgWdE';
+const SB_HDR  = { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
 
 const CATEGORIES = ['Production','Salary','Marketing','Operations','Other'];
 const FREQUENCIES = ['Monthly','One-time','Weekly','Daily'];
@@ -319,47 +322,71 @@ function render() {
   }
 }
 
-// ── Persist ───────────────────────────────────────────────────────────────────
-function save() {
-  const data = {
-    rows:  getRows(),
-    month: document.getElementById('p-month').value,
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+// ── Persist (Supabase) ────────────────────────────────────────────────────────
+async function save() {
   const btn = document.querySelector('.btn-save');
-  btn.textContent = 'Saved ✓';
-  setTimeout(() => btn.textContent = 'Save Costs', 1500);
+  btn.textContent = 'Saving…';
+  btn.disabled = true;
+  const month = document.getElementById('p-month').value;
+  const rows  = getRows();
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/monthly_costs`, {
+      method: 'POST',
+      headers: { ...SB_HDR, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ month, rows, updated_at: new Date().toISOString() }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    btn.textContent = 'Saved ✓';
+    setTimeout(() => { btn.textContent = 'Save Costs'; btn.disabled = false; }, 1500);
+  } catch(e) {
+    btn.textContent = 'Error saving';
+    btn.disabled = false;
+    alert('Save failed: ' + e.message);
+  }
 }
 
-function load() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) {
-    try {
-      const data = JSON.parse(raw);
-      if (data.month) document.getElementById('p-month').value = data.month;
-      (data.rows || []).forEach(addRow);
-      return;
-    } catch(_) {}
-  }
-  // Defaults — from MeowMesh_Dashboard.xlsx Cost Breakdown sheet
-  [
-    { desc: 'Materials: Structure (board/frame/wood)', category: 'Production', frequency: 'Monthly', amount: '' },
-    { desc: 'Materials: Fabric & soft goods',          category: 'Production', frequency: 'Monthly', amount: '' },
-    { desc: 'Materials: Toys, fittings & hardware',    category: 'Production', frequency: 'Monthly', amount: '' },
-    { desc: 'Packaging (cartons/bubble/bags)',          category: 'Production', frequency: 'Monthly', amount: '' },
-    { desc: 'Direct labour (sewing/macrame/assembly)', category: 'Production', frequency: 'Monthly', amount: '' },
-    { desc: 'Salaries & contractors',                  category: 'Salary',     frequency: 'Monthly', amount: '' },
-    { desc: 'Rent & office',                           category: 'Operations', frequency: 'Monthly', amount: '' },
-    { desc: 'Local transport & misc delivery',         category: 'Operations', frequency: 'Monthly', amount: '' },
-    { desc: 'Marketing misc, R&D & web (non-ad)',      category: 'Marketing',  frequency: 'Monthly', amount: '' },
-    { desc: 'Other / misc',                            category: 'Other',      frequency: 'Monthly', amount: '' },
-  ].forEach(addRow);
+const DEFAULT_ROWS = [
+  { desc: 'Materials: Structure (board/frame/wood)', category: 'Production', frequency: 'Monthly', amount: '' },
+  { desc: 'Materials: Fabric & soft goods',          category: 'Production', frequency: 'Monthly', amount: '' },
+  { desc: 'Materials: Toys, fittings & hardware',    category: 'Production', frequency: 'Monthly', amount: '' },
+  { desc: 'Packaging (cartons/bubble/bags)',          category: 'Production', frequency: 'Monthly', amount: '' },
+  { desc: 'Direct labour (sewing/macrame/assembly)', category: 'Production', frequency: 'Monthly', amount: '' },
+  { desc: 'Salaries & contractors',                  category: 'Salary',     frequency: 'Monthly', amount: '' },
+  { desc: 'Rent & office',                           category: 'Operations', frequency: 'Monthly', amount: '' },
+  { desc: 'Local transport & misc delivery',         category: 'Operations', frequency: 'Monthly', amount: '' },
+  { desc: 'Marketing misc, R&D & web (non-ad)',      category: 'Marketing',  frequency: 'Monthly', amount: '' },
+  { desc: 'Other / misc',                            category: 'Other',      frequency: 'Monthly', amount: '' },
+];
+
+async function load() {
+  const month = document.getElementById('p-month').value;
+  const st    = document.getElementById('rev-status');
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/monthly_costs?month=eq.${encodeURIComponent(month)}&select=rows`,
+      { headers: { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}` } }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data.length && Array.isArray(data[0].rows) && data[0].rows.length) {
+        data[0].rows.forEach(addRow);
+        return;
+      }
+    }
+  } catch(_) {}
+  DEFAULT_ROWS.forEach(addRow);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.getElementById('p-month').value = currentMonth();
-load();
-loadRevenue();
+
+document.getElementById('p-month').addEventListener('change', async () => {
+  document.getElementById('cost-body').innerHTML = '';
+  await load();
+  await loadRevenue();
+});
+
+(async () => { await load(); loadRevenue(); })();
 </script>
 </body>
 </html>
