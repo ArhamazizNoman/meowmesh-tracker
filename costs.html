@@ -146,10 +146,9 @@
   <table class="cost-table">
     <thead>
       <tr>
-        <th style="width:40%">Description</th>
-        <th style="width:22%">Category</th>
-        <th style="width:20%">Frequency</th>
-        <th style="width:12%">Amount (৳)</th>
+        <th style="width:50%">Description</th>
+        <th style="width:28%">Category</th>
+        <th style="width:16%">Amount (৳)</th>
         <th style="width:6%"></th>
       </tr>
     </thead>
@@ -166,10 +165,9 @@
   <table class="cost-table">
     <thead>
       <tr>
-        <th style="width:40%">Description</th>
-        <th style="width:22%">Category</th>
-        <th style="width:20%">Frequency</th>
-        <th style="width:12%">Amount (৳)</th>
+        <th style="width:50%">Description</th>
+        <th style="width:28%">Category</th>
+        <th style="width:16%">Amount (৳)</th>
         <th style="width:6%"></th>
       </tr>
     </thead>
@@ -220,7 +218,6 @@ const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsIn
 const SB_HDR  = { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}`, 'Content-Type': 'application/json' };
 
 const CATEGORIES = ['Production','Salary','Marketing','Operations','Other'];
-const FREQUENCIES = ['Monthly','One-time','Weekly','Daily'];
 const tk = n => '৳' + Math.round(n).toLocaleString('en-IN');
 
 let revenue = null, orderCount = 0;
@@ -263,7 +260,6 @@ async function loadRevenue() {
         <td><input class="c-desc" type="text" value="Meta Ads spend (auto)" readonly
           style="color:#926A00;font-weight:600;cursor:default"/></td>
         <td><select class="c-cat" disabled><option value="Marketing" selected>Marketing</option></select></td>
-        <td><select class="c-freq" disabled><option value="Monthly" selected>Monthly</option></select></td>
         <td><input class="c-amt" type="number" id="ads-amt" readonly
           style="color:#926A00;font-weight:600;cursor:default"/></td>
         <td><span style="font-size:11px;color:#926A00">auto</span></td>`;
@@ -285,10 +281,9 @@ function getRows(type) {
   const bodyId = type === 'fixed' ? 'fixed-body' : 'variable-body';
   return [...document.querySelectorAll(`#${bodyId} tr`)].map(tr => ({
     type,
-    desc:      tr.querySelector('.c-desc')?.value || '',
-    category:  tr.querySelector('.c-cat')?.value  || 'Other',
-    frequency: tr.querySelector('.c-freq')?.value || 'Monthly',
-    amount:    parseFloat(tr.querySelector('.c-amt')?.value) || 0,
+    desc:     tr.querySelector('.c-desc')?.value || '',
+    category: tr.querySelector('.c-cat')?.value  || 'Other',
+    amount:   parseFloat(tr.querySelector('.c-amt')?.value) || 0,
   }));
 }
 
@@ -297,7 +292,7 @@ function getAllRows() {
 }
 
 function addRow(type, row = {}) {
-  const defaults = { desc:'', category: type === 'fixed' ? 'Operations' : 'Production', frequency:'Monthly', amount:'' };
+  const defaults = { desc:'', category: type === 'fixed' ? 'Operations' : 'Production', amount:'' };
   const r = { ...defaults, ...row };
   const bodyId = type === 'fixed' ? 'fixed-body' : 'variable-body';
   const tr = document.createElement('tr');
@@ -306,11 +301,6 @@ function addRow(type, row = {}) {
     <td>
       <select class="c-cat" onchange="render()">
         ${CATEGORIES.map(c => `<option value="${c}"${c===r.category?' selected':''}>${c}</option>`).join('')}
-      </select>
-    </td>
-    <td>
-      <select class="c-freq" onchange="render()">
-        ${FREQUENCIES.map(f => `<option value="${f}"${f===r.frequency?' selected':''}>${f}</option>`).join('')}
       </select>
     </td>
     <td><input class="c-amt" type="number" value="${r.amount}" placeholder="0" min="0" oninput="render()"/></td>
@@ -392,18 +382,18 @@ async function save() {
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 const DEFAULT_FIXED = [
-  { desc: 'Salaries & contractors', category: 'Salary',     frequency: 'Monthly', amount: '' },
-  { desc: 'Rent & office',          category: 'Operations', frequency: 'Monthly', amount: '' },
+  { desc: 'Salaries & contractors', category: 'Salary',     amount: '' },
+  { desc: 'Rent & office',          category: 'Operations', amount: '' },
 ];
 const DEFAULT_VARIABLE = [
-  { desc: 'Materials: Structure (board/frame/wood)', category: 'Production', frequency: 'Monthly', amount: '' },
-  { desc: 'Materials: Fabric & soft goods',          category: 'Production', frequency: 'Monthly', amount: '' },
-  { desc: 'Materials: Toys, fittings & hardware',    category: 'Production', frequency: 'Monthly', amount: '' },
-  { desc: 'Packaging (cartons/bubble/bags)',          category: 'Production', frequency: 'Monthly', amount: '' },
-  { desc: 'Direct labour (sewing/macrame/assembly)', category: 'Production', frequency: 'Monthly', amount: '' },
-  { desc: 'Local transport & misc delivery',         category: 'Operations', frequency: 'Monthly', amount: '' },
-  { desc: 'Marketing misc, R&D & web (non-ad)',      category: 'Marketing',  frequency: 'Monthly', amount: '' },
-  { desc: 'Other / misc',                            category: 'Other',      frequency: 'Monthly', amount: '' },
+  { desc: 'Materials: Structure (board/frame/wood)', category: 'Production', amount: '' },
+  { desc: 'Materials: Fabric & soft goods',          category: 'Production', amount: '' },
+  { desc: 'Materials: Toys, fittings & hardware',    category: 'Production', amount: '' },
+  { desc: 'Packaging (cartons/bubble/bags)',          category: 'Production', amount: '' },
+  { desc: 'Direct labour (sewing/macrame/assembly)', category: 'Production', amount: '' },
+  { desc: 'Local transport & misc delivery',         category: 'Operations', amount: '' },
+  { desc: 'Marketing misc, R&D & web (non-ad)',      category: 'Marketing',  amount: '' },
+  { desc: 'Other / misc',                            category: 'Other',      amount: '' },
 ];
 
 // ── Load from Supabase ────────────────────────────────────────────────────────
