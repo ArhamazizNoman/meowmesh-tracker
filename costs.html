@@ -103,10 +103,8 @@
 
   <!-- Period picker -->
   <div class="period-bar">
-    <label>Period</label>
-    <input type="date" id="p-from" />
-    <span style="color:#6B6255">→</span>
-    <input type="date" id="p-to" />
+    <label>Month</label>
+    <input type="month" id="p-month" />
     <button class="btn-apply" onclick="loadRevenue()">Apply</button>
     <span id="rev-status" style="font-size:12px;color:#6B6255;margin-left:4px"></span>
   </div>
@@ -193,21 +191,25 @@ let revenue = null;
 let orderCount = 0;
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
-function todayStr() {
-  const d = new Date();
-  d.setTime(d.getTime() + 6 * 3600000); // BDT offset
-  return d.toISOString().slice(0, 10);
-}
-function monthStart() {
+function currentMonth() {
   const d = new Date();
   d.setTime(d.getTime() + 6 * 3600000);
-  return d.toISOString().slice(0, 7) + '-01';
+  return d.toISOString().slice(0, 7);
+}
+function monthRange(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const from = `${ym}-01`;
+  const lastDay = new Date(y, m, 0).getDate();
+  const to = `${ym}-${String(lastDay).padStart(2, '0')}`;
+  // Cap to to today if current month
+  const todayBDT = new Date(Date.now() + 6 * 3600000).toISOString().slice(0, 10);
+  return { from, to: to > todayBDT ? todayBDT : to };
 }
 
 // ── Load revenue + ads from API ───────────────────────────────────────────────
 async function loadRevenue() {
-  const from = document.getElementById('p-from').value;
-  const to   = document.getElementById('p-to').value;
+  const ym   = document.getElementById('p-month').value;
+  const { from, to } = monthRange(ym);
   const st   = document.getElementById('rev-status');
   st.textContent = 'Loading…';
   try {
@@ -339,9 +341,8 @@ function render() {
 // ── Persist ───────────────────────────────────────────────────────────────────
 function save() {
   const data = {
-    rows: getRows(),
-    from: document.getElementById('p-from').value,
-    to:   document.getElementById('p-to').value,
+    rows:  getRows(),
+    month: document.getElementById('p-month').value,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   const btn = document.querySelector('.btn-save');
@@ -354,8 +355,7 @@ function load() {
   if (raw) {
     try {
       const data = JSON.parse(raw);
-      if (data.from) document.getElementById('p-from').value = data.from;
-      if (data.to)   document.getElementById('p-to').value   = data.to;
+      if (data.month) document.getElementById('p-month').value = data.month;
       (data.rows || []).forEach(addRow);
       return;
     } catch(_) {}
@@ -371,8 +371,7 @@ function load() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-document.getElementById('p-from').value = monthStart();
-document.getElementById('p-to').value   = todayStr();
+document.getElementById('p-month').value = currentMonth();
 load();
 loadRevenue();
 </script>
