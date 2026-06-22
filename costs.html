@@ -237,6 +237,26 @@ async function loadRevenue() {
     }
     document.getElementById('ads-amt').value = adsBDT;
 
+    // COD fee row — 1% of gross COD collected by Steadfast
+    const grossCOD = d.steadfast?.deliveredToday?.cod || 0;
+    const codFee   = Math.round(grossCOD * 0.01);
+    let codRow = document.getElementById('cod-auto-row');
+    if (!codRow) {
+      codRow = document.createElement('tr');
+      codRow.id = 'cod-auto-row';
+      codRow.style.background = '#FFFBF0';
+      codRow.innerHTML = `
+        <td><input class="c-desc" type="text" value="Steadfast COD fee (1% of COD)" readonly
+          style="color:#926A00;font-weight:600;cursor:default"/></td>
+        <td><select class="c-cat" disabled><option value="Operations" selected>Operations</option></select></td>
+        <td><select class="c-freq" disabled><option value="Monthly" selected>Monthly</option></select></td>
+        <td><input class="c-amt" type="number" id="cod-amt" readonly
+          style="color:#926A00;font-weight:600;cursor:default"/></td>
+        <td><span style="font-size:11px;color:#926A00">auto</span></td>`;
+      document.getElementById('cost-body').children[0].after(codRow);
+    }
+    document.getElementById('cod-amt').value = codFee;
+
     document.getElementById('s-revenue').textContent = tk(revenue);
     document.getElementById('s-orders').textContent = `${orderCount} orders`;
     st.textContent = '✓ loaded';
