@@ -204,7 +204,7 @@ function monthStart() {
   return d.toISOString().slice(0, 7) + '-01';
 }
 
-// ── Load revenue from API ─────────────────────────────────────────────────────
+// ── Load revenue + ads from API ───────────────────────────────────────────────
 async function loadRevenue() {
   const from = document.getElementById('p-from').value;
   const to   = document.getElementById('p-to').value;
@@ -217,8 +217,26 @@ async function loadRevenue() {
     const d = await res.json();
     revenue    = d.orders?.totalSales || 0;
     orderCount = d.orders?.orderCount || 0;
-    const adsBDT = (d.ads?.spendToday || 0) * BDT_PER_USD;
-    // If ads cost not in manual list, note it
+    const adsBDT = Math.round((d.ads?.spendToday || 0) * BDT_PER_USD);
+
+    // Inject / update the locked ads row
+    let adsRow = document.getElementById('ads-auto-row');
+    if (!adsRow) {
+      adsRow = document.createElement('tr');
+      adsRow.id = 'ads-auto-row';
+      adsRow.style.background = '#FFFBF0';
+      adsRow.innerHTML = `
+        <td><input class="c-desc" type="text" value="Meta Ads spend (auto)" readonly
+          style="color:#926A00;font-weight:600;cursor:default"/></td>
+        <td><select class="c-cat" disabled><option value="Marketing" selected>Marketing</option></select></td>
+        <td><select class="c-freq" disabled><option value="Monthly" selected>Monthly</option></select></td>
+        <td><input class="c-amt" type="number" id="ads-amt" readonly
+          style="color:#926A00;font-weight:600;cursor:default"/></td>
+        <td><span style="font-size:11px;color:#926A00">auto</span></td>`;
+      document.getElementById('cost-body').prepend(adsRow);
+    }
+    document.getElementById('ads-amt').value = adsBDT;
+
     document.getElementById('s-revenue').textContent = tk(revenue);
     document.getElementById('s-orders').textContent = `${orderCount} orders`;
     st.textContent = '✓ loaded';
