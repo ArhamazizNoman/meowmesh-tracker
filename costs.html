@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MeowMesh — Cost Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: #FBF6EC; color: #23201A; font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+    h1,h2,h3 { font-family: 'Fraunces', serif; margin: 0; }
+
+    .topbar { background: #F3EADB; border-bottom: 1px solid #E2D6C2; margin-bottom: 32px; }
+    .topbar-inner { max-width: 960px; margin: 0 auto; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .topbar-brand { display: flex; align-items: center; gap: 10px; }
+    .topbar-brand h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+    .topbar-brand span.clay { color: #C8553D; }
+    .nav-links { display: flex; gap: 8px; }
+    .nav-link { all: unset; cursor: pointer; font-size: 13px; font-weight: 600; color: #6B6255; padding: 7px 14px; border-radius: 999px; border: 1px solid #E2D6C2; background: #fff; text-decoration: none; }
+    .nav-link.active { background: #23201A; color: #FBF6EC; border-color: #23201A; }
+
+    .page { max-width: 960px; margin: 0 auto; padding: 0 20px 64px; }
+
+    /* Summary strip */
+    .summary-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 28px; }
+    .sum-card { background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; padding: 14px 16px; border-top: 3px solid; }
+    .sum-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #6B6255; margin-bottom: 5px; }
+    .sum-val { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700; line-height: 1.1; }
+    .sum-sub { font-size: 11px; color: #6B6255; margin-top: 3px; }
+
+    /* Period picker */
+    .period-bar { background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .period-bar label { font-size: 12px; font-weight: 600; color: #6B6255; }
+    .period-bar input[type=date] { font-family: 'DM Sans', sans-serif; font-size: 13px; border: 1px solid #E2D6C2; border-radius: 8px; padding: 6px 10px; background: #FBF6EC; color: #23201A; outline: none; }
+    .btn-apply { all: unset; cursor: pointer; font-size: 13px; font-weight: 600; background: #23201A; color: #FBF6EC; padding: 7px 18px; border-radius: 999px; }
+    .btn-apply:hover { background: #4F7060; }
+
+    /* Cost sections */
+    .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: #6B6255; margin: 28px 0 10px; }
+    .cost-table { width: 100%; background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; overflow: hidden; border-collapse: collapse; }
+    .cost-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; padding: 10px 16px; background: #F9F4EE; border-bottom: 1px solid #E2D6C2; text-align: left; }
+    .cost-table td { padding: 10px 16px; border-bottom: 1px solid #F0E9DC; font-size: 14px; vertical-align: middle; }
+    .cost-table tr:last-child td { border-bottom: none; }
+    .cost-table input[type=text], .cost-table input[type=number] {
+      font-family: 'DM Sans', sans-serif; font-size: 14px; border: 1px solid transparent;
+      background: transparent; color: #23201A; outline: none; width: 100%; padding: 2px 4px;
+      border-radius: 6px; transition: border .15s, background .15s;
+    }
+    .cost-table input:focus { border-color: #E2D6C2; background: #FBF6EC; }
+    .cost-table select {
+      font-family: 'DM Sans', sans-serif; font-size: 12px; border: 1px solid #E2D6C2;
+      background: #FBF6EC; color: #23201A; border-radius: 6px; padding: 3px 6px; outline: none;
+    }
+    .btn-del { all: unset; cursor: pointer; color: #C8553D; font-size: 16px; padding: 2px 6px; border-radius: 6px; }
+    .btn-del:hover { background: #FEE; }
+    .btn-add { all: unset; cursor: pointer; font-size: 13px; font-weight: 600; color: #4F7060; padding: 8px 16px; border-radius: 999px; border: 1px dashed #4F7060; margin-top: 10px; display: inline-block; }
+    .btn-add:hover { background: #EAF1EC; }
+
+    .category-tag { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 99px; }
+    .cat-production { background: #FEF3EF; color: #A8422F; }
+    .cat-salary     { background: #EAF1EC; color: #3D6B4F; }
+    .cat-marketing  { background: #FEF9EC; color: #926A00; }
+    .cat-operations { background: #EEF3FB; color: #2B5A8A; }
+    .cat-other      { background: #F5F0FF; color: #5B3FA0; }
+
+    .section-total { display: flex; justify-content: flex-end; padding: 10px 16px; font-size: 13px; font-weight: 700; color: #23201A; background: #F9F4EE; border: 1px solid #E2D6C2; border-top: none; border-radius: 0 0 14px 14px; }
+
+    .profit-card { background: #fff; border: 1px solid #E2D6C2; border-radius: 16px; padding: 20px 24px; margin-top: 28px; }
+    .profit-row { display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-bottom: 1px solid #F0E9DC; }
+    .profit-row:last-child { border-bottom: none; }
+    .profit-row.total { font-weight: 700; font-size: 16px; padding-top: 12px; border-top: 2px solid #E2D6C2; }
+    .profit-row span:last-child { font-family: 'Fraunces', serif; }
+    .green { color: #4F7060; }
+    .red   { color: #C8553D; }
+    .amber { color: #926A00; }
+
+    .btn-save { all: unset; cursor: pointer; font-size: 13px; font-weight: 700; background: #4F7060; color: #fff; padding: 10px 24px; border-radius: 999px; }
+    .btn-save:hover { background: #3D5C4F; }
+    .save-bar { position: sticky; bottom: 20px; display: flex; justify-content: flex-end; padding-top: 16px; }
+
+    @media (max-width: 620px) {
+      .summary-strip { grid-template-columns: repeat(2, 1fr); }
+      .cost-table th:nth-child(3), .cost-table td:nth-child(3) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-brand">
+      <h1>Meow<span class="clay">Mesh</span></h1>
+    </div>
+    <div class="nav-links">
+      <a class="nav-link" href="dashboard.html">Dashboard</a>
+      <a class="nav-link active" href="costs.html">Costs</a>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- Period picker -->
+  <div class="period-bar">
+    <label>Period</label>
+    <input type="date" id="p-from" />
+    <span style="color:#6B6255">→</span>
+    <input type="date" id="p-to" />
+    <button class="btn-apply" onclick="loadRevenue()">Apply</button>
+    <span id="rev-status" style="font-size:12px;color:#6B6255;margin-left:4px"></span>
+  </div>
+
+  <!-- Summary strip -->
+  <div class="summary-strip">
+    <div class="sum-card" style="border-top-color:#C8553D">
+      <div class="sum-label">Revenue</div>
+      <div class="sum-val" id="s-revenue">—</div>
+      <div class="sum-sub">from WooCommerce</div>
+    </div>
+    <div class="sum-card" style="border-top-color:#E8A838">
+      <div class="sum-label">Total Costs</div>
+      <div class="sum-val" id="s-costs">৳0</div>
+      <div class="sum-sub" id="s-costs-sub">0 items</div>
+    </div>
+    <div class="sum-card" style="border-top-color:#4F7060" id="s-profit-card">
+      <div class="sum-label">Net Profit</div>
+      <div class="sum-val" id="s-profit">—</div>
+      <div class="sum-sub" id="s-margin">— margin</div>
+    </div>
+    <div class="sum-card" style="border-top-color:#6B9AB8">
+      <div class="sum-label">Profit / Order</div>
+      <div class="sum-val" id="s-per-order">—</div>
+      <div class="sum-sub" id="s-orders">— orders</div>
+    </div>
+  </div>
+
+  <!-- Cost entries -->
+  <div class="section-title">Cost Entries</div>
+
+  <table class="cost-table" id="cost-table">
+    <thead>
+      <tr>
+        <th style="width:36%">Description</th>
+        <th style="width:20%">Category</th>
+        <th style="width:20%">Frequency</th>
+        <th style="width:18%">Amount (৳)</th>
+        <th style="width:6%"></th>
+      </tr>
+    </thead>
+    <tbody id="cost-body"></tbody>
+  </table>
+  <div class="section-total" id="section-total">Total: ৳0</div>
+
+  <button class="btn-add" onclick="addRow()">+ Add cost item</button>
+
+  <!-- Profit breakdown -->
+  <div class="profit-card" id="profit-breakdown" style="display:none">
+    <h3 style="font-size:16px;margin-bottom:14px">Profit Breakdown</h3>
+    <div class="profit-row">
+      <span>Revenue</span>
+      <span id="pb-revenue" class="green">—</span>
+    </div>
+    <div class="profit-row" id="pb-rows"></div>
+    <div class="profit-row total">
+      <span>Net Profit</span>
+      <span id="pb-net">—</span>
+    </div>
+    <div class="profit-row" style="font-size:12px;color:#6B6255;border:none;padding-top:4px">
+      <span>Profit Margin</span>
+      <span id="pb-margin">—</span>
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <button class="btn-save" onclick="save()">Save Costs</button>
+  </div>
+
+</div>
+
+<script>
+const STORAGE_KEY = 'meowmesh_costs_v2';
+const API_URL = 'https://dicanelropavoaqisebh.supabase.co/functions/v1/fetch-dashboard';
+const API_KEY = 'sb_publishable_dO4YNs6kZZhzIKQQ2Q8UuQ_BLSe2OaW';
+const BDT_PER_USD = 140;
+
+const CATEGORIES = ['Production','Salary','Marketing','Operations','Other'];
+const FREQUENCIES = ['Monthly','One-time','Weekly','Daily'];
+
+const tk = n => '৳' + Math.round(n).toLocaleString('en-IN');
+
+let revenue = null;
+let orderCount = 0;
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
+function todayStr() {
+  const d = new Date();
+  d.setTime(d.getTime() + 6 * 3600000); // BDT offset
+  return d.toISOString().slice(0, 10);
+}
+function monthStart() {
+  const d = new Date();
+  d.setTime(d.getTime() + 6 * 3600000);
+  return d.toISOString().slice(0, 7) + '-01';
+}
+
+// ── Load revenue from API ─────────────────────────────────────────────────────
+async function loadRevenue() {
+  const from = document.getElementById('p-from').value;
+  const to   = document.getElementById('p-to').value;
+  const st   = document.getElementById('rev-status');
+  st.textContent = 'Loading…';
+  try {
+    const res = await fetch(`${API_URL}?from=${from}&to=${to}`, {
+      headers: { Authorization: `Bearer ${API_KEY}` }
+    });
+    const d = await res.json();
+    revenue    = d.orders?.totalSales || 0;
+    orderCount = d.orders?.orderCount || 0;
+    const adsBDT = (d.ads?.spendToday || 0) * BDT_PER_USD;
+    // If ads cost not in manual list, note it
+    document.getElementById('s-revenue').textContent = tk(revenue);
+    document.getElementById('s-orders').textContent = `${orderCount} orders`;
+    st.textContent = '✓ loaded';
+    render();
+  } catch(e) {
+    st.textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── Rows ──────────────────────────────────────────────────────────────────────
+function getRows() {
+  return [...document.querySelectorAll('#cost-body tr')].map(tr => ({
+    desc:      tr.querySelector('.c-desc')?.value || '',
+    category:  tr.querySelector('.c-cat')?.value  || 'Other',
+    frequency: tr.querySelector('.c-freq')?.value || 'Monthly',
+    amount:    parseFloat(tr.querySelector('.c-amt')?.value || 0) || 0,
+  }));
+}
+
+function addRow(row = { desc:'', category:'Production', frequency:'Monthly', amount:'' }) {
+  const tb = document.getElementById('cost-body');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input class="c-desc" type="text" value="${row.desc}" placeholder="e.g. Packaging material" oninput="render()"/></td>
+    <td>
+      <select class="c-cat" onchange="render()">
+        ${CATEGORIES.map(c => `<option value="${c}"${c===row.category?' selected':''}>${c}</option>`).join('')}
+      </select>
+    </td>
+    <td>
+      <select class="c-freq" onchange="render()">
+        ${FREQUENCIES.map(f => `<option value="${f}"${f===row.frequency?' selected':''}>${f}</option>`).join('')}
+      </select>
+    </td>
+    <td><input class="c-amt" type="number" value="${row.amount}" placeholder="0" min="0" oninput="render()"/></td>
+    <td><button class="btn-del" onclick="this.closest('tr').remove();render()">×</button></td>
+  `;
+  tb.appendChild(tr);
+  render();
+}
+
+// ── Render summary ────────────────────────────────────────────────────────────
+function render() {
+  const rows = getRows();
+  const total = rows.reduce((s, r) => s + r.amount, 0);
+  const count = rows.filter(r => r.amount > 0).length;
+
+  document.getElementById('s-costs').textContent     = tk(total);
+  document.getElementById('s-costs-sub').textContent = `${count} item${count!==1?'s':''}`;
+  document.getElementById('section-total').textContent = `Total: ${tk(total)}`;
+
+  if (revenue !== null) {
+    const profit = revenue - total;
+    const margin = revenue > 0 ? (profit / revenue * 100).toFixed(1) : 0;
+    const profitEl = document.getElementById('s-profit');
+    profitEl.textContent = tk(profit);
+    profitEl.className = 'sum-val ' + (profit >= 0 ? 'green' : 'red');
+    document.getElementById('s-margin').textContent = margin + '% margin';
+    document.getElementById('s-per-order').textContent = orderCount > 0 ? tk(Math.round(profit / orderCount)) : '—';
+
+    // Breakdown
+    const pb = document.getElementById('profit-breakdown');
+    pb.style.display = 'block';
+    document.getElementById('pb-revenue').textContent = tk(revenue);
+
+    // Group by category
+    const cats = {};
+    rows.forEach(r => { if (r.amount > 0) { cats[r.category] = (cats[r.category]||0) + r.amount; } });
+    const pbRows = document.getElementById('pb-rows');
+    pbRows.outerHTML = Object.entries(cats).map(([cat, amt]) =>
+      `<div class="profit-row" id="pb-rows"><span>${cat}</span><span class="red">-${tk(amt)}</span></div>`
+    ).join('') || '<div class="profit-row" id="pb-rows"><span style="color:#6B6255">No costs entered</span><span>—</span></div>';
+
+    const netEl = document.getElementById('pb-net');
+    netEl.textContent = tk(profit);
+    netEl.className = profit >= 0 ? 'green' : 'red';
+    document.getElementById('pb-margin').textContent = margin + '%';
+  }
+}
+
+// ── Persist ───────────────────────────────────────────────────────────────────
+function save() {
+  const data = {
+    rows: getRows(),
+    from: document.getElementById('p-from').value,
+    to:   document.getElementById('p-to').value,
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  const btn = document.querySelector('.btn-save');
+  btn.textContent = 'Saved ✓';
+  setTimeout(() => btn.textContent = 'Save Costs', 1500);
+}
+
+function load() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    try {
+      const data = JSON.parse(raw);
+      if (data.from) document.getElementById('p-from').value = data.from;
+      if (data.to)   document.getElementById('p-to').value   = data.to;
+      (data.rows || []).forEach(addRow);
+      return;
+    } catch(_) {}
+  }
+  // Defaults
+  [
+    { desc: 'Product manufacturing / COGS', category: 'Production', frequency: 'Monthly', amount: '' },
+    { desc: 'Packaging materials',          category: 'Production', frequency: 'Monthly', amount: '' },
+    { desc: 'Staff salary',                 category: 'Salary',     frequency: 'Monthly', amount: '' },
+    { desc: 'Office / warehouse rent',      category: 'Operations', frequency: 'Monthly', amount: '' },
+    { desc: 'Delivery & logistics',         category: 'Operations', frequency: 'Monthly', amount: '' },
+  ].forEach(addRow);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.getElementById('p-from').value = monthStart();
+document.getElementById('p-to').value   = todayStr();
+load();
+loadRevenue();
+</script>
+</body>
+</html>
