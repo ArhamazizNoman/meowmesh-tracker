@@ -159,7 +159,7 @@
       <span>Revenue</span>
       <span id="pb-revenue" class="green">—</span>
     </div>
-    <div class="profit-row" id="pb-rows"></div>
+    <div id="pb-rows"></div>
     <div class="profit-row total">
       <span>Net Profit</span>
       <span id="pb-net">—</span>
@@ -311,9 +311,9 @@ function render() {
     const cats = {};
     rows.forEach(r => { if (r.amount > 0) { cats[r.category] = (cats[r.category]||0) + r.amount; } });
     const pbRows = document.getElementById('pb-rows');
-    pbRows.outerHTML = Object.entries(cats).map(([cat, amt]) =>
-      `<div class="profit-row" id="pb-rows"><span>${cat}</span><span class="red">-${tk(amt)}</span></div>`
-    ).join('') || '<div class="profit-row" id="pb-rows"><span style="color:#6B6255">No costs entered</span><span>—</span></div>';
+    pbRows.innerHTML = Object.entries(cats).map(([cat, amt]) =>
+      `<div class="profit-row"><span>${cat}</span><span class="red">-${tk(amt)}</span></div>`
+    ).join('') || '<div class="profit-row"><span style="color:#6B6255">No costs entered</span><span>—</span></div>';
 
     const netEl = document.getElementById('pb-net');
     netEl.textContent = tk(profit);
