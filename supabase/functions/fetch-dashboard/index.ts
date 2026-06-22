@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     // Fetch WC + consignment IDs in parallel with Meta
     const [wcRes, sfIds, meta] = await Promise.allSettled([
       fetchWooCommerce(cfg, from, to),
-      fetchConsignmentIds(cfg.wcUrl),
+      fetchConsignmentIds(cfg.wcUrl, from),
       fetchMeta(cfg, from, to),
     ]);
 
@@ -242,9 +242,10 @@ function normalizeChannel(r: string) {
 
 type CidRow = { consignment_id: string; cod_amount: number };
 
-async function fetchConsignmentIds(wcUrl: string): Promise<CidRow[]> {
+async function fetchConsignmentIds(wcUrl: string, from: string): Promise<CidRow[]> {
   const base = wcUrl.replace(/\/$/, "");
-  const res  = await fetch(`${base}/wp-json/meowmesh/v1/steadfast-ids?days=30`);
+  const days = Math.ceil((Date.now() - new Date(from).getTime()) / 86400000) + 1;
+  const res  = await fetch(`${base}/wp-json/meowmesh/v1/steadfast-ids?days=${days}`);
   if (!res.ok) return [];
   const rows: any[] = parseWpJson(await res.text());
   return rows
