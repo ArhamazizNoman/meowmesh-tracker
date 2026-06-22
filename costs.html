@@ -360,13 +360,18 @@ function load() {
       return;
     } catch(_) {}
   }
-  // Defaults
+  // Defaults — from MeowMesh_Dashboard.xlsx Cost Breakdown sheet
   [
-    { desc: 'Product manufacturing / COGS', category: 'Production', frequency: 'Monthly', amount: '' },
-    { desc: 'Packaging materials',          category: 'Production', frequency: 'Monthly', amount: '' },
-    { desc: 'Staff salary',                 category: 'Salary',     frequency: 'Monthly', amount: '' },
-    { desc: 'Office / warehouse rent',      category: 'Operations', frequency: 'Monthly', amount: '' },
-    { desc: 'Delivery & logistics',         category: 'Operations', frequency: 'Monthly', amount: '' },
+    { desc: 'Materials: Structure (board/frame/wood)', category: 'Production', frequency: 'Monthly', amount: '' },
+    { desc: 'Materials: Fabric & soft goods',          category: 'Production', frequency: 'Monthly', amount: '' },
+    { desc: 'Materials: Toys, fittings & hardware',    category: 'Production', frequency: 'Monthly', amount: '' },
+    { desc: 'Packaging (cartons/bubble/bags)',          category: 'Production', frequency: 'Monthly', amount: '' },
+    { desc: 'Direct labour (sewing/macrame/assembly)', category: 'Production', frequency: 'Monthly', amount: '' },
+    { desc: 'Salaries & contractors',                  category: 'Salary',     frequency: 'Monthly', amount: '' },
+    { desc: 'Rent & office',                           category: 'Operations', frequency: 'Monthly', amount: '' },
+    { desc: 'Local transport & misc delivery',         category: 'Operations', frequency: 'Monthly', amount: '' },
+    { desc: 'Marketing misc, R&D & web (non-ad)',      category: 'Marketing',  frequency: 'Monthly', amount: '' },
+    { desc: 'Other / misc',                            category: 'Other',      frequency: 'Monthly', amount: '' },
   ].forEach(addRow);
 }
 
