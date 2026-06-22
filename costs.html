@@ -237,9 +237,8 @@ async function loadRevenue() {
     }
     document.getElementById('ads-amt').value = adsBDT;
 
-    // COD fee row — 1% of gross COD collected by Steadfast
-    const grossCOD = d.steadfast?.deliveredToday?.cod || 0;
-    const codFee   = Math.round(grossCOD * 0.01);
+    // COD fee — Steadfast charges 1% of total COD collected for the period
+    const codFee = Math.round(d.steadfast?.payout?.codFee || 0);
     let codRow = document.getElementById('cod-auto-row');
     if (!codRow) {
       codRow = document.createElement('tr');
