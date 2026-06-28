@@ -192,6 +192,15 @@
   <!-- rendered by JS -->
 </div>
 
+<!-- ── SALES PATTERNS SECTION ────────────────────────────────────────────── -->
+<div style="max-width:960px;margin:0 auto;padding:0 20px 48px">
+  <p class="section-title">Sales Patterns</p>
+  <div class="row row-2">
+    <div id="weekday-chart"></div>
+    <div id="monthday-chart"></div>
+  </div>
+</div>
+
 <!-- ─── SAMPLE DATA ──────────────────────────────────────────────────────── -->
 <script>
 const SAMPLE_DATA = {
@@ -800,6 +809,107 @@ async function loadSparkline() {
   } catch(e) {}
 }
 
+// ── Sales pattern charts ──────────────────────────────────────────────────────
+
+async function loadWeekdayChart() {
+  const t = bdtToday();
+  const el = document.getElementById('weekday-chart');
+  if (!el) return;
+  el.innerHTML = `<div class="card" style="opacity:.4;font-size:13px;color:#6B6255;padding:20px">Loading…</div>`;
+  try {
+    const data = await fetchFresh(fmt(addDays(t, -89)), fmt(t));
+    const daily = data?.orders?.dailySales || [];
+    if (!daily.length) { el.innerHTML = ''; return; }
+
+    // Bucket by day of week: Mon=0 … Sun=6
+    const buckets = Array(7).fill(null).map(() => ({ total: 0, count: 0 }));
+    daily.forEach(({ date, revenue }) => {
+      const [y, m, d] = date.split('-').map(Number);
+      const raw = new Date(y, m - 1, d).getDay(); // 0=Sun…6=Sat
+      const idx = raw === 0 ? 6 : raw - 1;        // Mon=0…Sun=6
+      buckets[idx].total += revenue;
+      buckets[idx].count++;
+    });
+
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const avgs   = buckets.map(b => b.count ? Math.round(b.total / b.count) : 0);
+    const max    = Math.max(...avgs, 1);
+    const best   = avgs.indexOf(Math.max(...avgs));
+
+    el.innerHTML = `
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:4px">Best Day of the Week</h3>
+        <div style="font-size:11px;color:#6B6255;margin-bottom:18px">Avg revenue per weekday · last 90 days</div>
+        <div style="display:flex;align-items:flex-end;gap:8px;height:90px">
+          ${avgs.map((v, i) => {
+            const h     = v === 0 ? 3 : Math.max(6, Math.round(v / max * 80));
+            const color = i === best ? '#C8553D' : '#4F7060';
+            const op    = v === 0 ? 0.15 : 1;
+            const label = v >= 1000 ? (Math.round(v / 100) / 10) + 'k' : v;
+            return `
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%">
+              ${v > 0 ? `<div style="font-size:9px;color:${i===best?'#C8553D':'#6B6255'};font-weight:${i===best?700:400}">${label}</div>` : '<div></div>'}
+              <div style="width:100%;border-radius:4px 4px 0 0;background:${color};height:${h}px;opacity:${op}"></div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          ${labels.map((l, i) => `<div style="flex:1;text-align:center;font-size:10px;font-weight:${i===best?700:500};color:${i===best?'#C8553D':'#6B6255'}">${l}</div>`).join('')}
+        </div>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid #F3EADB;font-size:12px;color:#6B6255">
+          Best: <strong style="color:#C8553D">${labels[best]}</strong> · avg ${tk(avgs[best])} / day
+        </div>
+      </div>`;
+  } catch(e) { el.innerHTML = ''; }
+}
+
+async function loadMonthDayChart() {
+  const t = bdtToday();
+  const el = document.getElementById('monthday-chart');
+  if (!el) return;
+  el.innerHTML = `<div class="card" style="opacity:.4;font-size:13px;color:#6B6255;padding:20px">Loading…</div>`;
+  try {
+    const data = await fetchFresh(fmt(addDays(t, -179)), fmt(t));
+    const daily = data?.orders?.dailySales || [];
+    if (!daily.length) { el.innerHTML = ''; return; }
+
+    // Bucket by day of month (1–31)
+    const buckets = Array(31).fill(null).map(() => ({ total: 0, count: 0 }));
+    daily.forEach(({ date, revenue }) => {
+      const idx = parseInt(date.split('-')[2], 10) - 1;
+      if (idx >= 0 && idx < 31) { buckets[idx].total += revenue; buckets[idx].count++; }
+    });
+
+    const avgs = buckets.map(b => b.count ? Math.round(b.total / b.count) : 0);
+    const max  = Math.max(...avgs, 1);
+    const best = avgs.indexOf(Math.max(...avgs));
+    const ord  = n => { const s = ['th','st','nd','rd']; const v = n % 100; return n + (s[(v-20)%10] || s[v] || s[0]); };
+
+    el.innerHTML = `
+      <div class="card">
+        <h3 style="font-size:15px;margin-bottom:4px">Best Day of the Month</h3>
+        <div style="font-size:11px;color:#6B6255;margin-bottom:18px">Avg revenue by date · last 6 months</div>
+        <div style="display:flex;align-items:flex-end;gap:3px;height:80px">
+          ${avgs.map((v, i) => {
+            const h     = v === 0 ? 2 : Math.max(4, Math.round(v / max * 72));
+            const color = i === best ? '#C8553D' : '#4F7060';
+            const op    = v === 0 ? 0.12 : 1;
+            return `<div title="${ord(i+1)}: ${tk(v)}" style="flex:1;border-radius:2px 2px 0 0;background:${color};height:${h}px;opacity:${op}"></div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;gap:3px;margin-top:4px">
+          ${avgs.map((_, i) => {
+            const show = (i+1)===1 || (i+1)%5===0 || (i+1)===31 || i===best;
+            return `<div style="flex:1;text-align:center;font-size:${i===best?'8.5':'7.5'}px;font-weight:${i===best?700:400};color:${i===best?'#C8553D':show?'#9B9286':'transparent'}">${show?i+1:''}</div>`;
+          }).join('')}
+        </div>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid #F3EADB;font-size:12px;color:#6B6255">
+          Best: <strong style="color:#C8553D">${ord(best+1)}</strong> of the month · avg ${tk(avgs[best])}
+        </div>
+      </div>`;
+  } catch(e) { el.innerHTML = ''; }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   // Set defaults
   const t = bdtToday();
@@ -835,6 +945,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initDashboard();
   loadMonthStrip();
   loadSparkline();
+  loadWeekdayChart();
+  loadMonthDayChart();
 });
 </script>
 
