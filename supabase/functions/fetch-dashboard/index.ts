@@ -142,15 +142,17 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
   let newOrders = 0, returningOrders = 0;
 
   for (const o of todayOrders) {
-    const orderRevenue = (parseFloat(o.total) || 0) - (parseFloat(o.shipping_total) || 0);
-    totalSales += orderRevenue;
+    let orderRevenue = 0;
     orderCount++;
     for (const item of (o.line_items || [])) {
+      const itemRevenue = parseFloat(item.total) || 0;
+      orderRevenue += itemRevenue;
       itemCount += item.quantity || 0;
       if (!productMap[item.name]) productMap[item.name] = { qty:0, revenue:0 };
       productMap[item.name].qty     += item.quantity || 0;
-      productMap[item.name].revenue += parseFloat(item.total) || 0;
+      productMap[item.name].revenue += itemRevenue;
     }
+    totalSales += orderRevenue;
     const src = (o.meta_data||[]).find((m:any)=>m.key==="_order_source")?.value || o.created_via || "unknown";
     const ch  = normalizeChannel(src);
     if (!channelMap[ch]) channelMap[ch] = { orders:0, revenue:0 };
@@ -194,7 +196,7 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
   const todayIds = new Set(todayOrders.map((o:any)=>o.id));
   const del = stageMap["Delivered"] || { orders:0, amount:0 };
   for (const o of deliveredOrders.filter((o:any)=>!todayIds.has(o.id))) {
-    del.orders++; del.amount += (parseFloat(o.total) || 0) - (parseFloat(o.shipping_total) || 0);
+    del.orders++; del.amount += (o.line_items||[]).reduce((s:number,i:any)=>s+(parseFloat(i.total)||0),0);
   }
   stageMap["Delivered"] = del;
 
