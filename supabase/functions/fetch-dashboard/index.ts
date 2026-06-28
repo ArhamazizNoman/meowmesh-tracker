@@ -142,7 +142,8 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
   let newOrders = 0, returningOrders = 0;
 
   for (const o of todayOrders) {
-    totalSales += parseFloat(o.total) || 0;
+    const orderRevenue = (parseFloat(o.total) || 0) - (parseFloat(o.shipping_total) || 0);
+    totalSales += orderRevenue;
     orderCount++;
     for (const item of (o.line_items || [])) {
       itemCount += item.quantity || 0;
@@ -154,7 +155,7 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
     const ch  = normalizeChannel(src);
     if (!channelMap[ch]) channelMap[ch] = { orders:0, revenue:0 };
     channelMap[ch].orders++;
-    channelMap[ch].revenue += parseFloat(o.total) || 0;
+    channelMap[ch].revenue += orderRevenue;
 
     const getMeta = (key: string) => (o.meta_data||[]).find((m:any)=>m.key===key)?.value;
     const origin =
@@ -167,7 +168,7 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
     const stage = mapStage(o.status);
     if (!stageMap[stage]) stageMap[stage] = { orders:0, amount:0 };
     stageMap[stage].orders++;
-    stageMap[stage].amount += parseFloat(o.total) || 0;
+    stageMap[stage].amount += orderRevenue;
 
     // City breakdown
     const city = (o.billing?.city || "Unknown").trim();
@@ -182,7 +183,7 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
       // Daily sales in BDT date
       const bdtDate = new Date(utcMs + 6 * 3600000);
       const dk = `${bdtDate.getUTCFullYear()}-${String(bdtDate.getUTCMonth()+1).padStart(2,"0")}-${String(bdtDate.getUTCDate()).padStart(2,"0")}`;
-      dailyMap[dk] = (dailyMap[dk] || 0) + (parseFloat(o.total) || 0);
+      dailyMap[dk] = (dailyMap[dk] || 0) + orderRevenue;
     }
 
     // New vs returning (customer_id=0 means guest/new)
@@ -193,7 +194,7 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
   const todayIds = new Set(todayOrders.map((o:any)=>o.id));
   const del = stageMap["Delivered"] || { orders:0, amount:0 };
   for (const o of deliveredOrders.filter((o:any)=>!todayIds.has(o.id))) {
-    del.orders++; del.amount += parseFloat(o.total)||0;
+    del.orders++; del.amount += (parseFloat(o.total) || 0) - (parseFloat(o.shipping_total) || 0);
   }
   stageMap["Delivered"] = del;
 
