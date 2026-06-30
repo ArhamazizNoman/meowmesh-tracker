@@ -484,7 +484,7 @@ function render(D) {
       const pend    = o.stages.find(s => s.name === "Pending")    || { orders:0, amount:0 };
       const courier = o.stages.find(s => s.name === "In Courier") || { orders:0, amount:0 };
       return `
-    <div class="kpi-grid" style="margin-bottom:20px;grid-template-columns:repeat(4,1fr)">
+    <div class="kpi-grid" style="margin-bottom:20px;grid-template-columns:repeat(3,1fr)">
       <div class="kpi" style="border-top-color:#F59E0B">
         <div class="kpi-label">In Processing</div>
         <div class="kpi-val">${proc.orders}</div>
@@ -504,6 +504,16 @@ function render(D) {
         <div class="kpi-label">Service Charge</div>
         <div class="kpi-val" style="color:#C8553D">${tk(sf.payout.shipping)}</div>
         <div class="kpi-sub">${sf.deliveredToday.parcels > 0 ? tk(Math.round(sf.payout.shipping / sf.deliveredToday.parcels)) + " / parcel" : "no deliveries"}</div>
+      </div>
+      <div class="kpi" style="border-top-color:#EF4444">
+        <div class="kpi-label">Cancel Amount</div>
+        <div class="kpi-val" style="color:#C8553D">${tk(sf.payout.returns)}</div>
+        <div class="kpi-sub">${sf.payout.returns > 0 ? "COD held on returns" : "no cancellations"}</div>
+      </div>
+      <div class="kpi" style="border-top-color:#4F7060">
+        <div class="kpi-label">Sales After Cancel</div>
+        <div class="kpi-val" style="color:#4F7060">${tk(sf.deliveredToday.cod - sf.payout.returns)}</div>
+        <div class="kpi-sub">gross COD − returns</div>
       </div>
     </div>`;
     })()}
