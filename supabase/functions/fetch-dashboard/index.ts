@@ -142,17 +142,32 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
   let newOrders = 0, returningOrders = 0;
 
   for (const o of todayOrders) {
+    const stage = mapStage(o.status);
+    const isCancelled = stage === 'Cancelled';
+
     let orderRevenue = 0;
-    orderCount++;
     for (const item of (o.line_items || [])) {
       const itemRevenue = parseFloat(item.total) || 0;
       orderRevenue += itemRevenue;
-      itemCount += item.quantity || 0;
-      if (!productMap[item.name]) productMap[item.name] = { qty:0, revenue:0 };
-      productMap[item.name].qty     += item.quantity || 0;
-      productMap[item.name].revenue += itemRevenue;
+      if (!isCancelled) {
+        itemCount += item.quantity || 0;
+        if (!productMap[item.name]) productMap[item.name] = { qty:0, revenue:0 };
+        productMap[item.name].qty     += item.quantity || 0;
+        productMap[item.name].revenue += itemRevenue;
+      }
     }
+
+    // Always track stage breakdown (so cancelled orders still show in Order Stage)
+    if (!stageMap[stage]) stageMap[stage] = { orders:0, amount:0 };
+    stageMap[stage].orders++;
+    stageMap[stage].amount += orderRevenue;
+
+    // Skip cancelled/failed orders from all sales metrics
+    if (isCancelled) continue;
+
     totalSales += orderRevenue;
+    orderCount++;
+
     const src = (o.meta_data||[]).find((m:any)=>m.key==="_order_source")?.value || o.created_via || "unknown";
     const ch  = normalizeChannel(src);
     if (!channelMap[ch]) channelMap[ch] = { orders:0, revenue:0 };
@@ -167,28 +182,19 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
       o.created_via || "unknown";
     sourceMap[String(origin).trim()] = (sourceMap[String(origin).trim()] || 0) + 1;
 
-    const stage = mapStage(o.status);
-    if (!stageMap[stage]) stageMap[stage] = { orders:0, amount:0 };
-    stageMap[stage].orders++;
-    stageMap[stage].amount += orderRevenue;
-
-    // City breakdown
     const city = (o.billing?.city || "Unknown").trim();
     cityMap[city] = (cityMap[city] || 0) + 1;
 
-    // Hour of day in BDT (date_created_gmt + 6h)
     const gmt = o.date_created_gmt || o.date_created || "";
     if (gmt) {
       const utcMs = new Date(gmt.endsWith("Z") ? gmt : gmt + "Z").getTime();
       const bdtHour = new Date(utcMs + 6 * 3600000).getUTCHours();
       hours[bdtHour]++;
-      // Daily sales in BDT date
       const bdtDate = new Date(utcMs + 6 * 3600000);
       const dk = `${bdtDate.getUTCFullYear()}-${String(bdtDate.getUTCMonth()+1).padStart(2,"0")}-${String(bdtDate.getUTCDate()).padStart(2,"0")}`;
       dailyMap[dk] = (dailyMap[dk] || 0) + orderRevenue;
     }
 
-    // New vs returning (customer_id=0 means guest/new)
     if (!o.customer_id || o.customer_id === 0) newOrders++;
     else returningOrders++;
   }
