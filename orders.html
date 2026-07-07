@@ -330,13 +330,16 @@ async function loadOrders(from, to) {
     });
     if (!res.ok) throw new Error(`${res.status}`);
     const json = await res.json();
-    allOrders = json.orders || [];
+    if (!Array.isArray(json.orders)) throw new Error("edge_not_deployed");
+    allOrders = json.orders;
     isSample = false;
     st.textContent = `✓ ${allOrders.length} orders`;
   } catch(e) {
     allOrders = SAMPLE_ORDERS;
     isSample = true;
-    st.textContent = "Sample data (API unavailable)";
+    st.textContent = e.message === "edge_not_deployed"
+      ? "⚠ Deploy the edge function to see live orders (showing sample)"
+      : "Sample data (API unavailable)";
   }
 
   updateKpis(allOrders);
