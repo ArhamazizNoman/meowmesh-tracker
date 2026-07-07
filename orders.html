@@ -167,7 +167,8 @@
           <th>Customer</th>
           <th>Phone</th>
           <th>Date</th>
-          <th>Status</th>
+          <th>WC Status</th>
+          <th>Steadfast</th>
           <th class="right">COD Amount</th>
           <th class="right">Shipping Charge</th>
           <th class="right">COD Fee</th>
@@ -175,11 +176,11 @@
         </tr>
       </thead>
       <tbody id="tableBody">
-        <tr><td colspan="9" class="state-msg"><strong>—</strong>Loading orders…</td></tr>
+        <tr><td colspan="10" class="state-msg"><strong>—</strong>Loading orders…</td></tr>
       </tbody>
       <tfoot id="tableFoot" style="display:none">
         <tr>
-          <td colspan="5" style="font-weight:700">Totals (filtered)</td>
+          <td colspan="6" style="font-weight:700">Totals (filtered)</td>
           <td class="right" id="ft-cod">—</td>
           <td class="right" id="ft-shipping">—</td>
           <td class="right" id="ft-codfee">—</td>
@@ -200,14 +201,14 @@ const tk  = n => "৳ " + Math.round(n).toLocaleString("en-IN");
 
 // ── Sample data (shown on load or API error) ───────────────────────────────
 const SAMPLE_ORDERS = [
-  { id: 1042, customer: "Rafiq Hossain",   phone: "01711-000001", date: "2026-07-07", status: "completed",   cod: 1800, consignment_id: "SF-001", shipping_charge: 120, cod_fee: 18, receivable: 1662 },
-  { id: 1041, customer: "Nadia Islam",     phone: "01822-000002", date: "2026-07-07", status: "processing",  cod: 1900, consignment_id: null,     shipping_charge: 0,   cod_fee: 0,  receivable: 0    },
-  { id: 1040, customer: "Karim Uddin",     phone: "01933-000003", date: "2026-07-07", status: "wc-in-courier",cod: 1900, consignment_id: "SF-002", shipping_charge: 120, cod_fee: 19, receivable: 1761 },
-  { id: 1039, customer: "Sumaiya Akter",   phone: "01600-000004", date: "2026-07-06", status: "completed",   cod: 1800, consignment_id: "SF-003", shipping_charge: 120, cod_fee: 18, receivable: 1662 },
-  { id: 1038, customer: "Jahangir Alam",   phone: "01711-000005", date: "2026-07-06", status: "cancelled",   cod: 1900, consignment_id: null,     shipping_charge: 0,   cod_fee: 0,  receivable: 0    },
-  { id: 1037, customer: "Fatema Begum",    phone: "01922-000006", date: "2026-07-05", status: "completed",   cod: 1800, consignment_id: "SF-004", shipping_charge: 120, cod_fee: 18, receivable: 1662 },
-  { id: 1036, customer: "Tanvir Ahmed",    phone: "01833-000007", date: "2026-07-05", status: "wc-in-courier",cod: 1800, consignment_id: "SF-005", shipping_charge: 120, cod_fee: 18, receivable: 1662 },
-  { id: 1035, customer: "Reshma Khanam",   phone: "01600-000008", date: "2026-07-04", status: "processing",  cod: 1900, consignment_id: null,     shipping_charge: 0,   cod_fee: 0,  receivable: 0    },
+  { id: 1042, customer: "Rafiq Hossain",  phone: "01711-000001", date: "2026-07-07", wc_status: "completed",    sf_status: "delivered",         cod: 1800, consignment_id: "SF-001", shipping_charge: 120, cod_fee: 18, receivable: 1662 },
+  { id: 1041, customer: "Nadia Islam",    phone: "01822-000002", date: "2026-07-07", wc_status: "processing",   sf_status: null,                cod: 1900, consignment_id: null,     shipping_charge: 0,   cod_fee: 0,  receivable: 0    },
+  { id: 1040, customer: "Karim Uddin",    phone: "01933-000003", date: "2026-07-07", wc_status: "wc-in-courier",sf_status: "in_review",         cod: 1900, consignment_id: "SF-002", shipping_charge: 120, cod_fee: 19, receivable: 1761 },
+  { id: 1039, customer: "Sumaiya Akter",  phone: "01600-000004", date: "2026-07-06", wc_status: "completed",    sf_status: "delivered",         cod: 1800, consignment_id: "SF-003", shipping_charge: 120, cod_fee: 18, receivable: 1662 },
+  { id: 1038, customer: "Jahangir Alam",  phone: "01711-000005", date: "2026-07-06", wc_status: "cancelled",    sf_status: "cancelled",         cod: 1900, consignment_id: null,     shipping_charge: 0,   cod_fee: 0,  receivable: 0    },
+  { id: 1037, customer: "Fatema Begum",   phone: "01922-000006", date: "2026-07-05", wc_status: "completed",    sf_status: "delivered",         cod: 1800, consignment_id: "SF-004", shipping_charge: 120, cod_fee: 18, receivable: 1662 },
+  { id: 1036, customer: "Tanvir Ahmed",   phone: "01833-000007", date: "2026-07-05", wc_status: "wc-in-courier",sf_status: "in_review",         cod: 1800, consignment_id: "SF-005", shipping_charge: 120, cod_fee: 18, receivable: 1662 },
+  { id: 1035, customer: "Reshma Khanam",  phone: "01600-000008", date: "2026-07-04", wc_status: "processing",   sf_status: null,                cod: 1900, consignment_id: null,     shipping_charge: 0,   cod_fee: 0,  receivable: 0    },
 ];
 
 let allOrders = [];
@@ -255,12 +256,24 @@ function statusPill(s) {
   const map = { "completed":"pill-green", "in-courier":"pill-blue", "cancelled":"pill-red", "pending":"pill-gray", "processing":"pill-amber" };
   return map[normalizeStatus(s)] || "pill-gray";
 }
+function sfStatusLabel(s) {
+  if (!s) return null;
+  const map = {
+    "delivered":         { label: "Delivered",    cls: "pill-green"  },
+    "partial_delivered": { label: "Part. Delivered", cls: "pill-green" },
+    "in_review":         { label: "In Review",    cls: "pill-blue"   },
+    "unknown":           { label: "Unknown",      cls: "pill-gray"   },
+    "cancelled":         { label: "Cancelled",    cls: "pill-red"    },
+    "hold":              { label: "On Hold",      cls: "pill-amber"  },
+  };
+  return map[s.toLowerCase()] || { label: s, cls: "pill-gray" };
+}
 
 // ── Render ─────────────────────────────────────────────────────────────────
 function applyFilters() {
   const q = document.getElementById("searchBox").value.toLowerCase().trim();
   const filtered = allOrders.filter(o => {
-    const statusMatch = activeStatus === "all" || normalizeStatus(o.status) === activeStatus;
+    const statusMatch = activeStatus === "all" || normalizeStatus(o.wc_status) === activeStatus;
     const searchMatch = !q || String(o.id).includes(q) || o.customer.toLowerCase().includes(q) || (o.phone||"").includes(q);
     return statusMatch && searchMatch;
   });
@@ -272,22 +285,24 @@ function renderTable(orders) {
   const foot = document.getElementById("tableFoot");
 
   if (!orders.length) {
-    body.innerHTML = `<tr><td colspan="9" class="state-msg"><strong>No orders found</strong>${isSample ? "Sample data · Connect the extension for live orders" : "Try adjusting the date range or filter"}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="10" class="state-msg"><strong>No orders found</strong>${isSample ? "Sample data · Connect the extension for live orders" : "Try adjusting the date range or filter"}</td></tr>`;
     foot.style.display = "none";
     return;
   }
 
   body.innerHTML = orders.map(o => {
     const booked = !!o.consignment_id;
+    const sf = sfStatusLabel(o.sf_status);
     return `
     <tr>
       <td><span class="order-id">#${o.id}</span></td>
       <td>${o.customer}</td>
       <td class="muted">${o.phone || "—"}</td>
       <td class="muted">${o.date || "—"}</td>
-      <td><span class="pill ${statusPill(o.status)}">${statusLabel(o.status)}</span></td>
+      <td><span class="pill ${statusPill(o.wc_status)}">${statusLabel(o.wc_status)}</span></td>
+      <td>${sf ? `<span class="pill ${sf.cls}">${sf.label}</span>` : '<span class="no-cid">not booked</span>'}</td>
       <td class="right">${tk(o.cod)}</td>
-      <td class="right">${booked ? `<span style="color:#C8553D">${tk(o.shipping_charge)}</span>` : '<span class="no-cid">not booked</span>'}</td>
+      <td class="right">${booked ? `<span style="color:#C8553D">${tk(o.shipping_charge)}</span>` : '<span class="no-cid">—</span>'}</td>
       <td class="right">${booked ? `<span style="color:#926A00">${tk(o.cod_fee)}</span>` : '<span class="no-cid">—</span>'}</td>
       <td class="right">${booked ? `<span style="color:#4F7060">${tk(o.receivable)}</span>` : '<span class="no-cid">—</span>'}</td>
     </tr>`;
@@ -321,7 +336,7 @@ function updateKpis(orders) {
 async function loadOrders(from, to) {
   const st = document.getElementById("loadStatus");
   st.textContent = "Loading…";
-  document.getElementById("tableBody").innerHTML = `<tr><td colspan="9" class="state-msg"><strong>—</strong>Fetching orders…</td></tr>`;
+  document.getElementById("tableBody").innerHTML = `<tr><td colspan="10" class="state-msg"><strong>—</strong>Fetching orders…</td></tr>`;
   document.getElementById("tableFoot").style.display = "none";
 
   try {

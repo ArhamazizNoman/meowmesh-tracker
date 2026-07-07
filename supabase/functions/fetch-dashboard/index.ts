@@ -341,10 +341,11 @@ async function fetchSteadfast({ sfKey, sfSecret }: Record<string,string>, cidRow
 
 // ── Orders Detail (mode=orders) ───────────────────────────────────────────────
 
-async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret }: Record<string,string>, from: string, to: string) {
+async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret, sfKey, sfSecret }: Record<string,string>, from: string, to: string) {
   const base  = wcUrl.replace(/\/$/, "");
   const auth  = btoa(`${wcKey}:${wcSecret}`);
   const hdrs  = { Authorization: `Basic ${auth}` };
+  const sfHdrs = { "Api-Key": sfKey, "Secret-Key": sfSecret };
   const after  = encodeURIComponent(dateToISO(from, 0));
   const before = encodeURIComponent(dateToISO(to,   1));
 
@@ -354,25 +355,48 @@ async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret }: Record<string,strin
 
   const DELIVERY_CHARGE = 120;
 
-  return orders
-    .map(o => {
-      const getMeta = (key: string) => (o.meta_data || []).find((m: any) => m.key === key)?.value;
-      const cid = getMeta("_steadfast_consignment_id") || getMeta("steadfast_consignment_id") || null;
+  // Extract consignment IDs from WC order meta
+  const getMeta = (o: any, key: string) => (o.meta_data || []).find((m: any) => m.key === key)?.value;
+  const ordersWithCid = orders.map(o => ({
+    order: o,
+    cid: getMeta(o, "_steadfast_consignment_id") || getMeta(o, "steadfast_consignment_id") || null,
+  }));
+
+  // Fetch delivery status from Steadfast for each booked order in parallel
+  const sfStatusMap = new Map<string, string>();
+  await Promise.all(
+    ordersWithCid
+      .filter(({ cid }) => cid)
+      .map(async ({ cid }) => {
+        try {
+          const res = await fetch(`https://portal.packzy.com/api/v1/status_by_cid/${cid}`, { headers: sfHdrs });
+          if (!res.ok) return;
+          const d = await res.json();
+          const ds = (d?.consignment?.delivery_status || d?.delivery_status || "").toLowerCase();
+          if (ds) sfStatusMap.set(cid!, ds);
+        } catch (_) { /* ignore per-ID errors */ }
+      })
+  );
+
+  return ordersWithCid
+    .map(({ order: o, cid }) => {
       const cod = Math.round(parseFloat(o.total) || 0);
+      const sfStatus       = cid ? (sfStatusMap.get(cid) || null) : null;
       const shippingCharge = cid ? DELIVERY_CHARGE : 0;
       const codFee         = cid ? Math.round(cod * 0.01) : 0;
       const receivable     = cid ? cod - shippingCharge - codFee : 0;
       return {
-        id:             o.id,
-        customer:       (`${o.billing?.first_name || ""} ${o.billing?.last_name || ""}`).trim() || "Guest",
-        phone:          o.billing?.phone || "",
-        status:         o.status,
+        id:              o.id,
+        customer:        (`${o.billing?.first_name || ""} ${o.billing?.last_name || ""}`).trim() || "Guest",
+        phone:           o.billing?.phone || "",
+        wc_status:       o.status,
+        sf_status:       sfStatus,
         cod,
-        consignment_id: cid,
+        consignment_id:  cid,
         shipping_charge: shippingCharge,
         cod_fee:         codFee,
         receivable,
-        date:           (o.date_created || "").slice(0, 10),
+        date:            (o.date_created || "").slice(0, 10),
       };
     })
     .sort((a: any, b: any) => b.id - a.id);
