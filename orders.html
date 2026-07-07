@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MeowMesh — Orders</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: #FBF6EC; color: #23201A; font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+    h1,h2,h3 { font-family: 'Fraunces', serif; margin: 0; }
+
+    .topbar { background: #F3EADB; border-bottom: 1px solid #E2D6C2; margin-bottom: 0; }
+    .topbar-inner { max-width: 1100px; margin: 0 auto; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .topbar-brand { display: flex; align-items: center; gap: 10px; }
+    .topbar-brand h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+    .topbar-brand span.clay { color: #C8553D; }
+    .nav-links { display: flex; gap: 8px; }
+    .nav-link { all: unset; cursor: pointer; font-size: 13px; font-weight: 600; color: #6B6255; padding: 7px 14px; border-radius: 999px; border: 1px solid #E2D6C2; background: #fff; text-decoration: none; transition: background .12s; }
+    .nav-link:hover:not(.active) { background: #F3EADB; }
+    .nav-link.active { background: #23201A; color: #FBF6EC; border-color: #23201A; }
+
+    /* Date bar */
+    .date-bar { background: #F3EADB; border-bottom: 1px solid #E2D6C2; padding: 10px 20px; }
+    .date-bar-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .preset-btn { all: unset; cursor: pointer; padding: 7px 13px; font-size: 12px; font-weight: 600; color: #6B6255; background: #fff; border: 1px solid #E2D6C2; border-radius: 999px; white-space: nowrap; transition: background .12s; }
+    .preset-btn.active { background: #23201A; color: #fff; border-color: #23201A; }
+    .preset-btn:hover:not(.active) { background: #F3EADB; }
+    .date-input { padding: 6px 10px; border: 1px solid #E2D6C2; border-radius: 8px; font-size: 12px; font-family: inherit; color: #23201A; background: #fff; outline: none; }
+    .btn-apply { all: unset; cursor: pointer; padding: 6px 14px; border-radius: 8px; background: #C8553D; color: #fff; font-size: 12px; font-weight: 600; }
+
+    .page { max-width: 1100px; margin: 0 auto; padding: 24px 20px 64px; }
+
+    /* KPI strip */
+    .kpi-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 24px; }
+    .kpi { background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; padding: 14px 16px; border-top: 3px solid; }
+    .kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #6B6255; margin-bottom: 5px; }
+    .kpi-val { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700; color: #23201A; line-height: 1.1; }
+    .kpi-sub { font-size: 11px; color: #6B6255; margin-top: 3px; }
+
+    /* Status bar + search */
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .status-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+    .sf-btn { all: unset; cursor: pointer; font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px; border: 1px solid #E2D6C2; background: #fff; color: #6B6255; transition: all .12s; }
+    .sf-btn.active { background: #23201A; color: #fff; border-color: #23201A; }
+    .search-box { padding: 7px 12px; border: 1px solid #E2D6C2; border-radius: 8px; font-size: 13px; font-family: inherit; outline: none; background: #fff; color: #23201A; min-width: 200px; }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid #E2D6C2; background: #fff; }
+    table { width: 100%; border-collapse: collapse; min-width: 700px; }
+    thead th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; padding: 11px 14px; background: #F9F4EE; border-bottom: 1px solid #E2D6C2; text-align: left; white-space: nowrap; }
+    thead th.right { text-align: right; }
+    tbody tr { border-bottom: 1px solid #F0E9DC; transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #FAF5EE; }
+    tbody td { padding: 10px 14px; font-size: 13px; vertical-align: middle; }
+    tbody td.right { text-align: right; font-family: 'Fraunces', serif; font-size: 14px; font-weight: 600; }
+    tbody td.muted { color: #6B6255; font-size: 12px; }
+    .order-id { font-weight: 700; color: #23201A; font-family: 'Fraunces', serif; }
+    .no-cid { color: #9B9286; font-size: 12px; font-style: italic; }
+
+    /* Pills */
+    .pill { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+    .pill-green  { background: #EAF1EC; color: #3D6B4F; }
+    .pill-blue   { background: #DBEAFE; color: #1E40AF; }
+    .pill-amber  { background: #FEF3C7; color: #92400E; }
+    .pill-red    { background: #FEE2E2; color: #991B1B; }
+    .pill-gray   { background: #F3F4F6; color: #4B5563; }
+
+    /* Empty / loading */
+    .state-msg { text-align: center; padding: 48px 20px; color: #6B6255; font-size: 14px; }
+    .state-msg strong { display: block; font-family: 'Fraunces', serif; font-size: 22px; color: #23201A; margin-bottom: 6px; }
+
+    /* Totals row */
+    tfoot td { padding: 11px 14px; font-size: 13px; font-weight: 700; background: #F9F4EE; border-top: 2px solid #E2D6C2; }
+    tfoot td.right { text-align: right; font-family: 'Fraunces', serif; font-size: 14px; }
+
+    @media (max-width: 640px) {
+      .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+      .search-box { min-width: 140px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-brand">
+      <span style="font-size:24px">🐾</span>
+      <h1>MeowMesh <span class="clay">Ops</span></h1>
+    </div>
+    <div class="nav-links">
+      <a class="nav-link" href="dashboard.html">Dashboard</a>
+      <a class="nav-link active" href="orders.html">Orders</a>
+      <a class="nav-link" href="costs.html">Costs</a>
+    </div>
+  </div>
+</div>
+
+<div class="date-bar">
+  <div class="date-bar-inner">
+    <button class="preset-btn active" data-preset="today">Today</button>
+    <button class="preset-btn" data-preset="yesterday">Yesterday</button>
+    <button class="preset-btn" data-preset="week">This Week</button>
+    <button class="preset-btn" data-preset="lastweek">Last Week</button>
+    <button class="preset-btn" data-preset="month">This Month</button>
+    <div style="display:flex;align-items:center;gap:6px;margin-left:4px">
+      <input type="date" id="dateFrom" class="date-input" />
+      <span style="font-size:12px;color:#6B6255">→</span>
+      <input type="date" id="dateTo" class="date-input" />
+      <button class="btn-apply" id="btnApply">Apply</button>
+    </div>
+    <span id="loadStatus" style="font-size:12px;color:#6B6255;margin-left:4px"></span>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- KPI strip -->
+  <div class="kpi-strip" id="kpiStrip">
+    <div class="kpi" style="border-top-color:#6B9AB8">
+      <div class="kpi-label">Total Orders</div>
+      <div class="kpi-val" id="k-orders">—</div>
+      <div class="kpi-sub" id="k-orders-sub">in range</div>
+    </div>
+    <div class="kpi" style="border-top-color:#C8553D">
+      <div class="kpi-label">Total COD</div>
+      <div class="kpi-val" id="k-cod">—</div>
+      <div class="kpi-sub">gross cash on delivery</div>
+    </div>
+    <div class="kpi" style="border-top-color:#E8A838">
+      <div class="kpi-label">Shipping Charges</div>
+      <div class="kpi-val" id="k-shipping">—</div>
+      <div class="kpi-sub">Steadfast delivery fee</div>
+    </div>
+    <div class="kpi" style="border-top-color:#9CA3AF">
+      <div class="kpi-label">COD Fee (1%)</div>
+      <div class="kpi-val" id="k-codfee">—</div>
+      <div class="kpi-sub">Steadfast collection fee</div>
+    </div>
+    <div class="kpi" style="border-top-color:#4F7060">
+      <div class="kpi-label">Total Receivable</div>
+      <div class="kpi-val" id="k-receivable" style="color:#4F7060">—</div>
+      <div class="kpi-sub">net amount to owner</div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="status-filters" id="statusFilters">
+      <button class="sf-btn active" data-status="all">All</button>
+      <button class="sf-btn" data-status="processing">Processing</button>
+      <button class="sf-btn" data-status="in-courier">In Courier</button>
+      <button class="sf-btn" data-status="completed">Delivered</button>
+      <button class="sf-btn" data-status="cancelled">Cancelled</button>
+    </div>
+    <input type="text" class="search-box" id="searchBox" placeholder="Search order # or customer…" oninput="applyFilters()" />
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table id="ordersTable">
+      <thead>
+        <tr>
+          <th>Order #</th>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th class="right">COD Amount</th>
+          <th class="right">Shipping Charge</th>
+          <th class="right">COD Fee</th>
+          <th class="right">Receivable</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="9" class="state-msg"><strong>—</strong>Loading orders…</td></tr>
+      </tbody>
+      <tfoot id="tableFoot" style="display:none">
+        <tr>
+          <td colspan="5" style="font-weight:700">Totals (filtered)</td>
+          <td class="right" id="ft-cod">—</td>
+          <td class="right" id="ft-shipping">—</td>
+          <td class="right" id="ft-codfee">—</td>
+          <td class="right" id="ft-receivable" style="color:#4F7060">—</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+</div>
+
+<script>
+const SUPABASE_URL  = "https://dicanelropavoaqisebh.supabase.co";
+const SUPABASE_ANON = "sb_publishable_dO4YNs6kZZhzIKQQ2Q8UuQ_BLSe2OaW";
+const EDGE_URL      = SUPABASE_URL + "/functions/v1/fetch-dashboard";
+
+const tk  = n => "৳ " + Math.round(n).toLocaleString("en-IN");
+
+// ── Sample data (shown on load or API error) ───────────────────────────────
+const SAMPLE_ORDERS = [
+  { id: 1042, customer: "Rafiq Hossain",   phone: "01711-000001", date: "2026-07-07", status: "completed",   cod: 1800, consignment_id: "SF-001", shipping_charge: 120, cod_fee: 18, receivable: 1662 },
+  { id: 1041, customer: "Nadia Islam",     phone: "01822-000002", date: "2026-07-07", status: "processing",  cod: 1900, consignment_id: null,     shipping_charge: 0,   cod_fee: 0,  receivable: 0    },
+  { id: 1040, customer: "Karim Uddin",     phone: "01933-000003", date: "2026-07-07", status: "wc-in-courier",cod: 1900, consignment_id: "SF-002", shipping_charge: 120, cod_fee: 19, receivable: 1761 },
+  { id: 1039, customer: "Sumaiya Akter",   phone: "01600-000004", date: "2026-07-06", status: "completed",   cod: 1800, consignment_id: "SF-003", shipping_charge: 120, cod_fee: 18, receivable: 1662 },
+  { id: 1038, customer: "Jahangir Alam",   phone: "01711-000005", date: "2026-07-06", status: "cancelled",   cod: 1900, consignment_id: null,     shipping_charge: 0,   cod_fee: 0,  receivable: 0    },
+  { id: 1037, customer: "Fatema Begum",    phone: "01922-000006", date: "2026-07-05", status: "completed",   cod: 1800, consignment_id: "SF-004", shipping_charge: 120, cod_fee: 18, receivable: 1662 },
+  { id: 1036, customer: "Tanvir Ahmed",    phone: "01833-000007", date: "2026-07-05", status: "wc-in-courier",cod: 1800, consignment_id: "SF-005", shipping_charge: 120, cod_fee: 18, receivable: 1662 },
+  { id: 1035, customer: "Reshma Khanam",   phone: "01600-000008", date: "2026-07-04", status: "processing",  cod: 1900, consignment_id: null,     shipping_charge: 0,   cod_fee: 0,  receivable: 0    },
+];
+
+let allOrders = [];
+let activeStatus = "all";
+let isSample = true;
+
+// ── Date helpers ───────────────────────────────────────────────────────────
+function bdtToday() { return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" })); }
+function fmt(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function startOfWeek(d)  { const r = new Date(d); r.setDate(r.getDate()-r.getDay()); return r; }
+function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+
+let currentRange = { from: fmt(bdtToday()), to: fmt(bdtToday()) };
+
+function applyPreset(preset) {
+  const t = bdtToday();
+  const map = {
+    today:    { from: fmt(t),                           to: fmt(t) },
+    yesterday:{ from: fmt(addDays(t,-1)),               to: fmt(addDays(t,-1)) },
+    week:     { from: fmt(startOfWeek(t)),              to: fmt(t) },
+    lastweek: { from: fmt(startOfWeek(addDays(t,-7))),  to: fmt(addDays(startOfWeek(t),-1)) },
+    month:    { from: fmt(startOfMonth(t)),             to: fmt(t) },
+  };
+  currentRange = map[preset] || map.today;
+  document.getElementById("dateFrom").value = currentRange.from;
+  document.getElementById("dateTo").value   = currentRange.to;
+  document.querySelectorAll(".preset-btn").forEach(b => b.classList.toggle("active", b.dataset.preset === preset));
+}
+
+// ── Status helpers ─────────────────────────────────────────────────────────
+function normalizeStatus(s) {
+  s = (s||"").toLowerCase();
+  if (["completed","delivered","wc-delivered"].includes(s)) return "completed";
+  if (["shipped","in-courier","wc-in-courier","out-for-delivery"].includes(s)) return "in-courier";
+  if (["cancelled","failed","refunded"].includes(s)) return "cancelled";
+  if (s === "pending") return "pending";
+  return "processing";
+}
+function statusLabel(s) {
+  const map = { "completed":"Delivered", "in-courier":"In Courier", "cancelled":"Cancelled", "pending":"Pending", "processing":"Processing" };
+  return map[normalizeStatus(s)] || s;
+}
+function statusPill(s) {
+  const map = { "completed":"pill-green", "in-courier":"pill-blue", "cancelled":"pill-red", "pending":"pill-gray", "processing":"pill-amber" };
+  return map[normalizeStatus(s)] || "pill-gray";
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function applyFilters() {
+  const q = document.getElementById("searchBox").value.toLowerCase().trim();
+  const filtered = allOrders.filter(o => {
+    const statusMatch = activeStatus === "all" || normalizeStatus(o.status) === activeStatus;
+    const searchMatch = !q || String(o.id).includes(q) || o.customer.toLowerCase().includes(q) || (o.phone||"").includes(q);
+    return statusMatch && searchMatch;
+  });
+  renderTable(filtered);
+}
+
+function renderTable(orders) {
+  const body = document.getElementById("tableBody");
+  const foot = document.getElementById("tableFoot");
+
+  if (!orders.length) {
+    body.innerHTML = `<tr><td colspan="9" class="state-msg"><strong>No orders found</strong>${isSample ? "Sample data · Connect the extension for live orders" : "Try adjusting the date range or filter"}</td></tr>`;
+    foot.style.display = "none";
+    return;
+  }
+
+  body.innerHTML = orders.map(o => {
+    const booked = !!o.consignment_id;
+    return `
+    <tr>
+      <td><span class="order-id">#${o.id}</span></td>
+      <td>${o.customer}</td>
+      <td class="muted">${o.phone || "—"}</td>
+      <td class="muted">${o.date || "—"}</td>
+      <td><span class="pill ${statusPill(o.status)}">${statusLabel(o.status)}</span></td>
+      <td class="right">${tk(o.cod)}</td>
+      <td class="right">${booked ? `<span style="color:#C8553D">${tk(o.shipping_charge)}</span>` : '<span class="no-cid">not booked</span>'}</td>
+      <td class="right">${booked ? `<span style="color:#926A00">${tk(o.cod_fee)}</span>` : '<span class="no-cid">—</span>'}</td>
+      <td class="right">${booked ? `<span style="color:#4F7060">${tk(o.receivable)}</span>` : '<span class="no-cid">—</span>'}</td>
+    </tr>`;
+  }).join("");
+
+  const totCOD      = orders.reduce((s, o) => s + o.cod, 0);
+  const totShipping = orders.reduce((s, o) => s + o.shipping_charge, 0);
+  const totFee      = orders.reduce((s, o) => s + o.cod_fee, 0);
+  const totRec      = orders.reduce((s, o) => s + o.receivable, 0);
+  document.getElementById("ft-cod").textContent      = tk(totCOD);
+  document.getElementById("ft-shipping").textContent = tk(totShipping);
+  document.getElementById("ft-codfee").textContent   = tk(totFee);
+  document.getElementById("ft-receivable").textContent = tk(totRec);
+  foot.style.display = "";
+}
+
+function updateKpis(orders) {
+  const totCOD      = orders.reduce((s, o) => s + o.cod, 0);
+  const totShipping = orders.reduce((s, o) => s + o.shipping_charge, 0);
+  const totFee      = orders.reduce((s, o) => s + o.cod_fee, 0);
+  const totRec      = orders.reduce((s, o) => s + o.receivable, 0);
+  document.getElementById("k-orders").textContent  = orders.length;
+  document.getElementById("k-orders-sub").textContent = isSample ? "sample data" : "in range";
+  document.getElementById("k-cod").textContent      = tk(totCOD);
+  document.getElementById("k-shipping").textContent = tk(totShipping);
+  document.getElementById("k-codfee").textContent   = tk(totFee);
+  document.getElementById("k-receivable").textContent = tk(totRec);
+}
+
+// ── Fetch ──────────────────────────────────────────────────────────────────
+async function loadOrders(from, to) {
+  const st = document.getElementById("loadStatus");
+  st.textContent = "Loading…";
+  document.getElementById("tableBody").innerHTML = `<tr><td colspan="9" class="state-msg"><strong>—</strong>Fetching orders…</td></tr>`;
+  document.getElementById("tableFoot").style.display = "none";
+
+  try {
+    const res = await fetch(`${EDGE_URL}?mode=orders&from=${from}&to=${to}`, {
+      headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` }
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const json = await res.json();
+    allOrders = json.orders || [];
+    isSample = false;
+    st.textContent = `✓ ${allOrders.length} orders`;
+  } catch(e) {
+    allOrders = SAMPLE_ORDERS;
+    isSample = true;
+    st.textContent = "Sample data (API unavailable)";
+  }
+
+  updateKpis(allOrders);
+  applyFilters();
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  const t = bdtToday();
+  document.getElementById("dateFrom").value = fmt(t);
+  document.getElementById("dateTo").value   = fmt(t);
+
+  document.querySelectorAll(".preset-btn").forEach(btn =>
+    btn.addEventListener("click", () => {
+      applyPreset(btn.dataset.preset);
+      loadOrders(currentRange.from, currentRange.to);
+    })
+  );
+
+  document.getElementById("btnApply").addEventListener("click", () => {
+    const from = document.getElementById("dateFrom").value;
+    const to   = document.getElementById("dateTo").value;
+    if (!from || !to) return;
+    currentRange = { from, to };
+    document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+    loadOrders(from, to);
+  });
+
+  document.querySelectorAll(".sf-btn").forEach(btn =>
+    btn.addEventListener("click", () => {
+      activeStatus = btn.dataset.status;
+      document.querySelectorAll(".sf-btn").forEach(b => b.classList.toggle("active", b === btn));
+      applyFilters();
+    })
+  );
+
+  loadOrders(currentRange.from, currentRange.to);
+});
+</script>
+
+</body>
+</html>
