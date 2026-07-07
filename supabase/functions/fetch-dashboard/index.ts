@@ -49,6 +49,14 @@ Deno.serve(async (req) => {
       metaAccountId: Deno.env.get("META_ACCOUNT_ID")!,
     };
 
+    const mode = url.searchParams.get("mode");
+    if (mode === "orders") {
+      const orders = await fetchOrdersDetail(cfg, from, to);
+      return new Response(JSON.stringify({ orders, from, to }), {
+        headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
+
     // Fetch WC + consignment IDs in parallel with Meta
     const [wcRes, sfIds, meta] = await Promise.allSettled([
       fetchWooCommerce(cfg, from, to),
@@ -329,6 +337,45 @@ async function fetchSteadfast({ sfKey, sfSecret }: Record<string,string>, cidRow
     pluginInstalled: true,
     totalParcels: statuses.length,
   };
+}
+
+// ── Orders Detail (mode=orders) ───────────────────────────────────────────────
+
+async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret }: Record<string,string>, from: string, to: string) {
+  const base  = wcUrl.replace(/\/$/, "");
+  const auth  = btoa(`${wcKey}:${wcSecret}`);
+  const hdrs  = { Authorization: `Basic ${auth}` };
+  const after  = encodeURIComponent(dateToISO(from, 0));
+  const before = encodeURIComponent(dateToISO(to,   1));
+
+  const orders = await wcFetchAllPages(
+    `${base}/wp-json/wc/v3/orders?after=${after}&before=${before}&per_page=100&status=any`, hdrs
+  );
+
+  const DELIVERY_CHARGE = 120;
+
+  return orders
+    .map(o => {
+      const getMeta = (key: string) => (o.meta_data || []).find((m: any) => m.key === key)?.value;
+      const cid = getMeta("_steadfast_consignment_id") || getMeta("steadfast_consignment_id") || null;
+      const cod = Math.round(parseFloat(o.total) || 0);
+      const shippingCharge = cid ? DELIVERY_CHARGE : 0;
+      const codFee         = cid ? Math.round(cod * 0.01) : 0;
+      const receivable     = cid ? cod - shippingCharge - codFee : 0;
+      return {
+        id:             o.id,
+        customer:       (`${o.billing?.first_name || ""} ${o.billing?.last_name || ""}`).trim() || "Guest",
+        phone:          o.billing?.phone || "",
+        status:         o.status,
+        cod,
+        consignment_id: cid,
+        shipping_charge: shippingCharge,
+        cod_fee:         codFee,
+        receivable,
+        date:           (o.date_created || "").slice(0, 10),
+      };
+    })
+    .sort((a: any, b: any) => b.id - a.id);
 }
 
 // ── Meta Ads ──────────────────────────────────────────────────────────────────
