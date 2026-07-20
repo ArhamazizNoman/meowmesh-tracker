@@ -396,7 +396,11 @@ async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret, sfKey, sfSecret }: Re
 
   return ordersWithCid
     .map(({ order: o, cidRow }) => {
-      const cod            = Math.round(parseFloat(o.total) || 0);
+      // Prefer COD amount from Steadfast booking (cidRow) over WC total,
+      // because some WC orders have o.total = 0 (manual/placeholder orders)
+      const sfCod  = cidRow ? Math.round(cidRow.cod_amount || 0) : 0;
+      const wcCod  = Math.round(parseFloat(o.total) || 0);
+      const cod    = sfCod > 0 ? sfCod : wcCod;
       const cid            = cidRow?.consignment_id || null;
       const sfParcel       = cid ? sfDataMap.get(cid) : null;
       const sfStatus       = sfParcel?.status || null;
