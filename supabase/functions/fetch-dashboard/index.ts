@@ -1,4 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import sfLookupData from "./steadfast_lookup.json" assert { type: "json" };
+
+type SfLookupEntry = { cod: number; shipping: number; cod_fee: number; status: string; wc_id?: number };
+const sfByOrderId: Record<string, SfLookupEntry> = (sfLookupData as any).by_order_id;
+const sfByCid:     Record<string, SfLookupEntry> = (sfLookupData as any).by_cid;
 
 // Strip PHP junk prepended before valid JSON (WPCode cache bug).
 // PHP snippet always ends with }); — find last }); then scan for [ or {.
@@ -386,7 +391,6 @@ async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret, sfKey, sfSecret }: Re
           const res = await fetch(`https://portal.packzy.com/api/v1/status_by_cid/${cidRow!.consignment_id}`, { headers: sfHdrs });
           if (!res.ok) return;
           const d = await res.json();
-          console.log("SF status_by_cid raw:", JSON.stringify(d).slice(0, 500));
           const c   = d?.consignment || d;
           const ds  = (c?.delivery_status || "").toLowerCase();
           const chg = parseFloat(c?.charge ?? c?.delivery_charge ?? c?.courier_charge ?? c?.cod_charge ?? c?.service_charge ?? "0") || 0;
@@ -397,18 +401,32 @@ async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret, sfKey, sfSecret }: Re
 
   return ordersWithCid
     .map(({ order: o, cidRow }) => {
-      // Prefer COD amount from Steadfast booking (cidRow) over WC total,
-      // because some WC orders have o.total = 0 (manual/placeholder orders)
-      const sfCod  = cidRow ? Math.round(cidRow.cod_amount || 0) : 0;
-      const wcCod  = Math.round(parseFloat(o.total) || 0);
-      const cod    = sfCod > 0 ? sfCod : wcCod;
-      const cid            = cidRow?.consignment_id || null;
-      const sfParcel       = cid ? sfDataMap.get(cid) : null;
-      const sfStatus       = sfParcel?.status || null;
-      // Use actual Steadfast charge; fall back to flat ৳120 if API didn't return it
-      const shippingCharge = cid ? (sfParcel?.charge || DELIVERY_CHARGE) : 0;
-      const codFee         = cid ? Math.round(cod * 0.01) : 0;
-      const receivable     = cid ? cod - shippingCharge - codFee : 0;
+      const cid      = cidRow?.consignment_id || null;
+      const sfParcel = cid ? sfDataMap.get(cid) : null;
+
+      // Look up real charges from the Excel export (most accurate source)
+      const xlEntry: SfLookupEntry | undefined =
+        sfByOrderId[String(o.id)] ?? (cid ? sfByCid[cid] : undefined);
+
+      const sfCod = cidRow ? Math.round(cidRow.cod_amount || 0) : 0;
+      const wcCod = Math.round(parseFloat(o.total) || 0);
+
+      // Priority: Excel export → WP endpoint → WC total
+      const cod = xlEntry != null ? xlEntry.cod : (sfCod > 0 ? sfCod : wcCod);
+
+      // Priority: Excel export → Steadfast API charge → ৳120 fallback
+      const shippingCharge = cid
+        ? (xlEntry != null ? xlEntry.shipping : (sfParcel?.charge || DELIVERY_CHARGE))
+        : 0;
+
+      // Priority: Excel export (exact) → 1% of COD
+      const codFee = cid
+        ? (xlEntry != null ? xlEntry.cod_fee : Math.round(cod * 0.01))
+        : 0;
+
+      // Status: live Steadfast API → Excel snapshot
+      const sfStatus   = sfParcel?.status || xlEntry?.status || null;
+      const receivable = cid ? cod - shippingCharge - codFee : 0;
       return {
         id:              o.id,
         customer:        (`${o.billing?.first_name || ""} ${o.billing?.last_name || ""}`).trim() || "Guest",
