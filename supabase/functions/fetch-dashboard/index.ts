@@ -375,8 +375,9 @@ async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret, sfKey, sfSecret }: Re
     return { order: o, cidRow: row || null };
   });
 
-  // Fetch Steadfast delivery status for every booked order in parallel
-  const sfStatusMap = new Map<string, string>();
+  // Fetch Steadfast delivery status + actual charge for every booked order in parallel
+  type SfParcel = { status: string; charge: number };
+  const sfDataMap = new Map<string, SfParcel>();
   await Promise.all(
     ordersWithCid
       .filter(({ cidRow }) => cidRow)
@@ -385,18 +386,26 @@ async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret, sfKey, sfSecret }: Re
           const res = await fetch(`https://portal.packzy.com/api/v1/status_by_cid/${cidRow!.consignment_id}`, { headers: sfHdrs });
           if (!res.ok) return;
           const d = await res.json();
-          const ds = (d?.consignment?.delivery_status || d?.delivery_status || "").toLowerCase();
-          if (ds) sfStatusMap.set(cidRow!.consignment_id, ds);
+          const c   = d?.consignment || d;
+          const ds  = (c?.delivery_status || "").toLowerCase();
+          const chg = parseFloat(c?.charge ?? c?.delivery_charge ?? c?.courier_charge ?? "0") || 0;
+          if (ds) sfDataMap.set(cidRow!.consignment_id, { status: ds, charge: chg });
         } catch (_) { /* ignore per-ID errors */ }
       })
   );
 
   return ordersWithCid
     .map(({ order: o, cidRow }) => {
-      const cod            = Math.round(parseFloat(o.total) || 0);
+      // Prefer COD amount from Steadfast booking (cidRow) over WC total,
+      // because some WC orders have o.total = 0 (manual/placeholder orders)
+      const sfCod  = cidRow ? Math.round(cidRow.cod_amount || 0) : 0;
+      const wcCod  = Math.round(parseFloat(o.total) || 0);
+      const cod    = sfCod > 0 ? sfCod : wcCod;
       const cid            = cidRow?.consignment_id || null;
-      const sfStatus       = cid ? (sfStatusMap.get(cid) || null) : null;
-      const shippingCharge = cid ? DELIVERY_CHARGE : 0;
+      const sfParcel       = cid ? sfDataMap.get(cid) : null;
+      const sfStatus       = sfParcel?.status || null;
+      // Use actual Steadfast charge; fall back to flat ৳120 if API didn't return it
+      const shippingCharge = cid ? (sfParcel?.charge || DELIVERY_CHARGE) : 0;
       const codFee         = cid ? Math.round(cod * 0.01) : 0;
       const receivable     = cid ? cod - shippingCharge - codFee : 0;
       return {
