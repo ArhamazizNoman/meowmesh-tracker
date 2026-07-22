@@ -1,9 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import sfLookupData from "./steadfast_lookup.json" assert { type: "json" };
-
 type SfLookupEntry = { cod: number; shipping: number; cod_fee: number; status: string; wc_id?: number };
-const sfByOrderId: Record<string, SfLookupEntry> = (sfLookupData as any).by_order_id;
-const sfByCid:     Record<string, SfLookupEntry> = (sfLookupData as any).by_cid;
 
 // Strip PHP junk prepended before valid JSON (WPCode cache bug).
 // PHP snippet always ends with }); — find last }); then scan for [ or {.
@@ -56,7 +52,7 @@ Deno.serve(async (req) => {
 
     const mode = url.searchParams.get("mode");
     if (mode === "orders") {
-      const orders = await fetchOrdersDetail(cfg, from, to);
+      const orders = await fetchOrdersDetail(cfg, from, to, sb);
       return new Response(JSON.stringify({ orders, from, to }), {
         headers: { ...CORS, "Content-Type": "application/json" },
       });
@@ -347,7 +343,8 @@ async function fetchSteadfast({ sfKey, sfSecret }: Record<string,string>, cidRow
 
 // ── Orders Detail (mode=orders) ───────────────────────────────────────────────
 
-async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret, sfKey, sfSecret }: Record<string,string>, from: string, to: string) {
+async function fetchOrdersDetail(cfg: Record<string,string>, from: string, to: string, sb: any) {
+  const { wcUrl, wcKey, wcSecret, sfKey, sfSecret } = cfg;
   const base   = wcUrl.replace(/\/$/, "");
   const auth   = btoa(`${wcKey}:${wcSecret}`);
   const hdrs   = { Authorization: `Basic ${auth}` };
@@ -380,7 +377,32 @@ async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret, sfKey, sfSecret }: Re
     return { order: o, cidRow: row || null };
   });
 
-  // Fetch Steadfast delivery status + actual charge for every booked order in parallel
+  // Query Supabase for real COD + shipping data stored from Steadfast exports
+  const orderIds = orders.map((o: any) => o.id);
+  const bookedCids = ordersWithCid.filter(x => x.cidRow).map(x => x.cidRow!.consignment_id);
+
+  const sfDbByOrderId = new Map<number, SfLookupEntry>();
+  const sfDbByCid     = new Map<string, SfLookupEntry>();
+
+  try {
+    const { data: sfRows } = await sb
+      .from("steadfast_consignments")
+      .select("tracking_code,wc_order_id,cod_amount,shipping_charge,cod_fee,delivery_status")
+      .or(`wc_order_id.in.(${orderIds.join(",")}),tracking_code.in.(${bookedCids.join(",")})`);
+
+    for (const r of (sfRows || [])) {
+      const entry: SfLookupEntry = {
+        cod:     r.cod_amount,
+        shipping: r.shipping_charge,
+        cod_fee:  r.cod_fee,
+        status:   (r.delivery_status || "").toLowerCase(),
+      };
+      if (r.wc_order_id) sfDbByOrderId.set(r.wc_order_id, entry);
+      if (r.tracking_code) sfDbByCid.set(r.tracking_code, entry);
+    }
+  } catch (_) { /* table may not exist yet — silently fall back */ }
+
+  // Fetch live Steadfast delivery status per booked order
   type SfParcel = { status: string; charge: number };
   const sfDataMap = new Map<string, SfParcel>();
   await Promise.all(
@@ -391,10 +413,9 @@ async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret, sfKey, sfSecret }: Re
           const res = await fetch(`https://portal.packzy.com/api/v1/status_by_cid/${cidRow!.consignment_id}`, { headers: sfHdrs });
           if (!res.ok) return;
           const d = await res.json();
-          const c   = d?.consignment || d;
-          const ds  = (c?.delivery_status || "").toLowerCase();
-          const chg = parseFloat(c?.charge ?? c?.delivery_charge ?? c?.courier_charge ?? c?.cod_charge ?? c?.service_charge ?? "0") || 0;
-          if (ds) sfDataMap.set(cidRow!.consignment_id, { status: ds, charge: chg });
+          const c  = d?.consignment || d;
+          const ds = (c?.delivery_status || "").toLowerCase();
+          if (ds) sfDataMap.set(cidRow!.consignment_id, { status: ds, charge: 0 });
         } catch (_) { /* ignore per-ID errors */ }
       })
   );
@@ -404,28 +425,24 @@ async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret, sfKey, sfSecret }: Re
       const cid      = cidRow?.consignment_id || null;
       const sfParcel = cid ? sfDataMap.get(cid) : null;
 
-      // Look up real charges from the Excel export (most accurate source)
-      const xlEntry: SfLookupEntry | undefined =
-        sfByOrderId[String(o.id)] ?? (cid ? sfByCid[cid] : undefined);
+      // Look up real charges from Supabase (from Steadfast export)
+      const dbEntry: SfLookupEntry | undefined =
+        sfDbByOrderId.get(o.id) ?? (cid ? sfDbByCid.get(cid) : undefined);
 
       const sfCod = cidRow ? Math.round(cidRow.cod_amount || 0) : 0;
       const wcCod = Math.round(parseFloat(o.total) || 0);
 
-      // Priority: Excel export → WP endpoint → WC total
-      const cod = xlEntry != null ? xlEntry.cod : (sfCod > 0 ? sfCod : wcCod);
+      // Priority: Supabase DB → WP endpoint → WC total
+      const cod = dbEntry != null ? dbEntry.cod : (sfCod > 0 ? sfCod : wcCod);
 
-      // Priority: Excel export → Steadfast API charge → ৳120 fallback
-      const shippingCharge = cid
-        ? (xlEntry != null ? xlEntry.shipping : (sfParcel?.charge || DELIVERY_CHARGE))
-        : 0;
+      // Priority: Supabase DB → ৳120 fallback
+      const shippingCharge = cid ? (dbEntry != null ? dbEntry.shipping : DELIVERY_CHARGE) : 0;
 
-      // Priority: Excel export (exact) → 1% of COD
-      const codFee = cid
-        ? (xlEntry != null ? xlEntry.cod_fee : Math.round(cod * 0.01))
-        : 0;
+      // Priority: Supabase DB (exact) → 1% of COD
+      const codFee = cid ? (dbEntry != null ? dbEntry.cod_fee : Math.round(cod * 0.01)) : 0;
 
-      // Status: live Steadfast API → Excel snapshot
-      const sfStatus   = sfParcel?.status || xlEntry?.status || null;
+      // Status: live Steadfast API → Supabase DB snapshot
+      const sfStatus   = sfParcel?.status || dbEntry?.status || null;
       const receivable = cid ? cod - shippingCharge - codFee : 0;
       return {
         id:              o.id,
