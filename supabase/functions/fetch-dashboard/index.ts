@@ -386,9 +386,10 @@ async function fetchOrdersDetail({ wcUrl, wcKey, wcSecret, sfKey, sfSecret }: Re
           const res = await fetch(`https://portal.packzy.com/api/v1/status_by_cid/${cidRow!.consignment_id}`, { headers: sfHdrs });
           if (!res.ok) return;
           const d = await res.json();
+          console.log("SF status_by_cid raw:", JSON.stringify(d).slice(0, 500));
           const c   = d?.consignment || d;
           const ds  = (c?.delivery_status || "").toLowerCase();
-          const chg = parseFloat(c?.charge ?? c?.delivery_charge ?? c?.courier_charge ?? "0") || 0;
+          const chg = parseFloat(c?.charge ?? c?.delivery_charge ?? c?.courier_charge ?? c?.cod_charge ?? c?.service_charge ?? "0") || 0;
           if (ds) sfDataMap.set(cidRow!.consignment_id, { status: ds, charge: chg });
         } catch (_) { /* ignore per-ID errors */ }
       })
