@@ -832,20 +832,21 @@ function loadPlManuals() {
 }
 
 function renderPL() {
-  if (revenue === null) return;
   const el = id => document.getElementById(id);
-  const pct = val => revenue > 0 && val ? (val / revenue * 100).toFixed(1) + '%' : '—';
+  const rev = revenue ?? 0;
+  const pct = val => rev > 0 && val ? (val / rev * 100).toFixed(1) + '%' : '—';
   const neg = val => val > 0 ? `-${tk(val)}` : '—';
+  const hasRev = revenue !== null;
 
   el('pl-card').style.display = 'block';
 
   // Revenue section
-  const grossShipped = revenue + sfReturns;
+  const grossShipped = rev + sfReturns;
   el('pl-gross-ship').textContent   = grossShipped > 0 ? tk(grossShipped) : '—';
-  el('pl-gross-ship-p').textContent = grossShipped > 0 && revenue > 0 ? (grossShipped / revenue * 100).toFixed(0) + '%' : '—';
+  el('pl-gross-ship-p').textContent = rev > 0 && grossShipped > 0 ? (grossShipped / rev * 100).toFixed(0) + '%' : '—';
   el('pl-returns').textContent      = sfReturns > 0 ? `-${tk(sfReturns)}` : '—';
-  el('pl-net-rev').textContent      = tk(revenue);
-  el('pl-ord-ct').textContent       = orderCount + ' ord';
+  el('pl-net-rev').textContent      = hasRev ? tk(rev) : '—';
+  el('pl-ord-ct').textContent       = orderCount > 0 ? orderCount + ' ord' : '—';
 
   // Product cost
   const prodCost = getCOGS();
@@ -862,16 +863,16 @@ function renderPL() {
   el('pl-ret-freight-p').textContent = pct(retFreight);
   el('pl-rto-loss-p').textContent    = pct(rtoLoss);
 
-  // Gross profit
-  const grossProfit = revenue - prodCost - delivCost;
-  el('pl-gross-profit').textContent   = tk(grossProfit);
-  el('pl-gross-profit').className     = 'pl-amt ' + (grossProfit >= 0 ? 'green' : 'red');
-  el('pl-gross-profit-p').textContent = pct(grossProfit);
+  // Gross profit (needs revenue)
+  const grossProfit = hasRev ? rev - prodCost - delivCost : null;
+  el('pl-gross-profit').textContent   = grossProfit !== null ? tk(grossProfit) : '—';
+  el('pl-gross-profit').className     = 'pl-amt' + (grossProfit !== null ? ' ' + (grossProfit >= 0 ? 'green' : 'red') : '');
+  el('pl-gross-profit-p').textContent = grossProfit !== null ? pct(grossProfit) : '—';
 
   // Marketing
   const contentAmt     = parseFloat(el('pl-content')?.value || '0') || 0;
   const totalMarketing = adsBDT + contentAmt;
-  el('pl-meta-ads').textContent  = neg(adsBDT);
+  el('pl-meta-ads').textContent   = neg(adsBDT);
   el('pl-meta-ads-p').textContent = pct(adsBDT);
   el('pl-content-p').textContent  = pct(contentAmt);
 
@@ -895,43 +896,42 @@ function renderPL() {
   const otherRow = el('pl-other-row');
   if (otherOverhead > 0) {
     otherRow.style.display = 'flex';
-    el('pl-other').textContent = neg(otherOverhead);
+    el('pl-other').textContent   = neg(otherOverhead);
     el('pl-other-p').textContent = pct(otherOverhead);
   } else {
     otherRow.style.display = 'none';
   }
 
-  // Net profit
-  const netProfit = grossProfit - totalMarketing - totalOverhead;
-  el('pl-net-profit').textContent   = tk(netProfit);
-  el('pl-net-profit').className     = 'pl-amt ' + (netProfit >= 0 ? 'green' : 'red');
-  el('pl-net-profit-p').textContent = pct(netProfit);
+  // Net profit (needs revenue)
+  const netProfit = grossProfit !== null ? grossProfit - totalMarketing - totalOverhead : null;
+  el('pl-net-profit').textContent   = netProfit !== null ? tk(netProfit) : '—';
+  el('pl-net-profit').className     = 'pl-amt' + (netProfit !== null ? ' ' + (netProfit >= 0 ? 'green' : 'red') : '');
+  el('pl-net-profit-p').textContent = netProfit !== null ? pct(netProfit) : '—';
 
   // Cash reconciliation
   el('pl-sf-recv').textContent = '—';
   const inventory = parseFloat(el('pl-inventory')?.value || '0') || 0;
-  el('pl-cash-net').textContent = (netProfit !== 0 || inventory > 0) ? tk(netProfit - inventory) : '—';
+  el('pl-cash-net').textContent = netProfit !== null ? tk(netProfit - inventory) : '—';
 
-  // Key metrics
-  const roas   = adsBDT > 0 ? revenue / adsBDT : null;
-  const beRoas = adsBDT > 0 ? (prodCost + delivCost + totalMarketing + totalOverhead) / adsBDT : null;
-  const cac    = orderCount > 0 && adsBDT > 0 ? adsBDT / orderCount : null;
-  const aov    = orderCount > 0 ? revenue / orderCount : null;
-  const contrib = orderCount > 0 ? (grossProfit - adsBDT) / orderCount : null;
+  // Key metrics (need revenue)
+  const roas    = hasRev && adsBDT > 0 ? rev / adsBDT : null;
+  const beRoas  = hasRev && adsBDT > 0 ? (prodCost + delivCost + totalMarketing + totalOverhead) / adsBDT : null;
+  const cac     = orderCount > 0 && adsBDT > 0 ? adsBDT / orderCount : null;
+  const aov     = hasRev && orderCount > 0 ? rev / orderCount : null;
+  const contrib = grossProfit !== null && orderCount > 0 ? (grossProfit - adsBDT) / orderCount : null;
   const totalUnits = wcProducts.reduce((s, p) => s + effectiveQty(p), 0);
   const upo = orderCount > 0 && totalUnits > 0 ? (totalUnits / orderCount).toFixed(2) : null;
 
   const metricsRow = el('pl-metrics-row');
-  metricsRow.style.display = roas !== null ? 'flex' : 'none';
-  if (roas !== null) {
-    el('pl-roas-v').textContent  = roas.toFixed(2) + 'x';
-    el('pl-roas-v').className    = roas >= (beRoas || 0) ? 'green' : 'red';
-    el('pl-be-v').textContent    = beRoas != null ? beRoas.toFixed(2) + 'x' : '—';
-    el('pl-cac-v').textContent   = cac != null ? tk(cac) : '—';
-    el('pl-aov-v').textContent   = aov != null ? tk(aov) : '—';
-    el('pl-contrib-v').textContent = contrib != null ? tk(contrib) : '—';
-    el('pl-upo-v').textContent   = upo || '—';
-  }
+  const anyMetric = roas !== null || cac !== null || aov !== null;
+  metricsRow.style.display = anyMetric ? 'flex' : 'none';
+  el('pl-roas-v').textContent    = roas   != null ? roas.toFixed(2) + 'x' : '—';
+  el('pl-roas-v').className      = roas != null && roas >= (beRoas || 0) ? 'green' : 'red';
+  el('pl-be-v').textContent      = beRoas != null ? beRoas.toFixed(2) + 'x' : '—';
+  el('pl-cac-v').textContent     = cac    != null ? tk(cac)    : '—';
+  el('pl-aov-v').textContent     = aov    != null ? tk(aov)    : '—';
+  el('pl-contrib-v').textContent = contrib != null ? tk(contrib) : '—';
+  el('pl-upo-v').textContent     = upo || '—';
 }
 
 // ── Render summary + P&L ─────────────────────────────────────────────────────
@@ -969,8 +969,6 @@ function render() {
     document.getElementById('s-profit').textContent     = tk(net);
     document.getElementById('s-profit').className      = 'kpi-val ' + (net>=0?'green':'red');
     document.getElementById('s-margin').textContent    = netM + '% net margin';
-
-    renderPL();
 
     // Bottom P&L strip
     document.getElementById('pl-strip').style.display = 'grid';
@@ -1012,6 +1010,7 @@ function render() {
       document.getElementById('s-net-prev').textContent = `${sign} ${tk(Math.abs(netDelta))} vs prev mo`;
     }
   }
+  renderPL();
 }
 
 // ── Revenue from API ─────────────────────────────────────────────────────────
