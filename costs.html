@@ -8,103 +8,157 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
-    body { margin: 0; background: #FBF6EC; color: #23201A; font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+    body {
+      margin: 0; background: #FBF6EC; color: #23201A;
+      font-family: 'DM Sans', sans-serif;
+      height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    }
     h1,h2,h3 { font-family: 'Fraunces', serif; margin: 0; }
+    .green { color: #4F7060; } .red { color: #C8553D; } .amber { color: #926A00; }
 
-    .topbar { background: #F3EADB; border-bottom: 1px solid #E2D6C2; margin-bottom: 32px; }
-    .topbar-inner { max-width: 1000px; margin: 0 auto; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-    .topbar-brand h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-    .topbar-brand span.clay { color: #C8553D; }
-    .nav-links { display: flex; gap: 8px; }
-    .nav-link { all: unset; cursor: pointer; font-size: 13px; font-weight: 600; color: #6B6255; padding: 7px 14px; border-radius: 999px; border: 1px solid #E2D6C2; background: #fff; text-decoration: none; }
+    /* ── Topbar ── */
+    .topbar { background: #F3EADB; border-bottom: 1px solid #E2D6C2; flex-shrink: 0; }
+    .topbar-inner {
+      padding: 7px 14px; display: flex; align-items: center; gap: 8px;
+    }
+    .topbar-brand h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+    .clay { color: #C8553D; }
+    .nav-links { display: flex; gap: 5px; }
+    .nav-link {
+      font-size: 11px; font-weight: 600; color: #6B6255;
+      padding: 3px 10px; border-radius: 999px; border: 1px solid #E2D6C2;
+      background: #fff; text-decoration: none;
+    }
     .nav-link.active { background: #23201A; color: #FBF6EC; border-color: #23201A; }
-
-    .page { max-width: 1000px; margin: 0 auto; padding: 0 20px 100px; }
-
-    /* Period picker */
-    .period-bar { background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .period-bar label { font-size: 12px; font-weight: 600; color: #6B6255; }
-    .btn-apply { all: unset; cursor: pointer; font-size: 13px; font-weight: 600; background: #23201A; color: #FBF6EC; padding: 7px 18px; border-radius: 999px; }
+    .sep { width: 1px; height: 18px; background: #D8CCBA; margin: 0 4px; flex-shrink: 0; }
+    .period-label { font-size: 11px; font-weight: 600; color: #6B6255; white-space: nowrap; }
+    #p-month { font-size: 11px; border: 1px solid #E2D6C2; border-radius: 6px; padding: 3px 6px; background: #fff; color: #23201A; outline: none; }
+    .btn-apply {
+      font-size: 11px; font-weight: 600; background: #23201A; color: #FBF6EC;
+      padding: 4px 12px; border-radius: 999px; border: none; cursor: pointer;
+    }
     .btn-apply:hover { background: #4F7060; }
+    #rev-status { font-size: 10px; color: #6B6255; white-space: nowrap; }
+    .topbar-right { margin-left: auto; }
+    .btn-save {
+      font-size: 11px; font-weight: 700; background: #4F7060; color: #fff;
+      padding: 5px 16px; border-radius: 999px; border: none; cursor: pointer;
+    }
+    .btn-save:hover { background: #3D5C4F; }
+    .btn-save:disabled { opacity: .5; cursor: default; }
 
-    /* Summary strip */
-    .summary-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; margin-bottom: 32px; }
-    .sum-card { background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; padding: 14px 16px; border-top: 3px solid; }
-    .sum-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #6B6255; margin-bottom: 5px; }
-    .sum-val { font-family: 'Fraunces', serif; font-size: 21px; font-weight: 700; line-height: 1.1; }
-    .sum-sub { font-size: 11px; color: #6B6255; margin-top: 3px; }
+    /* ── Page shell ── */
+    .page {
+      flex: 1; padding: 8px 12px 6px;
+      display: flex; flex-direction: column; gap: 7px;
+      overflow: hidden; min-height: 0;
+    }
 
-    /* Section headers */
-    .section-header { display: flex; align-items: center; justify-content: space-between; margin: 32px 0 10px; }
-    .section-title { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 600; }
-    .section-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 99px; }
+    /* ── KPI strip ── */
+    .kpi-strip { display: grid; grid-template-columns: repeat(6,1fr); gap: 6px; flex-shrink: 0; }
+    .kpi-card {
+      background: #fff; border: 1px solid #E2D6C2; border-radius: 8px;
+      padding: 6px 10px; border-top: 2px solid;
+    }
+    .kpi-label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #6B6255; margin-bottom: 2px; }
+    .kpi-val   { font-family: 'Fraunces', serif; font-size: 15px; font-weight: 700; line-height: 1.15; }
+    .kpi-sub   { font-size: 9px; color: #6B6255; margin-top: 1px; }
+
+    /* ── 3-col grid ── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      flex: 1; min-height: 0;
+    }
+    .col-panel { display: flex; flex-direction: column; min-height: 0; gap: 0; }
+
+    .col-title {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+      color: #23201A; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2px 4px; flex-shrink: 0;
+    }
+    .col-badge { font-size: 8px; font-weight: 600; padding: 2px 7px; border-radius: 99px; }
     .badge-ops  { background: #EEF3FB; color: #2B5A8A; }
     .badge-cogs { background: #FEF3EF; color: #A8422F; }
 
-    .subsection-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #6B6255; margin: 18px 0 7px; }
+    .subsec {
+      font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #6B6255; padding: 4px 2px 3px; flex-shrink: 0;
+    }
+    .subsec + .subsec { margin-top: 6px; }
 
-    /* Cost tables */
-    .cost-table { width: 100%; background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; overflow: hidden; border-collapse: collapse; }
-    .cost-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; padding: 10px 14px; background: #F9F4EE; border-bottom: 1px solid #E2D6C2; text-align: left; }
-    .cost-table td { padding: 9px 14px; border-bottom: 1px solid #F0E9DC; font-size: 14px; vertical-align: middle; }
-    .cost-table tr:last-child td { border-bottom: none; }
+    /* ── Shared table styles ── */
+    .cost-table, .cogs-table {
+      width: 100%; background: #fff; border: 1px solid #E2D6C2;
+      border-radius: 8px; overflow: hidden; border-collapse: collapse;
+    }
+    .cost-table th, .cogs-table th {
+      font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+      color: #6B6255; padding: 5px 8px; background: #F9F4EE;
+      border-bottom: 1px solid #E2D6C2; text-align: left;
+    }
+    .cost-table td, .cogs-table td {
+      padding: 4px 8px; border-bottom: 1px solid #F0E9DC;
+      font-size: 11px; vertical-align: middle;
+    }
+    .cost-table tr:last-child td, .cogs-table tr:last-child td { border-bottom: none; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .row-total { font-family: 'Fraunces', serif; font-weight: 600; color: #C8553D; }
+
     .cost-table input[type=text], .cost-table input[type=number] {
-      font-family: 'DM Sans', sans-serif; font-size: 14px; border: 1px solid transparent;
-      background: transparent; color: #23201A; outline: none; width: 100%; padding: 2px 4px;
-      border-radius: 6px; transition: border .15s, background .15s;
+      font-family: 'DM Sans', sans-serif; font-size: 11px; border: 1px solid transparent;
+      background: transparent; color: #23201A; outline: none; width: 100%; padding: 1px 3px;
+      border-radius: 4px; transition: border .1s, background .1s;
     }
     .cost-table input:focus { border-color: #C8553D; background: #FBF6EC; }
     .cost-table input[readonly] { color: #6B6255; cursor: default; }
     .cost-table select {
-      font-family: 'DM Sans', sans-serif; font-size: 12px; border: 1px solid #E2D6C2;
-      background: #FBF6EC; color: #23201A; border-radius: 6px; padding: 3px 6px; outline: none;
+      font-family: 'DM Sans', sans-serif; font-size: 10px; border: 1px solid #E2D6C2;
+      background: #FBF6EC; color: #23201A; border-radius: 4px; padding: 1px 3px; outline: none;
     }
-    .cost-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-    .cost-table .row-total { font-family: 'Fraunces', serif; font-weight: 600; color: #C8553D; }
-    .btn-del { all: unset; cursor: pointer; color: #C8553D; font-size: 16px; padding: 2px 6px; border-radius: 6px; }
+    .btn-del { all: unset; cursor: pointer; color: #C8553D; font-size: 13px; padding: 1px 4px; border-radius: 4px; }
     .btn-del:hover { background: #FEE; }
-    .table-footer { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: #F9F4EE; border: 1px solid #E2D6C2; border-top: none; border-radius: 0 0 14px 14px; }
-    .table-footer .subtotal { font-size: 13px; font-weight: 700; }
-    .btn-add { all: unset; cursor: pointer; font-size: 13px; font-weight: 600; color: #4F7060; padding: 8px 16px; border-radius: 999px; border: 1px dashed #4F7060; margin-top: 10px; display: inline-block; }
+
+    .tbl-wrap { overflow-y: auto; min-height: 0; }
+
+    .table-footer {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 4px 8px; background: #F9F4EE; border: 1px solid #E2D6C2;
+      border-top: none; border-radius: 0 0 8px 8px; flex-shrink: 0;
+    }
+    .table-footer .subtotal { font-size: 11px; font-weight: 700; }
+    .btn-add {
+      all: unset; cursor: pointer; font-size: 10px; font-weight: 600; color: #4F7060;
+      padding: 3px 9px; border-radius: 999px; border: 1px dashed #4F7060;
+    }
     .btn-add:hover { background: #EAF1EC; }
 
-    /* COGS table */
-    .cogs-note { font-size: 12px; color: #6B6255; margin-bottom: 10px; padding: 10px 14px; background: #FFFBF5; border: 1px solid #E2D6C2; border-radius: 10px; }
-    .cogs-table { width: 100%; background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; overflow: hidden; border-collapse: collapse; }
-    .cogs-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; padding: 10px 14px; background: #F9F4EE; border-bottom: 1px solid #E2D6C2; text-align: left; }
-    .cogs-table th.num, .cogs-table td.num { text-align: right; }
-    .cogs-table td { padding: 9px 14px; border-bottom: 1px solid #F0E9DC; font-size: 14px; vertical-align: middle; }
-    .cogs-table tr:last-child td { border-bottom: none; }
+    /* ── COGS table ── */
     .cogs-table input[type=number] {
-      font-family: 'DM Sans', sans-serif; font-size: 14px; border: 1px solid #E2D6C2;
-      background: #FFF8F0; color: #23201A; outline: none; width: 100px; padding: 4px 8px;
-      border-radius: 6px; text-align: right;
+      font-family: 'DM Sans', sans-serif; font-size: 11px; border: 1px solid #E2D6C2;
+      background: #FFF8F0; color: #23201A; outline: none; width: 58px; padding: 2px 4px;
+      border-radius: 4px; text-align: right;
     }
     .cogs-table input:focus { border-color: #C8553D; background: #FBF6EC; }
-    .cogs-total-row td { background: #F9F4EE; font-weight: 700; }
-    .cogs-empty { padding: 24px; text-align: center; color: #6B6255; font-size: 13px; }
+    .cogs-total-row td { background: #F9F4EE; font-weight: 700; font-size: 11px; }
+    .cogs-empty { padding: 12px; text-align: center; color: #6B6255; font-size: 11px; }
 
-    /* Profit breakdown */
-    .profit-card { background: #fff; border: 1px solid #E2D6C2; border-radius: 16px; padding: 22px 24px; margin-top: 32px; }
-    .profit-card h3 { font-size: 16px; margin-bottom: 16px; }
-    .profit-row { display: flex; justify-content: space-between; font-size: 14px; padding: 7px 0; border-bottom: 1px solid #F0E9DC; }
-    .profit-row:last-child { border-bottom: none; }
-    .profit-row.divider { border-top: 2px solid #E2D6C2; border-bottom: none; font-weight: 700; font-size: 15px; padding-top: 12px; margin-top: 4px; }
-    .profit-row.sub { padding-left: 20px; color: #6B6255; font-size: 13px; }
-    .profit-row.meta-row { font-size: 12px; color: #6B6255; border: none; padding-top: 2px; }
-    .profit-row span:last-child { font-family: 'Fraunces', serif; }
-    .green { color: #4F7060; }
-    .red   { color: #C8553D; }
-    .amber { color: #926A00; }
-
-    .save-bar { position: sticky; bottom: 20px; display: flex; justify-content: flex-end; padding-top: 16px; gap: 10px; }
-    .btn-save { all: unset; cursor: pointer; font-size: 13px; font-weight: 700; background: #4F7060; color: #fff; padding: 10px 26px; border-radius: 999px; }
-    .btn-save:hover { background: #3D5C4F; }
-    .btn-save:disabled { opacity: .5; cursor: default; }
-
-    @media (max-width: 620px) {
-      .summary-strip { grid-template-columns: repeat(2, 1fr); }
+    /* ── P&L strip ── */
+    .pl-strip {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      background: #fff; border: 1px solid #E2D6C2; border-radius: 8px;
+      overflow: hidden; flex-shrink: 0;
     }
+    .pl-item {
+      padding: 6px 8px; border-right: 1px solid #F0E9DC;
+      display: flex; flex-direction: column; align-items: center; gap: 1px;
+    }
+    .pl-item:last-child { border-right: none; }
+    .pl-label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; }
+    .pl-val   { font-family: 'Fraunces', serif; font-size: 13px; font-weight: 700; }
+    .pl-sub   { font-size: 8px; color: #6B6255; }
   </style>
 </head>
 <body>
@@ -117,179 +171,212 @@
       <a class="nav-link" href="orders.html">Orders</a>
       <a class="nav-link active" href="costs.html">Costs</a>
     </div>
+    <div class="sep"></div>
+    <span class="period-label">Month</span>
+    <input type="month" id="p-month" />
+    <button class="btn-apply" onclick="applyMonth()">Apply</button>
+    <span id="rev-status"></span>
+    <div class="topbar-right">
+      <button class="btn-save" id="btn-save" onclick="save()">Save</button>
+    </div>
   </div>
 </div>
 
 <div class="page">
 
-  <!-- Period picker -->
-  <div class="period-bar">
-    <label>Month</label>
-    <input type="month" id="p-month" />
-    <button class="btn-apply" onclick="applyMonth()">Apply</button>
-    <span id="rev-status" style="font-size:12px;color:#6B6255;margin-left:4px"></span>
-  </div>
-
-  <!-- Summary strip -->
-  <div class="summary-strip">
-    <div class="sum-card" style="border-top-color:#C8553D">
-      <div class="sum-label">Revenue</div>
-      <div class="sum-val" id="s-revenue">—</div>
-      <div class="sum-sub" id="s-orders">— orders</div>
+  <!-- KPI strip -->
+  <div class="kpi-strip">
+    <div class="kpi-card" style="border-top-color:#C8553D">
+      <div class="kpi-label">Revenue</div>
+      <div class="kpi-val" id="s-revenue">—</div>
+      <div class="kpi-sub" id="s-orders">— orders</div>
     </div>
-    <div class="sum-card" style="border-top-color:#A8422F">
-      <div class="sum-label">COGS</div>
-      <div class="sum-val" id="s-cogs">৳0</div>
-      <div class="sum-sub" id="s-cogs-sub">cost of goods sold</div>
+    <div class="kpi-card" style="border-top-color:#A8422F">
+      <div class="kpi-label">COGS</div>
+      <div class="kpi-val" id="s-cogs">৳0</div>
+      <div class="kpi-sub" id="s-cogs-sub">cost of goods sold</div>
     </div>
-    <div class="sum-card" style="border-top-color:#926A00">
-      <div class="sum-label">Gross Profit</div>
-      <div class="sum-val" id="s-gross">—</div>
-      <div class="sum-sub" id="s-gross-margin">— gross margin</div>
+    <div class="kpi-card" style="border-top-color:#926A00">
+      <div class="kpi-label">Gross Profit</div>
+      <div class="kpi-val" id="s-gross">—</div>
+      <div class="kpi-sub" id="s-gross-margin">—</div>
     </div>
-    <div class="sum-card" style="border-top-color:#2B5A8A">
-      <div class="sum-label">Operating Costs</div>
-      <div class="sum-val" id="s-opex">৳0</div>
-      <div class="sum-sub" id="s-opex-sub">fixed + variable</div>
+    <div class="kpi-card" style="border-top-color:#2B5A8A">
+      <div class="kpi-label">Operating Costs</div>
+      <div class="kpi-val" id="s-opex">৳0</div>
+      <div class="kpi-sub" id="s-opex-sub">—</div>
     </div>
-    <div class="sum-card" style="border-top-color:#4F7060">
-      <div class="sum-label">Net Profit</div>
-      <div class="sum-val" id="s-profit">—</div>
-      <div class="sum-sub" id="s-margin">— net margin</div>
+    <div class="kpi-card" style="border-top-color:#4F7060">
+      <div class="kpi-label">Net Profit</div>
+      <div class="kpi-val" id="s-profit">—</div>
+      <div class="kpi-sub" id="s-margin">—</div>
     </div>
-    <div class="sum-card" style="border-top-color:#6B9AB8">
-      <div class="sum-label">Profit / Order</div>
-      <div class="sum-val" id="s-per-order">—</div>
-      <div class="sum-sub">per order avg</div>
+    <div class="kpi-card" style="border-top-color:#6B9AB8">
+      <div class="kpi-label">Profit / Order</div>
+      <div class="kpi-val" id="s-per-order">—</div>
+      <div class="kpi-sub">per order avg</div>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════ -->
-  <!-- SECTION 1: FACTORY & OPERATIONS                               -->
-  <!-- ══════════════════════════════════════════════════════════════ -->
-  <div class="section-header">
-    <span class="section-title">Factory & Operations</span>
-    <span class="section-badge badge-ops">Monthly Expenses</span>
-  </div>
+  <!-- 3-column main grid -->
+  <div class="main-grid">
 
-  <div class="subsection-label">Fixed Costs</div>
-  <table class="cost-table">
-    <thead>
-      <tr>
-        <th style="width:50%">Description</th>
-        <th style="width:28%">Category</th>
-        <th style="width:16%" class="num">Amount (৳)</th>
-        <th style="width:6%"></th>
-      </tr>
-    </thead>
-    <tbody id="fixed-body"></tbody>
-  </table>
-  <div class="table-footer">
-    <button class="btn-add" onclick="addRow('fixed')">+ Add fixed cost</button>
-    <span class="subtotal" id="fixed-total">Subtotal: ৳0</span>
-  </div>
+    <!-- Col 1: Fixed Costs -->
+    <div class="col-panel">
+      <div class="col-title">
+        <span>Factory & Operations</span>
+        <span class="col-badge badge-ops">Monthly</span>
+      </div>
+      <div class="subsec">Fixed Costs</div>
+      <table class="cost-table" style="flex-shrink:0">
+        <thead><tr>
+          <th style="width:46%">Description</th>
+          <th style="width:26%">Category</th>
+          <th style="width:22%" class="num">Amount (৳)</th>
+          <th style="width:6%"></th>
+        </tr></thead>
+        <tbody id="fixed-body"></tbody>
+      </table>
+      <div class="table-footer" style="border-radius:0 0 8px 8px">
+        <button class="btn-add" onclick="addRow('fixed')">+ Fixed</button>
+        <span class="subtotal" id="fixed-total">৳0</span>
+      </div>
 
-  <div class="subsection-label" style="margin-top:24px">Variable Costs</div>
-  <table class="cost-table">
-    <thead>
-      <tr>
-        <th style="width:50%">Description</th>
-        <th style="width:28%">Category</th>
-        <th style="width:16%" class="num">Amount (৳)</th>
-        <th style="width:6%"></th>
-      </tr>
-    </thead>
-    <tbody id="variable-body"></tbody>
-  </table>
-  <div class="table-footer">
-    <button class="btn-add" onclick="addRow('variable')">+ Add variable cost</button>
-    <span class="subtotal" id="variable-total">Subtotal: ৳0</span>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════════════ -->
-  <!-- SECTION 2: COST OF GOODS SOLD                                 -->
-  <!-- ══════════════════════════════════════════════════════════════ -->
-  <div class="section-header" style="margin-top:40px">
-    <span class="section-title">Cost of Goods Sold</span>
-    <span class="section-badge badge-cogs">Units from WooCommerce × Your Cost Prices</span>
-  </div>
-
-  <div class="cogs-note">
-    Units counted are from <strong>Steadfast-delivered orders only</strong> — click any unit count to edit it manually. Cost per unit is saved permanently and reused each month.
-  </div>
-
-  <table class="cogs-table">
-    <thead>
-      <tr>
-        <th style="width:42%">Product</th>
-        <th style="width:14%" class="num">Delivered <span style="font-weight:400;color:#926A00" title="Units from Steadfast-delivered orders only. Click to edit.">✎</span></th>
-        <th style="width:20%" class="num">Cost / Unit (৳)</th>
-        <th style="width:24%" class="num">Total Cost</th>
-      </tr>
-    </thead>
-    <tbody id="cogs-body">
-      <tr><td colspan="4" class="cogs-empty">Loading products from WooCommerce…</td></tr>
-    </tbody>
-  </table>
-  <div class="table-footer">
-    <span style="font-size:12px;color:#6B6255">Cost prices saved to Supabase — only update when your production costs change</span>
-    <span class="subtotal" id="cogs-total">COGS: ৳0</span>
-  </div>
-
-  <!-- Profit Breakdown -->
-  <div class="profit-card" id="profit-breakdown" style="display:none">
-    <h3>Profit & Loss</h3>
-    <div class="profit-row">
-      <span>Revenue</span>
-      <span id="pb-revenue" class="green">—</span>
-    </div>
-    <div class="profit-row sub">
-      <span>Orders</span>
-      <span id="pb-orders">—</span>
+      <div class="subsec" style="margin-top:8px">Variable Costs</div>
+      <div class="tbl-wrap" style="flex:1">
+        <table class="cost-table">
+          <thead><tr>
+            <th style="width:46%">Description</th>
+            <th style="width:26%">Category</th>
+            <th style="width:22%" class="num">Amount (৳)</th>
+            <th style="width:6%"></th>
+          </tr></thead>
+          <tbody id="variable-body"></tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <button class="btn-add" onclick="addRow('variable')">+ Variable</button>
+        <span class="subtotal" id="variable-total">৳0</span>
+      </div>
     </div>
 
-    <div class="profit-row" style="margin-top:8px;font-weight:600">
-      <span>Cost of Goods Sold (COGS)</span>
-      <span id="pb-cogs" class="red">—</span>
+    <!-- Col 2: COGS -->
+    <div class="col-panel">
+      <div class="col-title">
+        <span>Cost of Goods Sold</span>
+        <span class="col-badge badge-cogs">SF Delivered × Cost</span>
+      </div>
+      <div class="tbl-wrap" style="flex:1">
+        <table class="cogs-table">
+          <thead><tr>
+            <th style="width:42%">Product</th>
+            <th style="width:14%" class="num">Del <span style="font-weight:400;color:#926A00" title="Steadfast-delivered units. Click to edit.">✎</span></th>
+            <th style="width:20%" class="num">Cost/Unit (৳)</th>
+            <th style="width:24%" class="num">Total</th>
+          </tr></thead>
+          <tbody id="cogs-body">
+            <tr><td colspan="4" class="cogs-empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <span style="font-size:10px;color:#6B6255">Costs saved permanently to Supabase</span>
+        <span class="subtotal" id="cogs-total">COGS: ৳0</span>
+      </div>
     </div>
-    <div id="pb-cogs-rows"></div>
 
-    <div class="profit-row divider">
-      <span>Gross Profit</span>
-      <span id="pb-gross">—</span>
-    </div>
-    <div class="profit-row meta-row">
-      <span>Gross Margin</span>
-      <span id="pb-gross-margin">—</span>
+    <!-- Col 3: P&L breakdown -->
+    <div class="col-panel">
+      <div class="col-title"><span>Profit & Loss</span></div>
+      <div class="tbl-wrap" style="flex:1">
+        <div id="profit-breakdown" style="display:none;background:#fff;border:1px solid #E2D6C2;border-radius:8px;padding:8px 12px;font-size:11px;">
+
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F0E9DC">
+            <span>Revenue</span>
+            <span id="pb-revenue" class="green" style="font-family:'Fraunces',serif"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0 3px 14px;font-size:10px;color:#6B6255">
+            <span>Orders</span><span id="pb-orders"></span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F0E9DC;font-weight:600">
+            <span>Cost of Goods (COGS)</span>
+            <span id="pb-cogs" class="red" style="font-family:'Fraunces',serif"></span>
+          </div>
+          <div id="pb-cogs-rows"></div>
+
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-top:2px solid #E2D6C2;border-bottom:1px solid #F0E9DC;font-weight:700;margin-top:2px">
+            <span>Gross Profit</span>
+            <span id="pb-gross" style="font-family:'Fraunces',serif"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0 4px;font-size:10px;color:#6B6255">
+            <span>Gross Margin</span><span id="pb-gross-margin"></span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F0E9DC;font-weight:600">
+            <span>Fixed Costs</span>
+            <span id="pb-fixed" class="red" style="font-family:'Fraunces',serif"></span>
+          </div>
+          <div id="pb-fixed-cats"></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F0E9DC;font-weight:600">
+            <span>Variable Costs</span>
+            <span id="pb-variable" class="red" style="font-family:'Fraunces',serif"></span>
+          </div>
+          <div id="pb-variable-cats"></div>
+
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-top:2px solid #E2D6C2;font-weight:700;margin-top:2px">
+            <span>Net Profit</span>
+            <span id="pb-net" style="font-family:'Fraunces',serif"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:10px;color:#6B6255">
+            <span>Net Margin</span><span id="pb-net-margin"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:10px;color:#6B6255">
+            <span>Profit / Order</span><span id="pb-per-order"></span>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="profit-row" style="margin-top:12px;font-weight:600">
-      <span>Fixed Costs</span>
-      <span id="pb-fixed" class="red">—</span>
-    </div>
-    <div id="pb-fixed-cats"></div>
-    <div class="profit-row" style="font-weight:600;margin-top:4px">
-      <span>Variable Costs</span>
-      <span id="pb-variable" class="red">—</span>
-    </div>
-    <div id="pb-variable-cats"></div>
+  </div><!-- /main-grid -->
 
-    <div class="profit-row divider">
-      <span>Net Profit</span>
-      <span id="pb-net">—</span>
+  <!-- Compact P&L strip -->
+  <div class="pl-strip" id="pl-strip" style="display:none">
+    <div class="pl-item">
+      <div class="pl-label">Revenue</div>
+      <div class="pl-val green" id="ps-revenue">—</div>
+      <div class="pl-sub" id="ps-orders">—</div>
     </div>
-    <div class="profit-row meta-row">
-      <span>Net Margin</span>
-      <span id="pb-net-margin">—</span>
+    <div class="pl-item">
+      <div class="pl-label">− COGS</div>
+      <div class="pl-val red" id="ps-cogs">—</div>
+      <div class="pl-sub">goods sold</div>
     </div>
-    <div class="profit-row meta-row">
-      <span>Profit / Order</span>
-      <span id="pb-per-order">—</span>
+    <div class="pl-item">
+      <div class="pl-label">= Gross Profit</div>
+      <div class="pl-val" id="ps-gross">—</div>
+      <div class="pl-sub" id="ps-gross-m">—</div>
     </div>
-  </div>
-
-  <div class="save-bar">
-    <button class="btn-save" id="btn-save" onclick="save()">Save</button>
+    <div class="pl-item">
+      <div class="pl-label">− Fixed</div>
+      <div class="pl-val red" id="ps-fixed">—</div>
+      <div class="pl-sub" id="ps-fixed-n">—</div>
+    </div>
+    <div class="pl-item">
+      <div class="pl-label">− Variable</div>
+      <div class="pl-val red" id="ps-variable">—</div>
+      <div class="pl-sub" id="ps-variable-n">—</div>
+    </div>
+    <div class="pl-item">
+      <div class="pl-label">= Net Profit</div>
+      <div class="pl-val" id="ps-net">—</div>
+      <div class="pl-sub" id="ps-net-m">—</div>
+    </div>
+    <div class="pl-item">
+      <div class="pl-label">Per Order</div>
+      <div class="pl-val" id="ps-per-order">—</div>
+      <div class="pl-sub">avg</div>
+    </div>
   </div>
 
 </div><!-- /page -->
@@ -305,11 +392,11 @@ const CATEGORIES = ['Production','Salary','Marketing','Operations','Other'];
 const tk = n => '৳' + Math.round(n).toLocaleString('en-IN');
 
 let revenue = null, orderCount = 0;
-let wcProducts = [];       // [{name, qty, revenue}] from WooCommerce
-let productCosts = {};     // {product_name: cost_per_unit} from Supabase
-let qtyOverrides = {};     // {product_name: qty} — manual overrides
+let wcProducts = [];
+let productCosts = {};
+let qtyOverrides = {};
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function currentMonth() {
   const d = new Date(Date.now() + 6 * 3600000);
   return d.toISOString().slice(0, 7);
@@ -323,7 +410,7 @@ function monthRange(ym) {
   return { from, to: to > todayBDT ? todayBDT : to };
 }
 
-// ── SECTION 1: Operating costs ────────────────────────────────────────────────
+// ── Section 1: Operating costs ───────────────────────────────────────────────
 function getRows(type) {
   return [...document.querySelectorAll(`#${type}-body tr`)].map(tr => ({
     type,
@@ -342,7 +429,7 @@ function addRow(type, row = {}) {
   const tr = document.createElement('tr');
   const readonlyAttr = r.locked ? 'readonly style="color:#926A00;font-weight:600;cursor:default"' : '';
   const delCell = r.locked
-    ? `<td><span style="font-size:11px;color:#926A00">auto</span></td>`
+    ? `<td><span style="font-size:10px;color:#926A00">auto</span></td>`
     : `<td><button class="btn-del" onclick="this.closest('tr').remove();render()">×</button></td>`;
   tr.innerHTML = `
     <td><input class="c-desc" type="text" value="${(r.desc||'').replace(/"/g,'&quot;')}" placeholder="Description" ${readonlyAttr} oninput="render()"/></td>
@@ -360,7 +447,7 @@ function addRow(type, row = {}) {
   render();
 }
 
-// ── SECTION 2: COGS ───────────────────────────────────────────────────────────
+// ── Section 2: COGS ──────────────────────────────────────────────────────────
 function renderCOGS() {
   const tbody = document.getElementById('cogs-body');
   if (!wcProducts.length) {
@@ -382,16 +469,16 @@ function renderCOGS() {
     const tr = document.createElement('tr');
     tr.dataset.product = p.name;
     tr.innerHTML = `
-      <td>${p.name}</td>
+      <td style="font-size:11px">${p.name}</td>
       <td class="num" style="white-space:nowrap">
-        <input type="number" class="cogs-qty" value="${qty}" min="0" style="width:72px;text-align:right;
-          font-family:'DM Sans',sans-serif;font-size:14px;border:1px solid ${isOverridden?'#C8553D':'transparent'};
-          background:${isOverridden?'#FFF8F0':'transparent'};border-radius:6px;padding:2px 4px;outline:none;"
+        <input type="number" class="cogs-qty" value="${qty}" min="0" style="width:52px;text-align:right;
+          font-family:'DM Sans',sans-serif;font-size:11px;border:1px solid ${isOverridden?'#C8553D':'transparent'};
+          background:${isOverridden?'#FFF8F0':'transparent'};border-radius:4px;padding:1px 3px;outline:none;"
           title="Steadfast delivered: ${p.qty}. Edit to override."
           data-product="${p.name.replace(/"/g,'&quot;')}" data-original="${p.qty}"
           oninput="onQtyInput(this)" onfocus="this.style.borderColor='#C8553D';this.style.background='#FBF6EC'"
           onblur="this.style.borderColor=(qtyOverrides[this.dataset.product]!=null?'#C8553D':'transparent');this.style.background=(qtyOverrides[this.dataset.product]!=null?'#FFF8F0':'transparent')"/>
-        ${isOverridden ? `<span title="Reset to Steadfast count (${p.qty})" style="cursor:pointer;color:#C8553D;font-size:11px;margin-left:2px" onclick="resetQty('${p.name.replace(/'/g,"\\'")}')">↺</span>` : ''}
+        ${isOverridden ? `<span title="Reset (${p.qty})" style="cursor:pointer;color:#C8553D;font-size:10px;margin-left:1px" onclick="resetQty('${p.name.replace(/'/g,"\\'")}')">↺</span>` : ''}
       </td>
       <td class="num">
         <input type="number" class="cogs-cost" value="${cost||''}" placeholder="0" min="0"
@@ -402,7 +489,6 @@ function renderCOGS() {
     tbody.appendChild(tr);
   }
 
-  // Totals row
   const tfoot = document.createElement('tr');
   tfoot.className = 'cogs-total-row';
   tfoot.innerHTML = `
@@ -419,11 +505,8 @@ function onQtyInput(input) {
   const name = input.dataset.product;
   const original = parseInt(input.dataset.original) || 0;
   const val = parseInt(input.value);
-  if (!isNaN(val) && val !== original) {
-    qtyOverrides[name] = val;
-  } else if (isNaN(val) || val === original) {
-    delete qtyOverrides[name];
-  }
+  if (!isNaN(val) && val !== original) qtyOverrides[name] = val;
+  else delete qtyOverrides[name];
   const p = wcProducts.find(x => x.name === name);
   const cost = productCosts[name] || 0;
   const qty = effectiveQty(p || { name, qty: original });
@@ -445,15 +528,11 @@ function onCostInput(input) {
   const name = input.dataset.product;
   const cost = parseFloat(input.value) || 0;
   productCosts[name] = cost;
-
-  // Update line total
   const p = wcProducts.find(x => x.name === name);
   const qty = effectiveQty(p || { name, qty: 0 });
   const lineTotal = p ? cost * qty : 0;
   const lineEl = document.getElementById('cogs-line-' + encodeURIComponent(name));
   if (lineEl) lineEl.textContent = (cost && p) ? tk(lineTotal) : '—';
-
-  // Recalculate total
   const total = wcProducts.reduce((s, p) => s + (productCosts[p.name]||0) * effectiveQty(p), 0);
   const cell = document.getElementById('cogs-total-cell');
   if (cell) cell.textContent = total > 0 ? tk(total) : '—';
@@ -469,12 +548,12 @@ function getCOGS() {
   return wcProducts.reduce((s, p) => s + (productCosts[p.name]||0) * effectiveQty(p), 0);
 }
 
-// ── Render summary + P&L ──────────────────────────────────────────────────────
+// ── Render summary + P&L ─────────────────────────────────────────────────────
 function catSubRows(rows, cls='red') {
   const cats = {};
   rows.forEach(r => { if (r.amount > 0) cats[r.category] = (cats[r.category]||0) + r.amount; });
   return Object.entries(cats)
-    .map(([cat, amt]) => `<div class="profit-row sub"><span>${cat}</span><span class="${cls}">-${tk(amt)}</span></div>`)
+    .map(([cat, amt]) => `<div style="display:flex;justify-content:space-between;padding:2px 0 2px 14px;font-size:10px;color:#6B6255"><span>${cat}</span><span class="${cls}">-${tk(amt)}</span></div>`)
     .join('');
 }
 
@@ -486,11 +565,11 @@ function render() {
   const opex = fixedTotal + variableTotal;
   const cogs = getCOGS();
 
-  document.getElementById('s-cogs').textContent      = tk(cogs);
-  document.getElementById('s-opex').textContent      = tk(opex);
-  document.getElementById('s-opex-sub').textContent  = `${fixed.filter(r=>r.amount>0).length} fixed, ${variable.filter(r=>r.amount>0).length} variable`;
-  document.getElementById('fixed-total').textContent    = `Subtotal: ${tk(fixedTotal)}`;
-  document.getElementById('variable-total').textContent = `Subtotal: ${tk(variableTotal)}`;
+  document.getElementById('s-cogs').textContent     = tk(cogs);
+  document.getElementById('s-opex').textContent     = tk(opex);
+  document.getElementById('s-opex-sub').textContent = `${fixed.filter(r=>r.amount>0).length} fixed, ${variable.filter(r=>r.amount>0).length} variable`;
+  document.getElementById('fixed-total').textContent    = tk(fixedTotal);
+  document.getElementById('variable-total').textContent = tk(variableTotal);
 
   if (revenue !== null) {
     const gross  = revenue - cogs;
@@ -498,14 +577,15 @@ function render() {
     const grossM = revenue > 0 ? (gross / revenue * 100).toFixed(1) : 0;
     const netM   = revenue > 0 ? (net   / revenue * 100).toFixed(1) : 0;
 
-    document.getElementById('s-gross').textContent       = tk(gross);
-    document.getElementById('s-gross').className        = 'sum-val ' + (gross>=0 ? 'green' : 'red');
+    document.getElementById('s-gross').textContent      = tk(gross);
+    document.getElementById('s-gross').className       = 'kpi-val ' + (gross>=0?'green':'red');
     document.getElementById('s-gross-margin').textContent = grossM + '% gross margin';
-    document.getElementById('s-profit').textContent      = tk(net);
-    document.getElementById('s-profit').className       = 'sum-val ' + (net>=0 ? 'green' : 'red');
-    document.getElementById('s-margin').textContent     = netM + '% net margin';
-    document.getElementById('s-per-order').textContent  = orderCount > 0 ? tk(net/orderCount) : '—';
+    document.getElementById('s-profit').textContent     = tk(net);
+    document.getElementById('s-profit').className      = 'kpi-val ' + (net>=0?'green':'red');
+    document.getElementById('s-margin').textContent    = netM + '% net margin';
+    document.getElementById('s-per-order').textContent = orderCount > 0 ? tk(net/orderCount) : '—';
 
+    // P&L card (col 3)
     document.getElementById('profit-breakdown').style.display = 'block';
     document.getElementById('pb-revenue').textContent  = tk(revenue);
     document.getElementById('pb-orders').textContent   = orderCount + ' orders';
@@ -522,16 +602,33 @@ function render() {
     document.getElementById('pb-net-margin').textContent  = netM + '%';
     document.getElementById('pb-per-order').textContent   = orderCount > 0 ? tk(net/orderCount) : '—';
 
-    // COGS rows in P&L
     const cogsRows = wcProducts
       .filter(p => productCosts[p.name] > 0)
-      .map(p => `<div class="profit-row sub"><span>${p.name} (${effectiveQty(p)} units)</span><span class="red">-${tk(productCosts[p.name]*effectiveQty(p))}</span></div>`)
+      .map(p => `<div style="display:flex;justify-content:space-between;padding:2px 0 2px 14px;font-size:10px;color:#6B6255"><span>${p.name} (${effectiveQty(p)})</span><span class="red">-${tk(productCosts[p.name]*effectiveQty(p))}</span></div>`)
       .join('');
     document.getElementById('pb-cogs-rows').innerHTML = cogsRows;
+
+    // Bottom P&L strip
+    document.getElementById('pl-strip').style.display = 'grid';
+    document.getElementById('ps-revenue').textContent    = tk(revenue);
+    document.getElementById('ps-orders').textContent     = orderCount + ' orders';
+    document.getElementById('ps-cogs').textContent       = `-${tk(cogs)}`;
+    document.getElementById('ps-gross').textContent      = tk(gross);
+    document.getElementById('ps-gross').className        = 'pl-val ' + (gross>=0?'green':'red');
+    document.getElementById('ps-gross-m').textContent    = grossM + '% gross';
+    document.getElementById('ps-fixed').textContent      = `-${tk(fixedTotal)}`;
+    document.getElementById('ps-variable').textContent   = `-${tk(variableTotal)}`;
+    document.getElementById('ps-fixed-n').textContent    = fixed.filter(r=>r.amount>0).length + ' items';
+    document.getElementById('ps-variable-n').textContent = variable.filter(r=>r.amount>0).length + ' items';
+    document.getElementById('ps-net').textContent        = tk(net);
+    document.getElementById('ps-net').className          = 'pl-val ' + (net>=0?'green':'red');
+    document.getElementById('ps-net-m').textContent      = netM + '% net';
+    document.getElementById('ps-per-order').textContent  = orderCount > 0 ? tk(net/orderCount) : '—';
+    document.getElementById('ps-per-order').className    = 'pl-val ' + (net>=0?'green':'red');
   }
 }
 
-// ── Revenue from API ──────────────────────────────────────────────────────────
+// ── Revenue from API ─────────────────────────────────────────────────────────
 async function loadRevenue() {
   const ym = document.getElementById('p-month').value;
   const { from, to } = monthRange(ym);
@@ -549,8 +646,6 @@ async function loadRevenue() {
     qtyOverrides = {};
 
     const adsBDT = Math.round((d.ads?.spendToday || 0) * BDT_PER_USD);
-
-    // Inject / update the locked Meta Ads row
     let adsRow = document.getElementById('ads-auto-row');
     if (!adsRow) {
       addRow('variable', { desc: 'Meta Ads spend (auto)', category: 'Marketing', amount: adsBDT, locked: true });
@@ -561,15 +656,15 @@ async function loadRevenue() {
 
     document.getElementById('s-revenue').textContent = tk(revenue);
     document.getElementById('s-orders').textContent  = `${orderCount} orders`;
-    st.textContent = '✓ loaded';
+    st.textContent = '✓';
     renderCOGS();
   } catch(e) {
-    st.textContent = 'Error: ' + e.message;
+    st.textContent = 'Error';
     renderCOGS();
   }
 }
 
-// ── Supabase: product costs ───────────────────────────────────────────────────
+// ── Supabase: product costs ──────────────────────────────────────────────────
 async function loadProductCosts() {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/product_costs?select=product_name,cost_per_unit`, {
@@ -622,13 +717,11 @@ async function save() {
   const month = document.getElementById('p-month').value;
   try {
     await Promise.all([
-      // Save monthly operating costs
       fetch(`${SB_URL}/rest/v1/monthly_costs`, {
         method: 'POST',
         headers: { ...SB_HDR, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify({ month, rows: getAllOpexRows(), updated_at: new Date().toISOString() }),
       }),
-      // Save product costs (permanent)
       saveProductCosts(),
     ]);
     btn.textContent = 'Saved ✓';
@@ -639,7 +732,7 @@ async function save() {
   }
 }
 
-// ── Defaults ──────────────────────────────────────────────────────────────────
+// ── Defaults ─────────────────────────────────────────────────────────────────
 const DEFAULT_FIXED = [
   { desc: 'Salaries & contractors', category: 'Salary',     amount: '' },
   { desc: 'Rent & office',          category: 'Operations', amount: '' },
@@ -655,7 +748,7 @@ const DEFAULT_VARIABLE = [
   { desc: 'Other / misc',                                 category: 'Other',      amount: '' },
 ];
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+// ── Init ─────────────────────────────────────────────────────────────────────
 async function applyMonth() {
   document.getElementById('fixed-body').innerHTML    = '';
   document.getElementById('variable-body').innerHTML = '';
