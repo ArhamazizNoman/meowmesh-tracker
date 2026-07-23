@@ -614,7 +614,7 @@ function onQtyInput(input) {
   const qty = effectiveQty(p || { name, qty: original });
   const lineEl = document.getElementById('cogs-line-' + encodeURIComponent(name));
   if (lineEl) lineEl.textContent = (cost && qty) ? tk(cost * qty) : '—';
-  const total = wcProducts.reduce((s, p) => s + (productCosts[p.name]||0) * effectiveQty(p), 0);
+  const total = getCOGS();
   const cell = document.getElementById('cogs-total-cell');
   if (cell) cell.textContent = total > 0 ? tk(total) : '—';
   document.getElementById('cogs-total').textContent = `COGS: ${tk(total)}`;
@@ -635,7 +635,7 @@ function onCostInput(input) {
   const lineTotal = p ? cost * qty : 0;
   const lineEl = document.getElementById('cogs-line-' + encodeURIComponent(name));
   if (lineEl) lineEl.textContent = (cost && p) ? tk(lineTotal) : '—';
-  const total = wcProducts.reduce((s, p) => s + (productCosts[p.name]||0) * effectiveQty(p), 0);
+  const total = getCOGS();
   const cell = document.getElementById('cogs-total-cell');
   if (cell) cell.textContent = total > 0 ? tk(total) : '—';
   document.getElementById('cogs-total').textContent = `COGS: ${tk(total)}`;
@@ -906,7 +906,11 @@ async function loadMonthlyCosts() {
     if (res.ok) {
       const data = await res.json();
       if (data.length && Array.isArray(data[0].rows) && data[0].rows.length) {
-        data[0].rows.forEach(r => addRow(r.type === 'fixed' ? 'fixed' : 'variable', r));
+        // Skip auto-generated rows — they're re-added by loadRevenue() to avoid duplication
+        const AUTO_DESCS = ['Meta Ads spend (auto)', 'Steadfast COD & delivery charges (auto)'];
+        data[0].rows
+          .filter(r => !AUTO_DESCS.includes(r.desc))
+          .forEach(r => addRow(r.type === 'fixed' ? 'fixed' : 'variable', r));
         return;
       }
     }
