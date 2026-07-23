@@ -431,6 +431,7 @@ function addRow(type, row = {}) {
   const delCell = r.locked
     ? `<td><span style="font-size:10px;color:#926A00">auto</span></td>`
     : `<td><button class="btn-del" onclick="this.closest('tr').remove();render()">×</button></td>`;
+  const amtId = r.amtId || (r.locked ? 'ads-amt' : '');
   tr.innerHTML = `
     <td><input class="c-desc" type="text" value="${(r.desc||'').replace(/"/g,'&quot;')}" placeholder="Description" ${readonlyAttr} oninput="render()"/></td>
     <td>
@@ -439,10 +440,13 @@ function addRow(type, row = {}) {
       </select>
     </td>
     <td class="num"><input class="c-amt" type="number" value="${r.amount}" placeholder="0" min="0"
-      ${r.locked?`id="ads-amt" readonly style="color:#926A00;font-weight:600;cursor:default"`:''}
+      ${r.locked?`${amtId?`id="${amtId}"`:''} readonly style="color:#926A00;font-weight:600;cursor:default"`:''}
       oninput="render()"/></td>
     ${delCell}`;
-  if (r.locked) tr.id = 'ads-auto-row'; tr.style.background = r.locked ? '#FFFBF0' : '';
+  if (r.rowId) tr.id = r.rowId;
+  else if (r.locked) tr.id = 'ads-auto-row';
+  if (r.locked) tr.dataset.locked = 'true';
+  tr.style.background = r.locked ? '#FFFBF0' : '';
   document.getElementById(`${type}-body`).appendChild(tr);
   render();
 }
@@ -542,6 +546,26 @@ function onCostInput(input) {
 
 function effectiveQty(p) {
   return qtyOverrides[p.name] != null ? qtyOverrides[p.name] : p.qty;
+}
+
+function onSfManualInput(input) {
+  localStorage.setItem(`sf-manual-${document.getElementById('p-month').value}`, input.value || '0');
+  render();
+}
+
+// Returns rows to save — excludes auto-generated locked rows and the SF manual row
+// (auto rows are re-populated from live data on each load; SF manual persists in localStorage)
+function getSaveRows() {
+  return ['fixed','variable'].flatMap(type =>
+    [...document.querySelectorAll(`#${type}-body tr`)]
+      .filter(tr => tr.dataset.locked !== 'true' && tr.dataset.sfManual !== 'true')
+      .map(tr => ({
+        type,
+        desc:     tr.querySelector('.c-desc')?.value || '',
+        category: tr.querySelector('.c-cat')?.value  || 'Other',
+        amount:   parseFloat(tr.querySelector('.c-amt')?.value) || 0,
+      }))
+  );
 }
 
 function getCOGS() {
@@ -648,10 +672,36 @@ async function loadRevenue() {
     const adsBDT = Math.round((d.ads?.spendToday || 0) * BDT_PER_USD);
     let adsRow = document.getElementById('ads-auto-row');
     if (!adsRow) {
-      addRow('variable', { desc: 'Meta Ads spend (auto)', category: 'Marketing', amount: adsBDT, locked: true });
+      addRow('variable', { desc: 'Meta Ads spend (auto)', category: 'Marketing', amount: adsBDT, locked: true, rowId: 'ads-auto-row', amtId: 'ads-amt' });
     } else {
       const adsAmt = document.getElementById('ads-amt');
       if (adsAmt) adsAmt.value = adsBDT;
+    }
+
+    // Steadfast COD & delivery charges auto-row
+    const sfCharges = Math.round((d.steadfast?.payout?.shipping || 0) + (d.steadfast?.payout?.codFee || 0));
+    const ym = document.getElementById('p-month').value;
+    const sfManualSaved = parseInt(localStorage.getItem(`sf-manual-${ym}`) || '0') || 0;
+    let sfAutoRow = document.getElementById('sf-auto-row');
+    if (!sfAutoRow) {
+      addRow('variable', {
+        desc: 'Steadfast COD & delivery charges (auto)',
+        category: 'Operations', amount: sfCharges,
+        locked: true, rowId: 'sf-auto-row', amtId: 'sf-amt'
+      });
+      const sfManualTr = document.createElement('tr');
+      sfManualTr.id = 'sf-manual-row';
+      sfManualTr.dataset.sfManual = 'true';
+      sfManualTr.innerHTML = `
+        <td style="padding-left:18px;font-size:10px;color:#6B6255">└ manual add-on</td>
+        <td><select class="c-cat" onchange="render()"><option value="Operations" selected>Operations</option></select></td>
+        <td class="num"><input class="c-amt" type="number" id="sf-manual-amt" value="${sfManualSaved}" min="0" placeholder="0" oninput="onSfManualInput(this)"/></td>
+        <td></td>`;
+      document.getElementById('variable-body').appendChild(sfManualTr);
+      render();
+    } else {
+      const sfAmt = document.getElementById('sf-amt');
+      if (sfAmt) { sfAmt.value = sfCharges; render(); }
     }
 
     document.getElementById('s-revenue').textContent = tk(revenue);
@@ -720,7 +770,7 @@ async function save() {
       fetch(`${SB_URL}/rest/v1/monthly_costs`, {
         method: 'POST',
         headers: { ...SB_HDR, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify({ month, rows: getAllOpexRows(), updated_at: new Date().toISOString() }),
+        body: JSON.stringify({ month, rows: getSaveRows(), updated_at: new Date().toISOString() }),
       }),
       saveProductCosts(),
     ]);
