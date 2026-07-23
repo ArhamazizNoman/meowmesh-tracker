@@ -59,14 +59,33 @@ Deno.serve(async (req) => {
     }
 
     // Fetch WC + consignment IDs in parallel with Meta
-    const [wcRes, sfIds, meta] = await Promise.allSettled([
+    const [wcRaw, sfIds, meta] = await Promise.allSettled([
       fetchWooCommerce(cfg, from, to),
       fetchConsignmentIds(cfg.wcUrl, from),
       fetchMeta(cfg, from, to),
     ]);
 
-    const wc = wcRes;
+    const rawWc = wcRaw.status === "fulfilled" ? wcRaw.value : { orders: [], delivered: [] };
     const cidRows: CidRow[] = sfIds.status === "fulfilled" ? sfIds.value : [];
+
+    // Query Supabase for order IDs that Steadfast has delivered
+    const allOrderIds = rawWc.orders.map((o: any) => o.id).filter(Boolean);
+    let sfDeliveredIds = new Set<number>();
+    if (allOrderIds.length) {
+      const { data: sfRows } = await sb
+        .from("steadfast_consignments")
+        .select("wc_order_id")
+        .in("wc_order_id", allOrderIds)
+        .ilike("delivery_status", "delivered");
+      sfDeliveredIds = new Set((sfRows || []).map((r: any) => Number(r.wc_order_id)));
+    }
+
+    const wc = {
+      status: wcRaw.status as string,
+      value: wcRaw.status === "fulfilled"
+        ? processOrders(rawWc.orders, rawWc.delivered, sfDeliveredIds)
+        : undefined,
+    };
 
     const [sf] = await Promise.allSettled([
       fetchSteadfast(cfg, cidRows),
@@ -81,12 +100,12 @@ Deno.serve(async (req) => {
         live: true,
         currency: "৳",
         errors: {
-          woocommerce: wc.status  === "rejected" ? (wc as PromiseRejectedResult).reason?.message  : null,
-          steadfast:   sf.status  === "rejected" ? (sf as PromiseRejectedResult).reason?.message  : null,
-          meta:        meta.status === "rejected" ? (meta as PromiseRejectedResult).reason?.message : null,
+          woocommerce: wcRaw.status === "rejected" ? (wcRaw as PromiseRejectedResult).reason?.message : null,
+          steadfast:   sf.status   === "rejected" ? (sf   as PromiseRejectedResult).reason?.message  : null,
+          meta:        meta.status  === "rejected" ? (meta  as PromiseRejectedResult).reason?.message : null,
         },
       },
-      orders:    wc.status   === "fulfilled" ? wc.value   : defaultOrders(),
+      orders:    wc.value ?? defaultOrders(),
       steadfast: sf.status   === "fulfilled" ? sf.value   : defaultSteadfast(),
       ads:       meta.status === "fulfilled" ? meta.value : defaultAds(),
     };
@@ -136,12 +155,13 @@ async function fetchWooCommerce({ wcUrl, wcKey, wcSecret }: Record<string,string
     wcFetchAllPages(`${base}/wp-json/wc/v3/orders?modified_after=${after}&modified_before=${before}&per_page=100&status=completed,wc-delivered`, hdrs).catch(() => []),
   ]);
 
-  return processOrders(orders, delivered);
+  return { orders, delivered };
 }
 
-function processOrders(todayOrders: any[], deliveredOrders: any[]) {
+function processOrders(todayOrders: any[], deliveredOrders: any[], sfDeliveredIds: Set<number> = new Set()) {
   let totalSales = 0, orderCount = 0, itemCount = 0;
   const productMap: Record<string,{qty:number,revenue:number}> = {};
+  const sfProductMap: Record<string,{qty:number,revenue:number}> = {};
   const channelMap: Record<string,{orders:number,revenue:number}> = {};
   const stageMap:   Record<string,{orders:number,amount:number}>  = {};
   const sourceMap:  Record<string,number> = {};
@@ -163,6 +183,11 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
         if (!productMap[item.name]) productMap[item.name] = { qty:0, revenue:0 };
         productMap[item.name].qty     += item.quantity || 0;
         productMap[item.name].revenue += itemRevenue;
+        if (sfDeliveredIds.has(o.id)) {
+          if (!sfProductMap[item.name]) sfProductMap[item.name] = { qty:0, revenue:0 };
+          sfProductMap[item.name].qty     += item.quantity || 0;
+          sfProductMap[item.name].revenue += itemRevenue;
+        }
       }
     }
 
@@ -222,6 +247,7 @@ function processOrders(todayOrders: any[], deliveredOrders: any[]) {
     cancelCount: cancelled.orders,
     cancelAmount: Math.round(cancelled.amount),
     products: Object.entries(productMap).map(([name,v])=>({name,qty:v.qty,revenue:Math.round(v.revenue)})).sort((a,b)=>b.revenue-a.revenue),
+    sfDeliveredProducts: Object.entries(sfProductMap).map(([name,v])=>({name,qty:v.qty,revenue:Math.round(v.revenue)})).sort((a,b)=>b.revenue-a.revenue),
     channels: Object.entries(channelMap).map(([name,v])=>({name,orders:v.orders,revenue:Math.round(v.revenue)})).sort((a,b)=>b.orders-a.orders),
     stages: ["Pending","Processing","In Courier","Delivered","Cancelled"].filter(s=>stageMap[s]).map(s=>({name:s,...stageMap[s],amount:Math.round(stageMap[s].amount)})),
     sources: Object.entries(sourceMap).map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count),
