@@ -159,6 +159,23 @@
     .pl-label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; }
     .pl-val   { font-family: 'Fraunces', serif; font-size: 13px; font-weight: 700; }
     .pl-sub   { font-size: 8px; color: #6B6255; }
+    /* ── P&L card (col 3) ── */
+    #pl-card { background:#fff; border:1px solid #E2D6C2; border-radius:8px; padding:6px 10px; }
+    .pl-sec { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#926A00; padding:5px 0 2px; border-top:1px solid #E2D6C2; margin-top:3px; }
+    .pl-row { display:flex; align-items:center; gap:3px; padding:2px 0; min-height:18px; border-top:1px dotted #F0E9DC; }
+    .pl-row:first-of-type { border-top:none; }
+    .pl-row.pl-bold { font-weight:700; border-top:1px solid #D0C8BC; }
+    .pl-row.pl-stot { font-weight:600; background:#FAF6F0; border-radius:3px; padding:2px 3px; margin:1px 0; border-top:1px solid #E2D6C2; }
+    .pl-row.pl-profit { font-weight:700; font-family:'Fraunces',serif; background:#F5F0E8; border-radius:4px; padding:4px 3px; margin:2px 0; border-top:2px solid #C8553D !important; border-bottom:2px solid #C8553D; }
+    .pl-lbl { flex:1; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .pl-lbl.i { padding-left:10px; color:#454038; font-size:9.5px; }
+    .pl-amt { width:68px; text-align:right; font-variant-numeric:tabular-nums; font-size:10px; }
+    .pl-pct { width:32px; text-align:right; color:#6B6255; font-size:8.5px; }
+    .pl-src { width:30px; text-align:right; color:#B8A48A; font-size:7.5px; white-space:nowrap; }
+    .pl-inp { font-family:'DM Sans',sans-serif; font-size:10px; border:1px solid #E2D6C2; background:#FFF8F0; border-radius:3px; padding:1px 3px; width:68px; text-align:right; outline:none; color:#23201A; }
+    .pl-inp:focus { border-color:#C8553D; background:#FBF6EC; }
+    .pl-metrics { font-size:8.5px; color:#6B6255; padding:4px 0 1px; border-top:1px solid #E2D6C2; margin-top:3px; display:flex; flex-wrap:wrap; gap:3px 8px; line-height:1.7; }
+    .pl-metrics b { color:#23201A; font-weight:700; }
   </style>
 </head>
 <body>
@@ -292,51 +309,170 @@
     <!-- Col 3: P&L breakdown -->
     <div class="col-panel">
       <div class="col-title"><span>Profit & Loss</span></div>
-      <div class="tbl-wrap" style="flex:1">
-        <div id="profit-breakdown" style="display:none;background:#fff;border:1px solid #E2D6C2;border-radius:8px;padding:8px 12px;font-size:11px;">
+      <div class="tbl-wrap" style="flex:1;padding-right:1px">
+        <div id="pl-card" style="display:none">
 
-          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F0E9DC">
-            <span>Revenue</span>
-            <span id="pb-revenue" class="green" style="font-family:'Fraunces',serif"></span>
+          <!-- Revenue -->
+          <div class="pl-sec" style="border-top:none;margin-top:0">Revenue</div>
+          <div class="pl-row" style="border-top:none">
+            <span class="pl-lbl i">Gross value shipped</span>
+            <span class="pl-amt" id="pl-gross-ship">—</span>
+            <span class="pl-pct" id="pl-gross-ship-p">—</span>
+            <span class="pl-src">SF all</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:3px 0 3px 14px;font-size:10px;color:#6B6255">
-            <span>Orders</span><span id="pb-orders"></span>
+          <div class="pl-row">
+            <span class="pl-lbl i">Less: returned / cancelled</span>
+            <span class="pl-amt red" id="pl-returns">—</span>
+            <span class="pl-pct">—</span>
+            <span class="pl-src">SF status</span>
+          </div>
+          <div class="pl-row pl-bold">
+            <span class="pl-lbl">Net delivered revenue</span>
+            <span class="pl-amt green" id="pl-net-rev">—</span>
+            <span class="pl-pct" style="color:#23201A;font-weight:700">100%</span>
+            <span class="pl-src" id="pl-ord-ct">—</span>
           </div>
 
-          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F0E9DC;font-weight:600">
-            <span>Cost of Goods (COGS)</span>
-            <span id="pb-cogs" class="red" style="font-family:'Fraunces',serif"></span>
+          <!-- Product cost -->
+          <div class="pl-sec">Product cost</div>
+          <div class="pl-row" style="border-top:none">
+            <span class="pl-lbl i">Materials</span>
+            <span class="pl-amt" style="color:#B8A48A">—</span>
+            <span class="pl-pct">—</span>
+            <span class="pl-src">unit×del</span>
           </div>
-          <div id="pb-cogs-rows"></div>
+          <div class="pl-row">
+            <span class="pl-lbl i">Direct labour</span>
+            <span class="pl-amt" style="color:#B8A48A">—</span>
+            <span class="pl-pct">—</span>
+            <span class="pl-src">unit×del</span>
+          </div>
+          <div class="pl-row">
+            <span class="pl-lbl i">Packaging</span>
+            <span class="pl-amt" style="color:#B8A48A">—</span>
+            <span class="pl-pct">—</span>
+            <span class="pl-src">unit×del</span>
+          </div>
+          <div class="pl-row pl-stot">
+            <span class="pl-lbl">Total product cost</span>
+            <span class="pl-amt red" id="pl-prod-cost">—</span>
+            <span class="pl-pct" id="pl-prod-cost-p">—</span>
+            <span class="pl-src">COGS</span>
+          </div>
 
-          <div style="display:flex;justify-content:space-between;padding:5px 0;border-top:2px solid #E2D6C2;border-bottom:1px solid #F0E9DC;font-weight:700;margin-top:2px">
-            <span>Gross Profit</span>
-            <span id="pb-gross" style="font-family:'Fraunces',serif"></span>
+          <!-- Delivery cost -->
+          <div class="pl-sec">Delivery cost</div>
+          <div class="pl-row" style="border-top:none">
+            <span class="pl-lbl i">Courier — delivered</span>
+            <span class="pl-amt red" id="pl-cour-del">—</span>
+            <span class="pl-pct" id="pl-cour-del-p">—</span>
+            <span class="pl-src">SF auto</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:2px 0 4px;font-size:10px;color:#6B6255">
-            <span>Gross Margin</span><span id="pb-gross-margin"></span>
+          <div class="pl-row">
+            <span class="pl-lbl i">Courier — return freight</span>
+            <input class="pl-inp" type="number" id="pl-ret-freight" placeholder="0" min="0" oninput="onPlManual('pl-ret',this)" />
+            <span class="pl-pct" id="pl-ret-freight-p">—</span>
+            <span class="pl-src">SF inv</span>
+          </div>
+          <div class="pl-row">
+            <span class="pl-lbl i">Goods lost on RTO</span>
+            <input class="pl-inp" type="number" id="pl-rto-loss" placeholder="0" min="0" oninput="onPlManual('pl-rto',this)" />
+            <span class="pl-pct" id="pl-rto-loss-p">—</span>
+            <span class="pl-src">manual</span>
           </div>
 
-          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F0E9DC;font-weight:600">
-            <span>Fixed Costs</span>
-            <span id="pb-fixed" class="red" style="font-family:'Fraunces',serif"></span>
+          <!-- Gross profit -->
+          <div class="pl-row pl-profit">
+            <span class="pl-lbl">Gross profit</span>
+            <span class="pl-amt" id="pl-gross-profit">—</span>
+            <span class="pl-pct" id="pl-gross-profit-p">—</span>
+            <span class="pl-src"></span>
           </div>
-          <div id="pb-fixed-cats"></div>
-          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F0E9DC;font-weight:600">
-            <span>Variable Costs</span>
-            <span id="pb-variable" class="red" style="font-family:'Fraunces',serif"></span>
-          </div>
-          <div id="pb-variable-cats"></div>
 
-          <div style="display:flex;justify-content:space-between;padding:5px 0;border-top:2px solid #E2D6C2;font-weight:700;margin-top:2px">
-            <span>Net Profit</span>
-            <span id="pb-net" style="font-family:'Fraunces',serif"></span>
+          <!-- Marketing -->
+          <div class="pl-sec">Marketing</div>
+          <div class="pl-row" style="border-top:none">
+            <span class="pl-lbl i">Meta ads</span>
+            <span class="pl-amt red" id="pl-meta-ads">—</span>
+            <span class="pl-pct" id="pl-meta-ads-p">—</span>
+            <span class="pl-src">auto</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:10px;color:#6B6255">
-            <span>Net Margin</span><span id="pb-net-margin"></span>
+          <div class="pl-row">
+            <span class="pl-lbl i">Content & creative</span>
+            <input class="pl-inp" type="number" id="pl-content" placeholder="0" min="0" oninput="onPlManual('pl-cont',this)" />
+            <span class="pl-pct" id="pl-content-p">—</span>
+            <span class="pl-src">manual</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:10px;color:#6B6255">
-            <span>Profit / Order</span><span id="pb-per-order"></span>
+
+          <!-- Overhead -->
+          <div class="pl-sec">Overhead</div>
+          <div class="pl-row" style="border-top:none">
+            <span class="pl-lbl i">Salaries & contractors</span>
+            <span class="pl-amt red" id="pl-sal">—</span>
+            <span class="pl-pct" id="pl-sal-p">—</span>
+            <span class="pl-src">Col 1</span>
+          </div>
+          <div class="pl-row">
+            <span class="pl-lbl i">Founder compensation</span>
+            <span class="pl-amt red" id="pl-found">—</span>
+            <span class="pl-pct" id="pl-found-p">—</span>
+            <span class="pl-src">Col 1</span>
+          </div>
+          <div class="pl-row">
+            <span class="pl-lbl i">Rent & utilities</span>
+            <span class="pl-amt red" id="pl-rent">—</span>
+            <span class="pl-pct" id="pl-rent-p">—</span>
+            <span class="pl-src">Col 1</span>
+          </div>
+          <div class="pl-row">
+            <span class="pl-lbl i">Software & hosting</span>
+            <span class="pl-amt red" id="pl-sw">—</span>
+            <span class="pl-pct" id="pl-sw-p">—</span>
+            <span class="pl-src">Col 1</span>
+          </div>
+          <div class="pl-row" id="pl-other-row" style="display:none">
+            <span class="pl-lbl i">Other overhead</span>
+            <span class="pl-amt red" id="pl-other">—</span>
+            <span class="pl-pct" id="pl-other-p">—</span>
+            <span class="pl-src">Col 1</span>
+          </div>
+
+          <!-- Net profit -->
+          <div class="pl-row pl-profit">
+            <span class="pl-lbl">Net profit</span>
+            <span class="pl-amt" id="pl-net-profit">—</span>
+            <span class="pl-pct" id="pl-net-profit-p">—</span>
+            <span class="pl-src"></span>
+          </div>
+
+          <!-- Cash reconciliation -->
+          <div class="pl-sec">Cash reconciliation</div>
+          <div class="pl-row" style="border-top:none">
+            <span class="pl-lbl i">± SF COD receivable</span>
+            <span class="pl-amt" id="pl-sf-recv">—</span>
+            <span class="pl-pct">—</span>
+            <span class="pl-src">remit lag</span>
+          </div>
+          <div class="pl-row">
+            <span class="pl-lbl i">− Inventory built, unsold</span>
+            <input class="pl-inp" type="number" id="pl-inventory" placeholder="0" min="0" oninput="onPlManual('pl-inv',this)" />
+            <span class="pl-pct">—</span>
+            <span class="pl-src">manual</span>
+          </div>
+          <div class="pl-row pl-bold">
+            <span class="pl-lbl">Net cash movement</span>
+            <span class="pl-amt" id="pl-cash-net">—</span>
+            <span class="pl-pct">—</span>
+            <span class="pl-src"></span>
+          </div>
+
+          <!-- Key metrics -->
+          <div class="pl-metrics" id="pl-metrics-row" style="display:none">
+            ROAS <b id="pl-roas-v">—</b> · BE <b id="pl-be-v">—</b>
+            &nbsp;|&nbsp; CAC <b id="pl-cac-v">—</b>
+            &nbsp;|&nbsp; AOV <b id="pl-aov-v">—</b>
+            &nbsp;|&nbsp; Contrib/ord <b id="pl-contrib-v">—</b>
+            &nbsp;|&nbsp; Units/ord <b id="pl-upo-v">—</b>
           </div>
         </div>
       </div>
@@ -397,7 +533,7 @@ const tk = n => '৳' + Math.round(n).toLocaleString('en-IN');
 
 let revenue = null, orderCount = 0;
 let prevRevenue = null, prevNet = null;
-let adsBDT = 0;
+let adsBDT = 0, sfReturns = 0;
 let wcProducts = [];
 let manualCogsProducts = []; // [{name, qty, cost}] — persisted in localStorage per month
 let productCosts = {};
@@ -672,6 +808,132 @@ function getCOGS() {
   return auto + manual;
 }
 
+// ── P&L panel helpers ────────────────────────────────────────────────────────
+function getFixedAmtByDesc(keyword) {
+  return getRows('fixed')
+    .filter(r => r.desc.toLowerCase().includes(keyword.toLowerCase()))
+    .reduce((s, r) => s + (r.amount || 0), 0);
+}
+
+function onPlManual(key, input) {
+  const ym = document.getElementById('p-month').value;
+  localStorage.setItem(`${key}-${ym}`, input.value || '0');
+  renderPL();
+}
+
+function loadPlManuals() {
+  const ym = document.getElementById('p-month').value;
+  const map = { 'pl-ret': 'pl-ret-freight', 'pl-rto': 'pl-rto-loss', 'pl-cont': 'pl-content', 'pl-inv': 'pl-inventory' };
+  for (const [lsKey, elId] of Object.entries(map)) {
+    const v = parseFloat(localStorage.getItem(`${lsKey}-${ym}`) || '0') || 0;
+    const el = document.getElementById(elId);
+    if (el) el.value = v || '';
+  }
+}
+
+function renderPL() {
+  if (revenue === null) return;
+  const el = id => document.getElementById(id);
+  const pct = val => revenue > 0 && val ? (val / revenue * 100).toFixed(1) + '%' : '—';
+  const neg = val => val > 0 ? `-${tk(val)}` : '—';
+
+  el('pl-card').style.display = 'block';
+
+  // Revenue section
+  const grossShipped = revenue + sfReturns;
+  el('pl-gross-ship').textContent   = grossShipped > 0 ? tk(grossShipped) : '—';
+  el('pl-gross-ship-p').textContent = grossShipped > 0 && revenue > 0 ? (grossShipped / revenue * 100).toFixed(0) + '%' : '—';
+  el('pl-returns').textContent      = sfReturns > 0 ? `-${tk(sfReturns)}` : '—';
+  el('pl-net-rev').textContent      = tk(revenue);
+  el('pl-ord-ct').textContent       = orderCount + ' ord';
+
+  // Product cost
+  const prodCost = getCOGS();
+  el('pl-prod-cost').textContent    = neg(prodCost);
+  el('pl-prod-cost-p').textContent  = pct(prodCost);
+
+  // Delivery cost
+  const sfChargesAmt = parseFloat(el('sf-amt')?.value || '0') || 0;
+  const retFreight   = parseFloat(el('pl-ret-freight')?.value || '0') || 0;
+  const rtoLoss      = parseFloat(el('pl-rto-loss')?.value    || '0') || 0;
+  const delivCost    = sfChargesAmt + retFreight + rtoLoss;
+  el('pl-cour-del').textContent      = neg(sfChargesAmt);
+  el('pl-cour-del-p').textContent    = pct(sfChargesAmt);
+  el('pl-ret-freight-p').textContent = pct(retFreight);
+  el('pl-rto-loss-p').textContent    = pct(rtoLoss);
+
+  // Gross profit
+  const grossProfit = revenue - prodCost - delivCost;
+  el('pl-gross-profit').textContent   = tk(grossProfit);
+  el('pl-gross-profit').className     = 'pl-amt ' + (grossProfit >= 0 ? 'green' : 'red');
+  el('pl-gross-profit-p').textContent = pct(grossProfit);
+
+  // Marketing
+  const contentAmt     = parseFloat(el('pl-content')?.value || '0') || 0;
+  const totalMarketing = adsBDT + contentAmt;
+  el('pl-meta-ads').textContent  = neg(adsBDT);
+  el('pl-meta-ads-p').textContent = pct(adsBDT);
+  el('pl-content-p').textContent  = pct(contentAmt);
+
+  // Overhead — named rows from fixed-body
+  const salAmt   = getFixedAmtByDesc('Salaries');
+  const foundAmt = getFixedAmtByDesc('Founder');
+  const rentAmt  = getFixedAmtByDesc('Rent');
+  const swAmt    = getFixedAmtByDesc('Software');
+  const knownFixed = salAmt + foundAmt + rentAmt + swAmt;
+  const otherFixed = getRows('fixed').reduce((s, r) => s + (r.amount || 0), 0) - knownFixed;
+  const otherVar   = getRows('variable').filter(r =>
+    !['Meta Ads spend (auto)', 'Steadfast COD & delivery charges (auto)'].includes(r.desc)
+  ).reduce((s, r) => s + (r.amount || 0), 0);
+  const otherOverhead = Math.max(0, otherFixed) + otherVar;
+  const totalOverhead = knownFixed + otherOverhead;
+
+  el('pl-sal').textContent    = neg(salAmt);   el('pl-sal-p').textContent   = pct(salAmt);
+  el('pl-found').textContent  = neg(foundAmt); el('pl-found-p').textContent = pct(foundAmt);
+  el('pl-rent').textContent   = neg(rentAmt);  el('pl-rent-p').textContent  = pct(rentAmt);
+  el('pl-sw').textContent     = neg(swAmt);    el('pl-sw-p').textContent    = pct(swAmt);
+  const otherRow = el('pl-other-row');
+  if (otherOverhead > 0) {
+    otherRow.style.display = 'flex';
+    el('pl-other').textContent = neg(otherOverhead);
+    el('pl-other-p').textContent = pct(otherOverhead);
+  } else {
+    otherRow.style.display = 'none';
+  }
+
+  // Net profit
+  const netProfit = grossProfit - totalMarketing - totalOverhead;
+  el('pl-net-profit').textContent   = tk(netProfit);
+  el('pl-net-profit').className     = 'pl-amt ' + (netProfit >= 0 ? 'green' : 'red');
+  el('pl-net-profit-p').textContent = pct(netProfit);
+
+  // Cash reconciliation
+  el('pl-sf-recv').textContent = '—';
+  const inventory = parseFloat(el('pl-inventory')?.value || '0') || 0;
+  el('pl-cash-net').textContent = (netProfit !== 0 || inventory > 0) ? tk(netProfit - inventory) : '—';
+
+  // Key metrics
+  const roas   = adsBDT > 0 ? revenue / adsBDT : null;
+  const beRoas = adsBDT > 0 ? (prodCost + delivCost + totalMarketing + totalOverhead) / adsBDT : null;
+  const cac    = orderCount > 0 && adsBDT > 0 ? adsBDT / orderCount : null;
+  const aov    = orderCount > 0 ? revenue / orderCount : null;
+  const contrib = orderCount > 0 ? (grossProfit - adsBDT) / orderCount : null;
+  const totalUnits = wcProducts.reduce((s, p) => s + effectiveQty(p), 0);
+  const upo = orderCount > 0 && totalUnits > 0 ? (totalUnits / orderCount).toFixed(2) : null;
+
+  const metricsRow = el('pl-metrics-row');
+  metricsRow.style.display = roas !== null ? 'flex' : 'none';
+  if (roas !== null) {
+    el('pl-roas-v').textContent  = roas.toFixed(2) + 'x';
+    el('pl-roas-v').className    = roas >= (beRoas || 0) ? 'green' : 'red';
+    el('pl-be-v').textContent    = beRoas != null ? beRoas.toFixed(2) + 'x' : '—';
+    el('pl-cac-v').textContent   = cac != null ? tk(cac) : '—';
+    el('pl-aov-v').textContent   = aov != null ? tk(aov) : '—';
+    el('pl-contrib-v').textContent = contrib != null ? tk(contrib) : '—';
+    el('pl-upo-v').textContent   = upo || '—';
+  }
+}
+
 // ── Render summary + P&L ─────────────────────────────────────────────────────
 function catSubRows(rows, cls='red') {
   const cats = {};
@@ -707,30 +969,8 @@ function render() {
     document.getElementById('s-profit').textContent     = tk(net);
     document.getElementById('s-profit').className      = 'kpi-val ' + (net>=0?'green':'red');
     document.getElementById('s-margin').textContent    = netM + '% net margin';
-    document.getElementById('s-per-order').textContent = orderCount > 0 ? tk(net/orderCount) : '—';
 
-    // P&L card (col 3)
-    document.getElementById('profit-breakdown').style.display = 'block';
-    document.getElementById('pb-revenue').textContent  = tk(revenue);
-    document.getElementById('pb-orders').textContent   = orderCount + ' orders';
-    document.getElementById('pb-cogs').textContent     = cogs > 0 ? `-${tk(cogs)}` : '৳0';
-    document.getElementById('pb-gross').textContent    = tk(gross);
-    document.getElementById('pb-gross').className      = gross>=0 ? 'green' : 'red';
-    document.getElementById('pb-gross-margin').textContent = grossM + '%';
-    document.getElementById('pb-fixed').textContent    = fixedTotal > 0 ? `-${tk(fixedTotal)}` : '৳0';
-    document.getElementById('pb-variable').textContent = variableTotal > 0 ? `-${tk(variableTotal)}` : '৳0';
-    document.getElementById('pb-fixed-cats').innerHTML    = catSubRows(fixed);
-    document.getElementById('pb-variable-cats').innerHTML = catSubRows(variable);
-    document.getElementById('pb-net').textContent      = tk(net);
-    document.getElementById('pb-net').className        = net>=0 ? 'green' : 'red';
-    document.getElementById('pb-net-margin').textContent  = netM + '%';
-    document.getElementById('pb-per-order').textContent   = orderCount > 0 ? tk(net/orderCount) : '—';
-
-    const cogsRows = wcProducts
-      .filter(p => productCosts[p.name] > 0)
-      .map(p => `<div style="display:flex;justify-content:space-between;padding:2px 0 2px 14px;font-size:10px;color:#6B6255"><span>${p.name} (${effectiveQty(p)})</span><span class="red">-${tk(productCosts[p.name]*effectiveQty(p))}</span></div>`)
-      .join('');
-    document.getElementById('pb-cogs-rows').innerHTML = cogsRows;
+    renderPL();
 
     // Bottom P&L strip
     document.getElementById('pl-strip').style.display = 'grid';
@@ -791,7 +1031,8 @@ async function loadRevenue() {
     wcProducts = (sfProds.length ? sfProds : (d.orders?.products || [])).filter(p => p.qty > 0);
     qtyOverrides = {};
 
-    adsBDT = Math.round((d.ads?.spendToday || 0) * BDT_PER_USD);
+    adsBDT    = Math.round((d.ads?.spendToday || 0) * BDT_PER_USD);
+    sfReturns = Math.round(d.steadfast?.payout?.returns || 0);
     let adsRow = document.getElementById('ads-auto-row');
     if (!adsRow) {
       addRow('variable', { desc: 'Meta Ads spend (auto)', category: 'Marketing', amount: adsBDT, locked: true, rowId: 'ads-auto-row', amtId: 'ads-amt' });
@@ -942,9 +1183,10 @@ async function save() {
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
 const DEFAULT_FIXED = [
-  { desc: 'Salaries & contractors', category: 'Salary',     amount: '' },
+  { desc: 'Salaries & contractors',   category: 'Salary',     amount: '' },
   { desc: 'Founder compensation / draw', category: 'Salary', amount: '' },
-  { desc: 'Rent & office',          category: 'Operations', amount: '' },
+  { desc: 'Rent & office',            category: 'Operations', amount: '' },
+  { desc: 'Software & hosting',       category: 'Operations', amount: '' },
 ];
 const DEFAULT_VARIABLE = [
   { desc: 'Materials: Structure – overhead not in COGS',  category: 'Production', amount: '' },
@@ -962,10 +1204,12 @@ const DEFAULT_VARIABLE = [
 async function applyMonth() {
   document.getElementById('fixed-body').innerHTML    = '';
   document.getElementById('variable-body').innerHTML = '';
-  wcProducts = []; prevRevenue = null; prevNet = null; adsBDT = 0;
+  document.getElementById('pl-card').style.display  = 'none';
+  wcProducts = []; prevRevenue = null; prevNet = null; adsBDT = 0; sfReturns = 0;
   document.getElementById('s-rev-prev').textContent = '';
   document.getElementById('s-net-prev').textContent = '';
   loadManualCogsFromStorage();
+  loadPlManuals();
   await loadMonthlyCosts();
   await loadRevenue();
 }
@@ -976,6 +1220,7 @@ document.getElementById('p-month').addEventListener('change', applyMonth);
 (async () => {
   await loadProductCosts();
   loadManualCogsFromStorage();
+  loadPlManuals();
   await loadMonthlyCosts();
   loadRevenue();
 })();
