@@ -190,6 +190,7 @@
       <div class="kpi-label">Revenue</div>
       <div class="kpi-val" id="s-revenue">—</div>
       <div class="kpi-sub" id="s-orders">— orders</div>
+      <div class="kpi-sub" id="s-rev-prev" style="margin-top:1px;font-size:8px;color:#926A00"></div>
     </div>
     <div class="kpi-card" style="border-top-color:#A8422F">
       <div class="kpi-label">COGS</div>
@@ -210,11 +211,12 @@
       <div class="kpi-label">Net Profit</div>
       <div class="kpi-val" id="s-profit">—</div>
       <div class="kpi-sub" id="s-margin">—</div>
+      <div class="kpi-sub" id="s-net-prev" style="margin-top:1px;font-size:8px;color:#926A00"></div>
     </div>
     <div class="kpi-card" style="border-top-color:#6B9AB8">
-      <div class="kpi-label">Profit / Order</div>
-      <div class="kpi-val" id="s-per-order">—</div>
-      <div class="kpi-sub">per order avg</div>
+      <div class="kpi-label">ROAS</div>
+      <div class="kpi-val" id="s-roas">—</div>
+      <div class="kpi-sub" id="s-roas-be">BE: —</div>
     </div>
   </div>
 
@@ -242,7 +244,9 @@
         <span class="subtotal" id="fixed-total">৳0</span>
       </div>
 
-      <div class="subsec" style="margin-top:8px">Variable Costs</div>
+      <div class="subsec" style="margin-top:8px">Variable Costs
+        <span style="font-size:7.5px;font-weight:400;color:#926A00;text-transform:none;letter-spacing:0;margin-left:5px">⚠ Materials/labour already in COGS — enter overhead excess only</span>
+      </div>
       <div class="tbl-wrap" style="flex:1">
         <table class="cost-table">
           <thead><tr>
@@ -373,9 +377,9 @@
       <div class="pl-sub" id="ps-net-m">—</div>
     </div>
     <div class="pl-item">
-      <div class="pl-label">Per Order</div>
-      <div class="pl-val" id="ps-per-order">—</div>
-      <div class="pl-sub">avg</div>
+      <div class="pl-label">ROAS</div>
+      <div class="pl-val" id="ps-roas">—</div>
+      <div class="pl-sub" id="ps-roas-be">BE: —</div>
     </div>
   </div>
 
@@ -392,6 +396,8 @@ const CATEGORIES = ['Production','Salary','Marketing','Operations','Other'];
 const tk = n => '৳' + Math.round(n).toLocaleString('en-IN');
 
 let revenue = null, orderCount = 0;
+let prevRevenue = null, prevNet = null;
+let adsBDT = 0;
 let wcProducts = [];
 let productCosts = {};
 let qtyOverrides = {};
@@ -647,8 +653,30 @@ function render() {
     document.getElementById('ps-net').textContent        = tk(net);
     document.getElementById('ps-net').className          = 'pl-val ' + (net>=0?'green':'red');
     document.getElementById('ps-net-m').textContent      = netM + '% net';
-    document.getElementById('ps-per-order').textContent  = orderCount > 0 ? tk(net/orderCount) : '—';
-    document.getElementById('ps-per-order').className    = 'pl-val ' + (net>=0?'green':'red');
+
+    // ROAS
+    const roas   = adsBDT > 0 ? (revenue / adsBDT) : null;
+    const beRoas = adsBDT > 0 ? ((cogs + fixedTotal + variableTotal) / adsBDT) : null;
+    const fmtRoas = r => r != null ? r.toFixed(2) + 'x' : '—';
+    const roasColor = (roas != null && beRoas != null) ? (roas >= beRoas ? 'green' : 'red') : '';
+    document.getElementById('s-roas').textContent    = fmtRoas(roas);
+    document.getElementById('s-roas').className      = 'kpi-val ' + roasColor;
+    document.getElementById('s-roas-be').textContent = beRoas != null ? `BE: ${fmtRoas(beRoas)}` : 'BE: —';
+    document.getElementById('ps-roas').textContent   = fmtRoas(roas);
+    document.getElementById('ps-roas').className     = 'pl-val ' + roasColor;
+    document.getElementById('ps-roas-be').textContent = beRoas != null ? `BE: ${fmtRoas(beRoas)}` : 'BE: —';
+
+    // Prev-month deltas
+    if (prevRevenue !== null) {
+      const revDelta = revenue - prevRevenue;
+      const sign = revDelta >= 0 ? '▲' : '▼';
+      document.getElementById('s-rev-prev').textContent = `${sign} ${tk(Math.abs(revDelta))} vs prev mo`;
+    }
+    if (prevNet !== null) {
+      const netDelta = net - prevNet;
+      const sign = netDelta >= 0 ? '▲' : '▼';
+      document.getElementById('s-net-prev').textContent = `${sign} ${tk(Math.abs(netDelta))} vs prev mo`;
+    }
   }
 }
 
@@ -669,7 +697,7 @@ async function loadRevenue() {
     wcProducts = (sfProds.length ? sfProds : (d.orders?.products || [])).filter(p => p.qty > 0);
     qtyOverrides = {};
 
-    const adsBDT = Math.round((d.ads?.spendToday || 0) * BDT_PER_USD);
+    adsBDT = Math.round((d.ads?.spendToday || 0) * BDT_PER_USD);
     let adsRow = document.getElementById('ads-auto-row');
     if (!adsRow) {
       addRow('variable', { desc: 'Meta Ads spend (auto)', category: 'Marketing', amount: adsBDT, locked: true, rowId: 'ads-auto-row', amtId: 'ads-amt' });
@@ -678,9 +706,11 @@ async function loadRevenue() {
       if (adsAmt) adsAmt.value = adsBDT;
     }
 
+    // Kick off prev-month comparison in background (non-blocking)
+    loadPrevMonth(ym).catch(() => {});
+
     // Steadfast COD & delivery charges auto-row
     const sfCharges = Math.round((d.steadfast?.payout?.shipping || 0) + (d.steadfast?.payout?.codFee || 0));
-    const ym = document.getElementById('p-month').value;
     const sfManualSaved = parseInt(localStorage.getItem(`sf-manual-${ym}`) || '0') || 0;
     let sfAutoRow = document.getElementById('sf-auto-row');
     if (!sfAutoRow) {
@@ -711,6 +741,36 @@ async function loadRevenue() {
   } catch(e) {
     st.textContent = 'Error';
     renderCOGS();
+  }
+}
+
+// ── Prior-month comparison ───────────────────────────────────────────────────
+async function loadPrevMonth(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const prevDate = new Date(y, m - 2, 1); // month is 0-indexed; m-2 = previous month
+  const prevYm = `${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
+  const { from, to } = monthRange(prevYm);
+
+  const [apiRes, costsRes] = await Promise.all([
+    fetch(`${API_URL}?from=${from}&to=${to}`, { headers: { Authorization: `Bearer ${API_KEY}` } }),
+    fetch(`${SB_URL}/rest/v1/monthly_costs?month=eq.${encodeURIComponent(prevYm)}&select=rows`,
+          { headers: { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}` } }),
+  ]);
+
+  if (apiRes.ok) {
+    const d = await apiRes.json();
+    prevRevenue = d.orders?.totalSales || 0;
+    // Calculate prev net using saved costs
+    let pFixed = 0, pVariable = 0;
+    if (costsRes.ok) {
+      const cd = await costsRes.json();
+      if (cd.length && cd[0].rows) {
+        pFixed    = cd[0].rows.filter(r => r.type==='fixed').reduce((s,r) => s+(r.amount||0), 0);
+        pVariable = cd[0].rows.filter(r => r.type==='variable').reduce((s,r) => s+(r.amount||0), 0);
+      }
+    }
+    prevNet = prevRevenue - pFixed - pVariable; // simplified (no prev COGS available)
+    render();
   }
 }
 
@@ -785,14 +845,16 @@ async function save() {
 // ── Defaults ─────────────────────────────────────────────────────────────────
 const DEFAULT_FIXED = [
   { desc: 'Salaries & contractors', category: 'Salary',     amount: '' },
+  { desc: 'Founder compensation / draw', category: 'Salary', amount: '' },
   { desc: 'Rent & office',          category: 'Operations', amount: '' },
 ];
 const DEFAULT_VARIABLE = [
-  { desc: 'Materials: Structure (board/frame/wood)',       category: 'Production', amount: '' },
-  { desc: 'Materials: Fabric & soft goods',               category: 'Production', amount: '' },
-  { desc: 'Materials: Toys, fittings & hardware',         category: 'Production', amount: '' },
-  { desc: 'Packaging (cartons/bubble/bags)',               category: 'Production', amount: '' },
-  { desc: 'Direct labour (sewing/macrame/assembly)',       category: 'Production', amount: '' },
+  { desc: 'Materials: Structure – overhead not in COGS',  category: 'Production', amount: '' },
+  { desc: 'Materials: Fabric & soft goods – not in COGS', category: 'Production', amount: '' },
+  { desc: 'Materials: Toys, fittings & hardware – not in COGS', category: 'Production', amount: '' },
+  { desc: 'Packaging – overhead not in COGS',             category: 'Production', amount: '' },
+  { desc: 'Direct labour – overhead not in COGS',         category: 'Production', amount: '' },
+  { desc: 'Cancellation / RTO loss (returns)',            category: 'Operations', amount: '' },
   { desc: 'Local transport & misc delivery',              category: 'Operations', amount: '' },
   { desc: 'Marketing misc & web (non-ad)',                category: 'Marketing',  amount: '' },
   { desc: 'Other / misc',                                 category: 'Other',      amount: '' },
@@ -802,7 +864,9 @@ const DEFAULT_VARIABLE = [
 async function applyMonth() {
   document.getElementById('fixed-body').innerHTML    = '';
   document.getElementById('variable-body').innerHTML = '';
-  wcProducts = [];
+  wcProducts = []; prevRevenue = null; prevNet = null; adsBDT = 0;
+  document.getElementById('s-rev-prev').textContent = '';
+  document.getElementById('s-net-prev').textContent = '';
   await loadMonthlyCosts();
   await loadRevenue();
 }
