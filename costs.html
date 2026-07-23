@@ -215,14 +215,14 @@
   </div>
 
   <div class="cogs-note">
-    Enter cost per unit once — it's saved permanently and reused each month. Units sold refresh automatically from WooCommerce when you change the month.
+    Units counted are from <strong>Steadfast-delivered orders only</strong> — click any unit count to edit it manually. Cost per unit is saved permanently and reused each month.
   </div>
 
   <table class="cogs-table">
     <thead>
       <tr>
         <th style="width:42%">Product</th>
-        <th style="width:14%" class="num">Units Sold</th>
+        <th style="width:14%" class="num">Delivered <span style="font-weight:400;color:#926A00" title="Units from Steadfast-delivered orders only. Click to edit.">✎</span></th>
         <th style="width:20%" class="num">Cost / Unit (৳)</th>
         <th style="width:24%" class="num">Total Cost</th>
       </tr>
@@ -307,6 +307,7 @@ const tk = n => '৳' + Math.round(n).toLocaleString('en-IN');
 let revenue = null, orderCount = 0;
 let wcProducts = [];       // [{name, qty, revenue}] from WooCommerce
 let productCosts = {};     // {product_name: cost_per_unit} from Supabase
+let qtyOverrides = {};     // {product_name: qty} — manual overrides
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function currentMonth() {
@@ -373,14 +374,25 @@ function renderCOGS() {
 
   for (const p of wcProducts) {
     const cost = productCosts[p.name] || 0;
-    const lineTotal = cost * p.qty;
+    const qty  = effectiveQty(p);
+    const isOverridden = qtyOverrides[p.name] != null;
+    const lineTotal = cost * qty;
     totalCOGS += lineTotal;
 
     const tr = document.createElement('tr');
     tr.dataset.product = p.name;
     tr.innerHTML = `
       <td>${p.name}</td>
-      <td class="num">${p.qty.toLocaleString('en-IN')}</td>
+      <td class="num" style="white-space:nowrap">
+        <input type="number" class="cogs-qty" value="${qty}" min="0" style="width:72px;text-align:right;
+          font-family:'DM Sans',sans-serif;font-size:14px;border:1px solid ${isOverridden?'#C8553D':'transparent'};
+          background:${isOverridden?'#FFF8F0':'transparent'};border-radius:6px;padding:2px 4px;outline:none;"
+          title="Steadfast delivered: ${p.qty}. Edit to override."
+          data-product="${p.name.replace(/"/g,'&quot;')}" data-original="${p.qty}"
+          oninput="onQtyInput(this)" onfocus="this.style.borderColor='#C8553D';this.style.background='#FBF6EC'"
+          onblur="this.style.borderColor=(qtyOverrides[this.dataset.product]!=null?'#C8553D':'transparent');this.style.background=(qtyOverrides[this.dataset.product]!=null?'#FFF8F0':'transparent')"/>
+        ${isOverridden ? `<span title="Reset to Steadfast count (${p.qty})" style="cursor:pointer;color:#C8553D;font-size:11px;margin-left:2px" onclick="resetQty('${p.name.replace(/'/g,"\\'")}')">↺</span>` : ''}
+      </td>
       <td class="num">
         <input type="number" class="cogs-cost" value="${cost||''}" placeholder="0" min="0"
           data-product="${p.name.replace(/"/g,'&quot;')}"
@@ -403,6 +415,32 @@ function renderCOGS() {
   render();
 }
 
+function onQtyInput(input) {
+  const name = input.dataset.product;
+  const original = parseInt(input.dataset.original) || 0;
+  const val = parseInt(input.value);
+  if (!isNaN(val) && val !== original) {
+    qtyOverrides[name] = val;
+  } else if (isNaN(val) || val === original) {
+    delete qtyOverrides[name];
+  }
+  const p = wcProducts.find(x => x.name === name);
+  const cost = productCosts[name] || 0;
+  const qty = effectiveQty(p || { name, qty: original });
+  const lineEl = document.getElementById('cogs-line-' + encodeURIComponent(name));
+  if (lineEl) lineEl.textContent = (cost && qty) ? tk(cost * qty) : '—';
+  const total = wcProducts.reduce((s, p) => s + (productCosts[p.name]||0) * effectiveQty(p), 0);
+  const cell = document.getElementById('cogs-total-cell');
+  if (cell) cell.textContent = total > 0 ? tk(total) : '—';
+  document.getElementById('cogs-total').textContent = `COGS: ${tk(total)}`;
+  render();
+}
+
+function resetQty(name) {
+  delete qtyOverrides[name];
+  renderCOGS();
+}
+
 function onCostInput(input) {
   const name = input.dataset.product;
   const cost = parseFloat(input.value) || 0;
@@ -410,20 +448,25 @@ function onCostInput(input) {
 
   // Update line total
   const p = wcProducts.find(x => x.name === name);
-  const lineTotal = p ? cost * p.qty : 0;
+  const qty = effectiveQty(p || { name, qty: 0 });
+  const lineTotal = p ? cost * qty : 0;
   const lineEl = document.getElementById('cogs-line-' + encodeURIComponent(name));
   if (lineEl) lineEl.textContent = (cost && p) ? tk(lineTotal) : '—';
 
   // Recalculate total
-  const total = wcProducts.reduce((s, p) => s + (productCosts[p.name]||0) * p.qty, 0);
+  const total = wcProducts.reduce((s, p) => s + (productCosts[p.name]||0) * effectiveQty(p), 0);
   const cell = document.getElementById('cogs-total-cell');
   if (cell) cell.textContent = total > 0 ? tk(total) : '—';
   document.getElementById('cogs-total').textContent = `COGS: ${tk(total)}`;
   render();
 }
 
+function effectiveQty(p) {
+  return qtyOverrides[p.name] != null ? qtyOverrides[p.name] : p.qty;
+}
+
 function getCOGS() {
-  return wcProducts.reduce((s, p) => s + (productCosts[p.name]||0) * p.qty, 0);
+  return wcProducts.reduce((s, p) => s + (productCosts[p.name]||0) * effectiveQty(p), 0);
 }
 
 // ── Render summary + P&L ──────────────────────────────────────────────────────
@@ -482,7 +525,7 @@ function render() {
     // COGS rows in P&L
     const cogsRows = wcProducts
       .filter(p => productCosts[p.name] > 0)
-      .map(p => `<div class="profit-row sub"><span>${p.name} (${p.qty} units)</span><span class="red">-${tk(productCosts[p.name]*p.qty)}</span></div>`)
+      .map(p => `<div class="profit-row sub"><span>${p.name} (${effectiveQty(p)} units)</span><span class="red">-${tk(productCosts[p.name]*effectiveQty(p))}</span></div>`)
       .join('');
     document.getElementById('pb-cogs-rows').innerHTML = cogsRows;
   }
@@ -501,7 +544,9 @@ async function loadRevenue() {
     const d = await res.json();
     revenue    = d.orders?.totalSales || 0;
     orderCount = d.orders?.orderCount || 0;
-    wcProducts = (d.orders?.products || []).filter(p => p.qty > 0);
+    const sfProds = d.orders?.sfDeliveredProducts || [];
+    wcProducts = (sfProds.length ? sfProds : (d.orders?.products || [])).filter(p => p.qty > 0);
+    qtyOverrides = {};
 
     const adsBDT = Math.round((d.ads?.spendToday || 0) * BDT_PER_USD);
 
