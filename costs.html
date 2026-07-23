@@ -284,7 +284,7 @@
         </table>
       </div>
       <div class="table-footer">
-        <span style="font-size:10px;color:#6B6255">Costs saved permanently to Supabase</span>
+        <button class="btn-add" onclick="addManualCOGS()">+ Product</button>
         <span class="subtotal" id="cogs-total">COGS: ৳0</span>
       </div>
     </div>
@@ -399,6 +399,7 @@ let revenue = null, orderCount = 0;
 let prevRevenue = null, prevNet = null;
 let adsBDT = 0;
 let wcProducts = [];
+let manualCogsProducts = []; // [{name, qty, cost}] — persisted in localStorage per month
 let productCosts = {};
 let qtyOverrides = {};
 
@@ -460,8 +461,8 @@ function addRow(type, row = {}) {
 // ── Section 2: COGS ──────────────────────────────────────────────────────────
 function renderCOGS() {
   const tbody = document.getElementById('cogs-body');
-  if (!wcProducts.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="cogs-empty">No products found for this period.</td></tr>`;
+  if (!wcProducts.length && !manualCogsProducts.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="cogs-empty">No products found. Click + Product to add manually.</td></tr>`;
     document.getElementById('cogs-total').textContent = 'COGS: ৳0';
     render(); return;
   }
@@ -469,6 +470,7 @@ function renderCOGS() {
   tbody.innerHTML = '';
   let totalCOGS = 0;
 
+  // SF / auto product rows
   for (const p of wcProducts) {
     const cost = productCosts[p.name] || 0;
     const qty  = effectiveQty(p);
@@ -499,6 +501,40 @@ function renderCOGS() {
     tbody.appendChild(tr);
   }
 
+  // Manual product rows
+  for (let i = 0; i < manualCogsProducts.length; i++) {
+    const mp = manualCogsProducts[i];
+    const cost = mp.cost || 0;
+    const qty  = mp.qty  || 0;
+    const lineTotal = cost * qty;
+    totalCOGS += lineTotal;
+
+    const tr = document.createElement('tr');
+    tr.dataset.manualIdx = i;
+    tr.style.background = '#F0F4FF';
+    tr.innerHTML = `
+      <td><input type="text" value="${(mp.name||'').replace(/"/g,'&quot;')}" placeholder="Product name"
+        style="font-family:'DM Sans',sans-serif;font-size:11px;border:1px solid #C8D4F0;border-radius:4px;
+        padding:1px 4px;width:100%;outline:none;background:transparent;"
+        data-idx="${i}" oninput="onManualNameInput(this)"/></td>
+      <td class="num">
+        <input type="number" value="${qty}" min="0" placeholder="0"
+          style="width:52px;text-align:right;font-family:'DM Sans',sans-serif;font-size:11px;
+          border:1px solid #C8D4F0;background:transparent;border-radius:4px;padding:1px 3px;outline:none;"
+          data-idx="${i}" oninput="onManualQtyInput(this)"/>
+      </td>
+      <td class="num">
+        <input type="number" class="cogs-cost" value="${cost||''}" placeholder="0" min="0"
+          style="background:transparent;border-color:#C8D4F0;"
+          data-idx="${i}" data-manual="true" oninput="onManualCostInput(this)"/>
+      </td>
+      <td class="num" style="white-space:nowrap">
+        <span class="row-total" id="cogs-manual-line-${i}">${cost && qty ? tk(lineTotal) : '—'}</span>
+        <button class="btn-del" onclick="removeManualCOGS(${i})">×</button>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+
   const tfoot = document.createElement('tr');
   tfoot.className = 'cogs-total-row';
   tfoot.innerHTML = `
@@ -509,6 +545,62 @@ function renderCOGS() {
 
   document.getElementById('cogs-total').textContent = `COGS: ${tk(totalCOGS)}`;
   render();
+}
+
+function addManualCOGS() {
+  manualCogsProducts.push({ name: '', qty: 0, cost: 0 });
+  saveManualCogsToStorage();
+  renderCOGS();
+}
+
+function removeManualCOGS(i) {
+  manualCogsProducts.splice(i, 1);
+  saveManualCogsToStorage();
+  renderCOGS();
+}
+
+function onManualNameInput(input) {
+  manualCogsProducts[parseInt(input.dataset.idx)].name = input.value;
+  saveManualCogsToStorage();
+}
+
+function onManualQtyInput(input) {
+  const i = parseInt(input.dataset.idx);
+  manualCogsProducts[i].qty = parseInt(input.value) || 0;
+  const mp = manualCogsProducts[i];
+  const lineEl = document.getElementById(`cogs-manual-line-${i}`);
+  if (lineEl) lineEl.textContent = (mp.cost && mp.qty) ? tk(mp.cost * mp.qty) : '—';
+  const total = getCOGS();
+  const cell = document.getElementById('cogs-total-cell');
+  if (cell) cell.textContent = total > 0 ? tk(total) : '—';
+  document.getElementById('cogs-total').textContent = `COGS: ${tk(total)}`;
+  saveManualCogsToStorage();
+  render();
+}
+
+function onManualCostInput(input) {
+  const i = parseInt(input.dataset.idx);
+  manualCogsProducts[i].cost = parseFloat(input.value) || 0;
+  const mp = manualCogsProducts[i];
+  const lineEl = document.getElementById(`cogs-manual-line-${i}`);
+  if (lineEl) lineEl.textContent = (mp.cost && mp.qty) ? tk(mp.cost * mp.qty) : '—';
+  const total = getCOGS();
+  const cell = document.getElementById('cogs-total-cell');
+  if (cell) cell.textContent = total > 0 ? tk(total) : '—';
+  document.getElementById('cogs-total').textContent = `COGS: ${tk(total)}`;
+  saveManualCogsToStorage();
+  render();
+}
+
+function saveManualCogsToStorage() {
+  const ym = document.getElementById('p-month').value;
+  localStorage.setItem(`cogs-manual-${ym}`, JSON.stringify(manualCogsProducts));
+}
+
+function loadManualCogsFromStorage() {
+  const ym = document.getElementById('p-month').value;
+  try { manualCogsProducts = JSON.parse(localStorage.getItem(`cogs-manual-${ym}`) || '[]'); }
+  catch(_) { manualCogsProducts = []; }
 }
 
 function onQtyInput(input) {
@@ -575,7 +667,9 @@ function getSaveRows() {
 }
 
 function getCOGS() {
-  return wcProducts.reduce((s, p) => s + (productCosts[p.name]||0) * effectiveQty(p), 0);
+  const auto   = wcProducts.reduce((s, p) => s + (productCosts[p.name]||0) * effectiveQty(p), 0);
+  const manual = manualCogsProducts.reduce((s, p) => s + (p.cost||0) * (p.qty||0), 0);
+  return auto + manual;
 }
 
 // ── Render summary + P&L ─────────────────────────────────────────────────────
@@ -867,6 +961,7 @@ async function applyMonth() {
   wcProducts = []; prevRevenue = null; prevNet = null; adsBDT = 0;
   document.getElementById('s-rev-prev').textContent = '';
   document.getElementById('s-net-prev').textContent = '';
+  loadManualCogsFromStorage();
   await loadMonthlyCosts();
   await loadRevenue();
 }
@@ -876,6 +971,7 @@ document.getElementById('p-month').addEventListener('change', applyMonth);
 
 (async () => {
   await loadProductCosts();
+  loadManualCogsFromStorage();
   await loadMonthlyCosts();
   loadRevenue();
 })();
