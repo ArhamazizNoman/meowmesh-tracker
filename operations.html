@@ -302,14 +302,32 @@ async function loadCloud() {
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const rows = await res.json();
-    entries = rows.map(r => ({ id: r.id, entry_date: r.entry_date, kind: r.kind, category: r.category, note: r.note || '', amount: r.amount || 0 }));
-    saveLocal();
+    const cloud = rows.map(r => ({ id: r.id, entry_date: r.entry_date, kind: r.kind, category: r.category, note: r.note || '', amount: r.amount || 0 }));
     cloudOK = true;
+
+    // Reconcile: any device entry not yet in the cloud gets uploaded (first-time
+    // migration + offline entries), so switching on cloud never loses local data.
+    const cloudIds = new Set(cloud.map(e => e.id));
+    const localOnly = entries.filter(e => !cloudIds.has(e.id));
+    if (localOnly.length) await cloudInsertMany(localOnly);
+
+    // Merge cloud + device-only, newest first, and persist the union locally.
+    entries = [...cloud, ...localOnly].sort((a,b) => (b.entry_date||'').localeCompare(a.entry_date||''));
+    saveLocal();
   } catch(_) {
     cloudOK = false;
     loadLocal();
   }
   setStoreTag();
+}
+
+async function cloudInsertMany(list) {
+  try {
+    await fetch(`${SB_URL}/rest/v1/daily_entries`, {
+      method: 'POST', headers: { ...SB_HDR, 'Prefer': 'return=minimal,resolution=merge-duplicates' },
+      body: JSON.stringify(list.map(e => ({ id: e.id, entry_date: e.entry_date, kind: e.kind, category: e.category, note: e.note, amount: e.amount }))),
+    });
+  } catch(_) {}
 }
 function setStoreTag() {
   const t = document.getElementById('store-tag');
