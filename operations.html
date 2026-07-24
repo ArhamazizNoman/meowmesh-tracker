@@ -441,9 +441,13 @@ function doRemoveEntry(id) {
 
 // ── Edit-code lock ───────────────────────────────────────────────────────────
 // Light client-side gate: viewing is open, but adding/deleting asks for a code.
-// Only a SHA-256 hash of the code is stored (localStorage, per device). The code
-// itself is never saved. Unlock lasts until the tab is closed.
+// Only a SHA-256 hash of the code is stored — never the code itself. The hash
+// lives in Supabase (app_settings) so ONE code works across every device, with
+// a localStorage copy as an offline cache/fallback.
 const CODE_HASH_KEY = 'meowmesh-edit-code-hash';
+const SETTINGS_CODE_KEY = 'daily_edit_code_hash';
+let codeHash = localStorage.getItem(CODE_HASH_KEY) || null; // in-memory current hash
+let codeShared = false;     // true once the shared hash is confirmed from cloud
 let pendingAction = null;   // action to run after a successful unlock
 let modalMode = 'unlock';   // 'unlock' | 'set' | 'change'
 
@@ -451,8 +455,45 @@ async function sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
 }
-function hasCode()    { return !!localStorage.getItem(CODE_HASH_KEY); }
+function hasCode()    { return !!codeHash; }
 function isUnlocked() { return sessionStorage.getItem('meowmesh-edit-unlocked') === '1'; }
+
+// Load the shared code hash from Supabase; cache locally. If the cloud table
+// exists but has no code yet and this device already has one, push it up.
+async function loadCodeHash() {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/app_settings?key=eq.${SETTINGS_CODE_KEY}&select=value`, {
+      headers: { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}` }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    if (rows.length && rows[0].value) {
+      codeHash = rows[0].value;
+      localStorage.setItem(CODE_HASH_KEY, codeHash);
+      codeShared = true;
+    } else if (codeHash) {
+      await saveCodeHashCloud(codeHash);   // migrate this device's code to the shared store
+      codeShared = true;
+    } else {
+      codeShared = true;                   // table reachable, just no code set yet
+    }
+  } catch(_) {
+    codeShared = false;                    // offline — fall back to local cache
+  }
+}
+async function saveCodeHash(hash) {
+  codeHash = hash;
+  localStorage.setItem(CODE_HASH_KEY, hash);
+  await saveCodeHashCloud(hash);
+}
+async function saveCodeHashCloud(hash) {
+  try {
+    await fetch(`${SB_URL}/rest/v1/app_settings`, {
+      method: 'POST', headers: { ...SB_HDR, 'Prefer': 'return=minimal,resolution=merge-duplicates' },
+      body: JSON.stringify({ key: SETTINGS_CODE_KEY, value: hash, updated_at: new Date().toISOString() }),
+    });
+  } catch(_) {}
+}
 
 function setUnlocked(on) {
   if (on) sessionStorage.setItem('meowmesh-edit-unlocked', '1');
@@ -492,13 +533,14 @@ function openLock(mode) {
   const desc  = document.getElementById('lock-desc');
   const ok    = document.getElementById('lock-ok');
   const inp   = document.getElementById('lock-input');
+  const scope = codeShared ? 'all your devices' : 'this device';
   if (mode === 'set') {
     title.textContent = 'Set an edit code';
-    desc.textContent  = 'Create a code (e.g. a 4-digit PIN). It will be required to add or delete entries on this device.';
+    desc.textContent  = `Create a code (e.g. a 4-digit PIN). It will be required to add or delete entries on ${scope}.`;
     ok.textContent = 'Save code';
   } else if (mode === 'change') {
     title.textContent = 'Change edit code';
-    desc.textContent  = 'Enter a new code. Editing is currently unlocked; the new code applies from now on.';
+    desc.textContent  = `Enter a new code. Editing is currently unlocked; the new code applies to ${scope} from now on.`;
     ok.textContent = 'Update code';
   } else {
     title.textContent = 'Enter edit code';
@@ -522,7 +564,7 @@ async function lockSubmit() {
 
   if (modalMode === 'set' || modalMode === 'change') {
     if (val.length < 3) { err.textContent = 'Use at least 3 characters.'; return; }
-    localStorage.setItem(CODE_HASH_KEY, await sha256(val));
+    await saveCodeHash(await sha256(val));
     setUnlocked(true);
     document.getElementById('lock-modal').classList.remove('show');
     const act = pendingAction; pendingAction = null;
@@ -531,7 +573,7 @@ async function lockSubmit() {
   }
 
   // unlock
-  const ok = (await sha256(val)) === localStorage.getItem(CODE_HASH_KEY);
+  const ok = (await sha256(val)) === codeHash;
   if (!ok) { err.textContent = 'Wrong code. Try again.'; inp.select(); return; }
   setUnlocked(true);
   document.getElementById('lock-modal').classList.remove('show');
@@ -670,7 +712,10 @@ document.getElementById('lock-modal').addEventListener('click', e => { if (e.tar
 (async () => {
   loadLocal();
   render();               // instant paint from local cache
-  await loadCloud();      // then reconcile with cloud if available
+  await Promise.all([
+    loadCloud(),          // reconcile entries with cloud if available
+    loadCodeHash(),       // fetch the shared edit-code hash
+  ]);
   render();
 })();
 </script>
