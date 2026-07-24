@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MeowMesh — Daily Operations</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0; background: #FBF6EC; color: #23201A;
+      font-family: 'DM Sans', sans-serif;
+      height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    }
+    h1,h2,h3 { font-family: 'Fraunces', serif; margin: 0; }
+    .green { color: #4F7060; } .red { color: #C8553D; } .amber { color: #926A00; }
+
+    /* ── Topbar ── */
+    .topbar { background: #F3EADB; border-bottom: 1px solid #E2D6C2; flex-shrink: 0; }
+    .topbar-inner { padding: 7px 14px; display: flex; align-items: center; gap: 8px; }
+    .topbar-brand h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+    .clay { color: #C8553D; }
+    .nav-links { display: flex; gap: 5px; }
+    .nav-link {
+      font-size: 11px; font-weight: 600; color: #6B6255;
+      padding: 3px 10px; border-radius: 999px; border: 1px solid #E2D6C2;
+      background: #fff; text-decoration: none;
+    }
+    .nav-link.active { background: #23201A; color: #FBF6EC; border-color: #23201A; }
+    .sep { width: 1px; height: 18px; background: #D8CCBA; margin: 0 4px; flex-shrink: 0; }
+    .period-label { font-size: 11px; font-weight: 600; color: #6B6255; white-space: nowrap; }
+    #p-month { font-size: 11px; border: 1px solid #E2D6C2; border-radius: 6px; padding: 3px 6px; background: #fff; color: #23201A; outline: none; }
+    #op-status { font-size: 10px; color: #6B6255; white-space: nowrap; }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .store-tag { font-size: 9px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+    .store-cloud { background: #EAF1EC; color: #3D5C4F; }
+    .store-local { background: #FBF0E8; color: #A8422F; }
+
+    /* ── Page shell ── */
+    .page {
+      flex: 1; padding: 8px 12px 8px;
+      display: flex; flex-direction: column; gap: 8px;
+      overflow: hidden; min-height: 0;
+    }
+
+    /* ── KPI strip ── */
+    .kpi-strip { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; flex-shrink: 0; }
+    .kpi-card {
+      background: #fff; border: 1px solid #E2D6C2; border-radius: 8px;
+      padding: 8px 12px; border-top: 2px solid;
+    }
+    .kpi-label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #6B6255; margin-bottom: 2px; }
+    .kpi-val   { font-family: 'Fraunces', serif; font-size: 19px; font-weight: 700; line-height: 1.15; }
+    .kpi-sub   { font-size: 9px; color: #6B6255; margin-top: 2px; }
+
+    /* ── 2-col grid ── */
+    .main-grid {
+      display: grid; grid-template-columns: 1.35fr 1fr; gap: 10px;
+      flex: 1; min-height: 0;
+    }
+    .col-panel { display: flex; flex-direction: column; min-height: 0; }
+    .col-title {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+      color: #23201A; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2px 5px; flex-shrink: 0;
+    }
+    .col-badge { font-size: 8px; font-weight: 600; padding: 2px 7px; border-radius: 99px; background: #EEF3FB; color: #2B5A8A; }
+
+    /* ── Add-entry bar ── */
+    .add-bar {
+      display: grid; grid-template-columns: 104px 92px 1fr 96px 34px; gap: 6px;
+      background: #fff; border: 1px solid #E2D6C2; border-radius: 8px;
+      padding: 7px 8px; flex-shrink: 0; margin-bottom: 7px; align-items: center;
+    }
+    .add-bar input, .add-bar select {
+      font-family: 'DM Sans', sans-serif; font-size: 11px; border: 1px solid #E2D6C2;
+      background: #FBF6EC; color: #23201A; border-radius: 6px; padding: 5px 7px; outline: none; width: 100%;
+    }
+    .add-bar input:focus, .add-bar select:focus { border-color: #C8553D; background: #fff; }
+    .seg { display: inline-flex; border: 1px solid #E2D6C2; border-radius: 6px; overflow: hidden; }
+    .seg button {
+      all: unset; cursor: pointer; font-size: 10px; font-weight: 700; text-align: center;
+      padding: 5px 0; flex: 1; color: #6B6255; background: #FBF6EC;
+    }
+    .seg button.on-in  { background: #4F7060; color: #fff; }
+    .seg button.on-out { background: #C8553D; color: #fff; }
+    .btn-add-entry {
+      all: unset; cursor: pointer; font-size: 15px; font-weight: 700; color: #fff; background: #23201A;
+      width: 34px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    }
+    .btn-add-entry:hover { background: #4F7060; }
+
+    /* ── Ledger table ── */
+    .ledger-wrap { flex: 1; overflow-y: auto; min-height: 0; border: 1px solid #E2D6C2; border-radius: 8px; background: #fff; }
+    .ledger { width: 100%; border-collapse: collapse; }
+    .ledger th {
+      font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+      color: #6B6255; padding: 6px 9px; background: #F9F4EE; text-align: left;
+      border-bottom: 1px solid #E2D6C2; position: sticky; top: 0; z-index: 1;
+    }
+    .ledger td { padding: 5px 9px; border-bottom: 1px solid #F0E9DC; font-size: 11px; vertical-align: middle; }
+    .ledger tr:last-child td { border-bottom: none; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .pill { font-size: 8.5px; font-weight: 700; padding: 2px 7px; border-radius: 99px; white-space: nowrap; }
+    .pill-in  { background: #EAF1EC; color: #3D5C4F; }
+    .pill-out { background: #FBF0E8; color: #A8422F; }
+    .cat-tag { font-size: 10px; color: #6B6255; }
+    .day-head td {
+      background: #FCF8F1; font-size: 8.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #926A00; padding: 4px 9px; border-bottom: 1px solid #EEE3D2;
+    }
+    .btn-del { all: unset; cursor: pointer; color: #C8553D; font-size: 14px; padding: 1px 5px; border-radius: 4px; }
+    .btn-del:hover { background: #FEE; }
+    .ledger-empty { padding: 26px; text-align: center; color: #6B6255; font-size: 12px; }
+
+    /* ── Distribution panel ── */
+    .dist-card { background: #fff; border: 1px solid #E2D6C2; border-radius: 8px; padding: 11px 13px; overflow-y: auto; flex: 1; min-height: 0; }
+    .dist-bar { display: flex; height: 20px; border-radius: 5px; overflow: hidden; background: #F0E9DC; margin: 4px 0 12px; }
+    .dist-seg { height: 100%; }
+    .dist-legend { display: flex; flex-direction: column; gap: 0; }
+    .dist-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px dotted #F0E9DC; }
+    .dist-row:first-child { border-top: none; }
+    .dot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+    .dist-name { flex: 1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dist-track { width: 70px; height: 6px; background: #F0E9DC; border-radius: 99px; overflow: hidden; flex-shrink: 0; }
+    .dist-fill { height: 100%; border-radius: 99px; }
+    .dist-amt { width: 66px; text-align: right; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+    .dist-pct { width: 40px; text-align: right; font-size: 9.5px; color: #6B6255; }
+    .dist-hd  { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #6B6255; margin: 12px 0 3px; }
+    .dist-retained {
+      display: flex; justify-content: space-between; align-items: baseline;
+      background: #F5F0E8; border-radius: 6px; padding: 8px 11px; margin-top: 6px;
+      border-left: 3px solid #4F7060;
+    }
+    .dist-retained.neg { border-left-color: #C8553D; }
+    .dist-retained .lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6B6255; }
+    .dist-retained .val { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; }
+    .dist-empty { padding: 30px 10px; text-align: center; color: #6B6255; font-size: 12px; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-brand"><h1>Meow<span class="clay">Mesh</span></h1></div>
+    <div class="nav-links">
+      <a class="nav-link" href="dashboard.html">Dashboard</a>
+      <a class="nav-link" href="orders.html">Orders</a>
+      <a class="nav-link" href="costs.html">Costs</a>
+      <a class="nav-link active" href="operations.html">Daily</a>
+    </div>
+    <div class="sep"></div>
+    <span class="period-label">Month</span>
+    <input type="month" id="p-month" />
+    <span id="op-status"></span>
+    <div class="topbar-right">
+      <span class="store-tag store-local" id="store-tag">local</span>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- KPI strip -->
+  <div class="kpi-strip">
+    <div class="kpi-card" style="border-top-color:#4F7060">
+      <div class="kpi-label">Income In</div>
+      <div class="kpi-val green" id="k-income">৳0</div>
+      <div class="kpi-sub" id="k-income-sub">— entries</div>
+    </div>
+    <div class="kpi-card" style="border-top-color:#C8553D">
+      <div class="kpi-label">Money Out</div>
+      <div class="kpi-val red" id="k-expense">৳0</div>
+      <div class="kpi-sub" id="k-expense-sub">— entries</div>
+    </div>
+    <div class="kpi-card" style="border-top-color:#23201A">
+      <div class="kpi-label">Net Cash Kept</div>
+      <div class="kpi-val" id="k-net">৳0</div>
+      <div class="kpi-sub" id="k-net-sub">income − out</div>
+    </div>
+    <div class="kpi-card" style="border-top-color:#926A00">
+      <div class="kpi-label">Kept per ৳100</div>
+      <div class="kpi-val amber" id="k-rate">—</div>
+      <div class="kpi-sub" id="k-rate-sub">of income retained</div>
+    </div>
+  </div>
+
+  <!-- 2-column grid -->
+  <div class="main-grid">
+
+    <!-- Ledger -->
+    <div class="col-panel">
+      <div class="col-title">
+        <span>Daily Cash Book</span>
+        <span class="col-badge" id="ledger-count">0 entries</span>
+      </div>
+
+      <!-- add entry -->
+      <div class="add-bar">
+        <input type="date" id="e-date" />
+        <div class="seg" id="e-kind-seg">
+          <button type="button" id="k-out" class="on-out" onclick="setKind('expense')">Out</button>
+          <button type="button" id="k-in" onclick="setKind('income')">In</button>
+        </div>
+        <input type="text" id="e-note" placeholder="What was it for?" onkeydown="if(event.key==='Enter')addEntry()" />
+        <select id="e-cat"></select>
+        <button class="btn-add-entry" onclick="addEntry()" title="Add entry">+</button>
+      </div>
+      <div style="display:flex;gap:6px;margin:-2px 0 7px 0;align-items:center">
+        <input type="number" id="e-amt" placeholder="Amount ৳" min="0" onkeydown="if(event.key==='Enter')addEntry()"
+          style="font-family:'DM Sans',sans-serif;font-size:12px;border:1px solid #E2D6C2;background:#fff;color:#23201A;border-radius:6px;padding:6px 9px;outline:none;width:150px;font-weight:600" />
+        <span style="font-size:10px;color:#6B6255">↵ Enter to add · pick In/Out, category & amount</span>
+      </div>
+
+      <div class="ledger-wrap">
+        <table class="ledger">
+          <thead><tr>
+            <th style="width:34%">Note</th>
+            <th style="width:14%">Type</th>
+            <th style="width:26%">Category</th>
+            <th style="width:18%" class="num">Amount</th>
+            <th style="width:8%"></th>
+          </tr></thead>
+          <tbody id="ledger-body">
+            <tr><td colspan="5" class="ledger-empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Distribution -->
+    <div class="col-panel">
+      <div class="col-title"><span>Where the Income Goes</span></div>
+      <div class="dist-card">
+        <div id="dist-content">
+          <div class="dist-empty">Add income and expenses to see how your money is distributed.</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main-grid -->
+</div><!-- /page -->
+
+<script>
+const SB_URL  = 'https://dicanelropavoaqisebh.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpY2FuZWxyb3Bhdm9hcWlzZWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5ODExMDYsImV4cCI6MjA5NjU1NzEwNn0.EwDW8At3lgaRN0M3pJr1zwCFyu5jwyX2OwB9JPRgWdE';
+const SB_HDR  = { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}`, 'Content-Type': 'application/json' };
+const LS_KEY  = 'meowmesh-daily-entries';
+const tk = n => '৳' + Math.round(n).toLocaleString('en-IN');
+
+const EXPENSE_CATS = ['Inventory / Stock','Delivery / Courier','Marketing / Ads','Salary & Wages','Rent & Utilities','Packaging','Transport','Refund / Return','Fees & Charges','Other'];
+const INCOME_CATS  = ['Product Sales','COD Received','Advance / Deposit','Other Income'];
+
+// Fixed colour per expense category (retained profit is always green)
+const CAT_COLORS = {
+  'Inventory / Stock':  '#C8553D',
+  'Delivery / Courier': '#3E7CB1',
+  'Marketing / Ads':    '#E0A458',
+  'Salary & Wages':     '#8A6BA8',
+  'Rent & Utilities':   '#5B8C7B',
+  'Packaging':          '#B08968',
+  'Transport':          '#6B9AC4',
+  'Refund / Return':    '#A8422F',
+  'Fees & Charges':     '#C99A3B',
+  'Other':              '#9A8C98',
+};
+const RETAINED_COLOR = '#4F7060';
+
+let entries = [];          // all entries (all months)
+let kind = 'expense';      // current add-form type
+let cloudOK = false;       // whether Supabase is reachable
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function todayBD() { return new Date(Date.now() + 6 * 3600000).toISOString().slice(0,10); }
+function currentMonth() { return todayBD().slice(0,7); }
+function selMonth() { return document.getElementById('p-month').value; }
+function inMonth(dateStr, ym) { return (dateStr || '').slice(0,7) === ym; }
+function uid() { return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function catColor(c) { return CAT_COLORS[c] || '#9A8C98'; }
+
+function setKind(k) {
+  kind = k;
+  document.getElementById('k-in').className  = k === 'income'  ? 'on-in'  : '';
+  document.getElementById('k-out').className = k === 'expense' ? 'on-out' : '';
+  fillCats();
+}
+function fillCats() {
+  const sel = document.getElementById('e-cat');
+  const cats = kind === 'income' ? INCOME_CATS : EXPENSE_CATS;
+  sel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+// ── Storage: localStorage always; Supabase best-effort ───────────────────────
+function saveLocal() { localStorage.setItem(LS_KEY, JSON.stringify(entries)); }
+function loadLocal() { try { entries = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch(_) { entries = []; } }
+
+async function loadCloud() {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/daily_entries?select=id,entry_date,kind,category,note,amount&order=entry_date.desc`, {
+      headers: { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}` }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    entries = rows.map(r => ({ id: r.id, entry_date: r.entry_date, kind: r.kind, category: r.category, note: r.note || '', amount: r.amount || 0 }));
+    saveLocal();
+    cloudOK = true;
+  } catch(_) {
+    cloudOK = false;
+    loadLocal();
+  }
+  setStoreTag();
+}
+function setStoreTag() {
+  const t = document.getElementById('store-tag');
+  if (cloudOK) { t.textContent = 'cloud synced'; t.className = 'store-tag store-cloud'; }
+  else         { t.textContent = 'saved on this device'; t.className = 'store-tag store-local'; }
+}
+
+async function cloudInsert(e) {
+  if (!cloudOK) return;
+  try {
+    await fetch(`${SB_URL}/rest/v1/daily_entries`, {
+      method: 'POST', headers: { ...SB_HDR, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ id: e.id, entry_date: e.entry_date, kind: e.kind, category: e.category, note: e.note, amount: e.amount }),
+    });
+  } catch(_) {}
+}
+async function cloudDelete(id) {
+  if (!cloudOK) return;
+  try {
+    await fetch(`${SB_URL}/rest/v1/daily_entries?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE', headers: SB_HDR,
+    });
+  } catch(_) {}
+}
+
+// ── Mutations ────────────────────────────────────────────────────────────────
+function addEntry() {
+  const date = document.getElementById('e-date').value || todayBD();
+  const note = document.getElementById('e-note').value.trim();
+  const cat  = document.getElementById('e-cat').value;
+  const amt  = Math.round(parseFloat(document.getElementById('e-amt').value) || 0);
+  if (amt <= 0) { flashAmt(); return; }
+
+  const e = { id: uid(), entry_date: date, kind, category: cat, note, amount: amt };
+  entries.push(e);
+  saveLocal();
+  cloudInsert(e);
+
+  document.getElementById('e-note').value = '';
+  document.getElementById('e-amt').value  = '';
+  document.getElementById('e-note').focus();
+  render();
+}
+function flashAmt() {
+  const el = document.getElementById('e-amt');
+  el.style.borderColor = '#C8553D'; el.focus();
+  setTimeout(() => { el.style.borderColor = '#E2D6C2'; }, 900);
+}
+function removeEntry(id) {
+  entries = entries.filter(e => e.id !== id);
+  saveLocal();
+  cloudDelete(id);
+  render();
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const ym = selMonth();
+  const monthEntries = entries.filter(e => inMonth(e.entry_date, ym));
+  const income  = monthEntries.filter(e => e.kind === 'income').reduce((s,e) => s + e.amount, 0);
+  const expense = monthEntries.filter(e => e.kind === 'expense').reduce((s,e) => s + e.amount, 0);
+  const net = income - expense;
+
+  const incCount = monthEntries.filter(e => e.kind === 'income').length;
+  const expCount = monthEntries.filter(e => e.kind === 'expense').length;
+
+  document.getElementById('k-income').textContent = tk(income);
+  document.getElementById('k-income-sub').textContent = `${incCount} entr${incCount===1?'y':'ies'}`;
+  document.getElementById('k-expense').textContent = tk(expense);
+  document.getElementById('k-expense-sub').textContent = `${expCount} entr${expCount===1?'y':'ies'}`;
+  const netEl = document.getElementById('k-net');
+  netEl.textContent = tk(net);
+  netEl.className = 'kpi-val ' + (net >= 0 ? 'green' : 'red');
+  const rate = income > 0 ? Math.round(net / income * 100) : null;
+  document.getElementById('k-rate').textContent = rate !== null ? `৳${rate}` : '—';
+  document.getElementById('k-rate').className = 'kpi-val ' + (rate === null ? 'amber' : rate >= 0 ? 'green' : 'red');
+
+  document.getElementById('ledger-count').textContent = `${monthEntries.length} entr${monthEntries.length===1?'y':'ies'}`;
+
+  renderLedger(monthEntries);
+  renderDistribution(monthEntries, income, expense, net);
+}
+
+function renderLedger(list) {
+  const tbody = document.getElementById('ledger-body');
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="ledger-empty">No entries for this month yet.<br>Log your first income or expense above ☝️</td></tr>`;
+    return;
+  }
+  // group by date desc, entries within a day keep insertion order (newest last added shown last)
+  const byDate = {};
+  list.forEach(e => { (byDate[e.entry_date] = byDate[e.entry_date] || []).push(e); });
+  const dates = Object.keys(byDate).sort((a,b) => b.localeCompare(a));
+
+  let html = '';
+  for (const d of dates) {
+    const dayItems = byDate[d];
+    const dayIn  = dayItems.filter(e => e.kind==='income').reduce((s,e)=>s+e.amount,0);
+    const dayOut = dayItems.filter(e => e.kind==='expense').reduce((s,e)=>s+e.amount,0);
+    const dObj = new Date(d + 'T00:00:00');
+    const label = dObj.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+    html += `<tr class="day-head"><td colspan="3">${label}</td><td class="num" colspan="2">
+      ${dayIn?`<span class="green">+${tk(dayIn)}</span>`:''}${dayIn&&dayOut?' · ':''}${dayOut?`<span class="red">−${tk(dayOut)}</span>`:''}</td></tr>`;
+    for (const e of dayItems) {
+      const isIn = e.kind === 'income';
+      html += `<tr>
+        <td>${e.note ? esc(e.note) : '<span style="color:#B8A48A">—</span>'}</td>
+        <td><span class="pill ${isIn?'pill-in':'pill-out'}">${isIn?'IN':'OUT'}</span></td>
+        <td><span class="cat-tag"><span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:${isIn?RETAINED_COLOR:catColor(e.category)};margin-right:5px"></span>${esc(e.category)}</span></td>
+        <td class="num ${isIn?'green':'red'}" style="font-weight:600">${isIn?'+':'−'}${tk(e.amount)}</td>
+        <td class="num"><button class="btn-del" title="Delete" onclick="removeEntry('${e.id}')">×</button></td>
+      </tr>`;
+    }
+  }
+  tbody.innerHTML = html;
+}
+
+function renderDistribution(list, income, expense, net) {
+  const box = document.getElementById('dist-content');
+  if (!income && !expense) {
+    box.innerHTML = `<div class="dist-empty">Add income and expenses to see how your money is distributed.</div>`;
+    return;
+  }
+
+  // expense by category
+  const byCat = {};
+  list.filter(e => e.kind === 'expense').forEach(e => { byCat[e.category] = (byCat[e.category]||0) + e.amount; });
+  const cats = Object.entries(byCat).sort((a,b) => b[1] - a[1]);
+
+  // Denominator for distribution: income (so we show how each ৳ of income is used).
+  // If expenses exceed income, use total-out as base so bars still make sense.
+  const base = income > 0 ? income : expense;
+  const retained = Math.max(0, income - expense);
+  const overspend = income > 0 && expense > income;
+
+  // Stacked bar segments
+  let barSegs = cats.map(([c, amt]) =>
+    `<div class="dist-seg" style="width:${(amt/base*100).toFixed(2)}%;background:${catColor(c)}" title="${esc(c)}: ${tk(amt)}"></div>`
+  ).join('');
+  if (retained > 0) {
+    barSegs += `<div class="dist-seg" style="width:${(retained/base*100).toFixed(2)}%;background:${RETAINED_COLOR}" title="Retained: ${tk(retained)}"></div>`;
+  }
+
+  // Legend rows
+  const legend = cats.map(([c, amt]) => {
+    const pct = base > 0 ? (amt / base * 100) : 0;
+    return `<div class="dist-row">
+      <span class="dot" style="background:${catColor(c)}"></span>
+      <span class="dist-name">${esc(c)}</span>
+      <span class="dist-track"><span class="dist-fill" style="width:${Math.min(100,pct).toFixed(1)}%;background:${catColor(c)}"></span></span>
+      <span class="dist-amt red">−${tk(amt)}</span>
+      <span class="dist-pct">${pct.toFixed(0)}%</span>
+    </div>`;
+  }).join('');
+
+  const baseLabel = income > 0 ? 'of income' : 'of total out';
+  const retainedRow = `<div class="dist-retained ${overspend?'neg':''}">
+      <span class="lbl">${overspend ? 'Overspent' : 'Retained / Profit'}</span>
+      <span class="val ${overspend?'red':'green'}">${overspend ? '−'+tk(expense-income) : tk(retained)}</span>
+    </div>`;
+
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <span style="font-size:10px;color:#6B6255">Every ${tk(base)} ${income>0?'earned':'spent'} splits as:</span>
+      <span style="font-size:9px;color:#B8A48A">${baseLabel}</span>
+    </div>
+    <div class="dist-bar">${barSegs || '<div class="dist-seg" style="width:100%;background:#F0E9DC"></div>'}</div>
+    <div class="dist-hd">Expense breakdown</div>
+    <div class="dist-legend">${legend || '<div style="font-size:11px;color:#6B6255;padding:6px 0">No expenses logged.</div>'}</div>
+    ${retainedRow}
+  `;
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+document.getElementById('p-month').value = currentMonth();
+document.getElementById('e-date').value  = todayBD();
+document.getElementById('p-month').addEventListener('change', render);
+fillCats();
+
+(async () => {
+  loadLocal();
+  render();               // instant paint from local cache
+  await loadCloud();      // then reconcile with cloud if available
+  render();
+})();
+</script>
+</body>
+</html>
