@@ -1023,6 +1023,7 @@ async function loadRevenue() {
     const res = await fetch(`${API_URL}?from=${from}&to=${to}`, {
       headers: { Authorization: `Bearer ${API_KEY}` }
     });
+    if (!res.ok) throw new Error(`API ${res.status}`);
     const d = await res.json();
     revenue    = d.orders?.totalSales || 0;
     orderCount = d.orders?.orderCount || 0;
@@ -1073,7 +1074,9 @@ async function loadRevenue() {
     st.textContent = '✓';
     renderCOGS();
   } catch(e) {
-    st.textContent = 'Error';
+    st.textContent = 'Error: ' + (e.message || 'load failed');
+    st.title = 'Dashboard API unreachable — showing entered costs only.';
+    document.getElementById('s-revenue').textContent = revenue !== null ? tk(revenue) : '—';
     renderCOGS();
   }
 }
@@ -1204,6 +1207,7 @@ async function applyMonth() {
   document.getElementById('fixed-body').innerHTML    = '';
   document.getElementById('variable-body').innerHTML = '';
   document.getElementById('pl-card').style.display  = 'none';
+  revenue = null; orderCount = 0;
   wcProducts = []; prevRevenue = null; prevNet = null; adsBDT = 0; sfReturns = 0;
   document.getElementById('s-rev-prev').textContent = '';
   document.getElementById('s-net-prev').textContent = '';
