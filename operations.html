@@ -36,6 +36,43 @@
     .store-tag { font-size: 9px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
     .store-cloud { background: #EAF1EC; color: #3D5C4F; }
     .store-local { background: #FBF0E8; color: #A8422F; }
+    .lock-chip {
+      all: unset; cursor: pointer; font-size: 9px; font-weight: 700; padding: 4px 10px;
+      border-radius: 999px; border: 1px solid transparent; white-space: nowrap; display: inline-flex; gap: 3px; align-items: center;
+    }
+    .lock-chip.locked   { background: #FBF0E8; color: #A8422F; border-color: #F0D3C6; }
+    .lock-chip.unlocked { background: #EAF1EC; color: #3D5C4F; border-color: #CFE0D4; }
+
+    /* ── Lock overlay/modal ── */
+    #lock-modal {
+      position: fixed; inset: 0; background: rgba(35,32,26,.42); z-index: 50;
+      display: none; align-items: center; justify-content: center;
+    }
+    #lock-modal.show { display: flex; }
+    .lock-box {
+      background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; width: 300px;
+      padding: 18px 20px 16px; box-shadow: 0 12px 40px rgba(35,32,26,.22);
+    }
+    .lock-box h3 { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
+    .lock-box p  { font-size: 11px; color: #6B6255; margin: 0 0 12px; line-height: 1.4; }
+    .lock-box input {
+      width: 100%; font-family: 'DM Sans', sans-serif; font-size: 15px; letter-spacing: 3px; text-align: center;
+      border: 1px solid #E2D6C2; background: #FBF6EC; color: #23201A; border-radius: 8px; padding: 9px; outline: none;
+    }
+    .lock-box input:focus { border-color: #C8553D; background: #fff; }
+    .lock-err { font-size: 10px; color: #C8553D; min-height: 13px; margin: 5px 2px 0; }
+    .lock-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .lock-btn {
+      all: unset; cursor: pointer; text-align: center; flex: 1; font-size: 12px; font-weight: 700;
+      padding: 8px 0; border-radius: 8px;
+    }
+    .lock-btn.primary { background: #23201A; color: #FBF6EC; }
+    .lock-btn.primary:hover { background: #4F7060; }
+    .lock-btn.ghost { background: #F3EADB; color: #6B6255; }
+    .lock-btn.ghost:hover { background: #E9DDC9; }
+
+    /* Hide edit affordances while locked */
+    body.locked .btn-del { display: none; }
 
     /* ── Page shell ── */
     .page {
@@ -155,6 +192,7 @@
     <input type="month" id="p-month" />
     <span id="op-status"></span>
     <div class="topbar-right">
+      <button class="lock-chip locked" id="lock-chip" onclick="onLockChip()" title="Editing is code-protected">🔒 Locked</button>
       <span class="store-tag store-local" id="store-tag">local</span>
     </div>
   </div>
@@ -241,6 +279,21 @@
 
   </div><!-- /main-grid -->
 </div><!-- /page -->
+
+<!-- Code lock modal -->
+<div id="lock-modal">
+  <div class="lock-box">
+    <h3 id="lock-title">Enter edit code</h3>
+    <p id="lock-desc">This code is needed to add or delete entries.</p>
+    <input type="password" id="lock-input" inputmode="numeric" autocomplete="off"
+           placeholder="••••" onkeydown="if(event.key==='Enter')lockSubmit()" />
+    <div class="lock-err" id="lock-err"></div>
+    <div class="lock-actions">
+      <button class="lock-btn ghost" onclick="lockClose()">Cancel</button>
+      <button class="lock-btn primary" id="lock-ok" onclick="lockSubmit()">Unlock</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const SB_URL  = 'https://dicanelropavoaqisebh.supabase.co';
@@ -353,8 +406,11 @@ async function cloudDelete(id) {
   } catch(_) {}
 }
 
-// ── Mutations ────────────────────────────────────────────────────────────────
-function addEntry() {
+// ── Mutations (code-gated) ───────────────────────────────────────────────────
+function addEntry()      { requireUnlock(doAddEntry); }
+function removeEntry(id) { requireUnlock(() => doRemoveEntry(id)); }
+
+function doAddEntry() {
   const date = document.getElementById('e-date').value || todayBD();
   const note = document.getElementById('e-note').value.trim();
   const cat  = document.getElementById('e-cat').value;
@@ -376,11 +432,111 @@ function flashAmt() {
   el.style.borderColor = '#C8553D'; el.focus();
   setTimeout(() => { el.style.borderColor = '#E2D6C2'; }, 900);
 }
-function removeEntry(id) {
+function doRemoveEntry(id) {
   entries = entries.filter(e => e.id !== id);
   saveLocal();
   cloudDelete(id);
   render();
+}
+
+// ── Edit-code lock ───────────────────────────────────────────────────────────
+// Light client-side gate: viewing is open, but adding/deleting asks for a code.
+// Only a SHA-256 hash of the code is stored (localStorage, per device). The code
+// itself is never saved. Unlock lasts until the tab is closed.
+const CODE_HASH_KEY = 'meowmesh-edit-code-hash';
+let pendingAction = null;   // action to run after a successful unlock
+let modalMode = 'unlock';   // 'unlock' | 'set' | 'change'
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+function hasCode()    { return !!localStorage.getItem(CODE_HASH_KEY); }
+function isUnlocked() { return sessionStorage.getItem('meowmesh-edit-unlocked') === '1'; }
+
+function setUnlocked(on) {
+  if (on) sessionStorage.setItem('meowmesh-edit-unlocked', '1');
+  else    sessionStorage.removeItem('meowmesh-edit-unlocked');
+  applyLockUI();
+}
+function applyLockUI() {
+  const unlocked = isUnlocked();
+  document.body.classList.toggle('locked', !unlocked);
+  document.body.classList.toggle('unlocked', unlocked);
+  const chip = document.getElementById('lock-chip');
+  if (unlocked) { chip.textContent = '🔓 Editing'; chip.className = 'lock-chip unlocked'; chip.title = 'Click to lock / change code'; }
+  else          { chip.textContent = '🔒 Locked';  chip.className = 'lock-chip locked';   chip.title = 'Editing is code-protected'; }
+}
+
+// Runs fn if already unlocked; otherwise opens the code prompt (or code-setup on first use).
+function requireUnlock(fn) {
+  if (isUnlocked()) return fn();
+  pendingAction = fn;
+  openLock(hasCode() ? 'unlock' : 'set');
+}
+
+function onLockChip() {
+  if (isUnlocked()) {
+    // Offer to change the code or lock again
+    pendingAction = null;
+    openLock('change');
+  } else {
+    pendingAction = null;
+    openLock(hasCode() ? 'unlock' : 'set');
+  }
+}
+
+function openLock(mode) {
+  modalMode = mode;
+  const title = document.getElementById('lock-title');
+  const desc  = document.getElementById('lock-desc');
+  const ok    = document.getElementById('lock-ok');
+  const inp   = document.getElementById('lock-input');
+  if (mode === 'set') {
+    title.textContent = 'Set an edit code';
+    desc.textContent  = 'Create a code (e.g. a 4-digit PIN). It will be required to add or delete entries on this device.';
+    ok.textContent = 'Save code';
+  } else if (mode === 'change') {
+    title.textContent = 'Change edit code';
+    desc.textContent  = 'Enter a new code. Editing is currently unlocked; the new code applies from now on.';
+    ok.textContent = 'Update code';
+  } else {
+    title.textContent = 'Enter edit code';
+    desc.textContent  = 'This code is needed to add or delete entries.';
+    ok.textContent = 'Unlock';
+  }
+  document.getElementById('lock-err').textContent = '';
+  inp.value = '';
+  document.getElementById('lock-modal').classList.add('show');
+  setTimeout(() => inp.focus(), 30);
+}
+function lockClose() {
+  document.getElementById('lock-modal').classList.remove('show');
+  pendingAction = null;
+}
+async function lockSubmit() {
+  const inp = document.getElementById('lock-input');
+  const err = document.getElementById('lock-err');
+  const val = (inp.value || '').trim();
+  if (!val) { err.textContent = 'Please enter a code.'; return; }
+
+  if (modalMode === 'set' || modalMode === 'change') {
+    if (val.length < 3) { err.textContent = 'Use at least 3 characters.'; return; }
+    localStorage.setItem(CODE_HASH_KEY, await sha256(val));
+    setUnlocked(true);
+    document.getElementById('lock-modal').classList.remove('show');
+    const act = pendingAction; pendingAction = null;
+    if (act) act();
+    return;
+  }
+
+  // unlock
+  const ok = (await sha256(val)) === localStorage.getItem(CODE_HASH_KEY);
+  if (!ok) { err.textContent = 'Wrong code. Try again.'; inp.select(); return; }
+  setUnlocked(true);
+  document.getElementById('lock-modal').classList.remove('show');
+  const act = pendingAction; pendingAction = null;
+  if (act) act();
 }
 
 // ── Render ───────────────────────────────────────────────────────────────────
@@ -508,6 +664,8 @@ document.getElementById('p-month').value = currentMonth();
 document.getElementById('e-date').value  = todayBD();
 document.getElementById('p-month').addEventListener('change', render);
 fillCats();
+applyLockUI();
+document.getElementById('lock-modal').addEventListener('click', e => { if (e.target.id === 'lock-modal') lockClose(); });
 
 (async () => {
   loadLocal();
