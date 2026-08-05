@@ -162,6 +162,7 @@ function processOrders(todayOrders: any[], deliveredOrders: any[], sfDeliveredId
   let totalSales = 0, orderCount = 0, itemCount = 0;
   const productMap: Record<string,{qty:number,revenue:number}> = {};
   const sfProductMap: Record<string,{qty:number,revenue:number}> = {};
+  const wcDeliveredProductMap: Record<string,{qty:number,revenue:number}> = {};
   const channelMap: Record<string,{orders:number,revenue:number}> = {};
   const stageMap:   Record<string,{orders:number,amount:number}>  = {};
   const sourceMap:  Record<string,number> = {};
@@ -187,6 +188,12 @@ function processOrders(todayOrders: any[], deliveredOrders: any[], sfDeliveredId
           if (!sfProductMap[item.name]) sfProductMap[item.name] = { qty:0, revenue:0 };
           sfProductMap[item.name].qty     += item.quantity || 0;
           sfProductMap[item.name].revenue += itemRevenue;
+        }
+        // Products from orders WooCommerce itself marks delivered (completed / wc-delivered)
+        if (stage === 'Delivered') {
+          if (!wcDeliveredProductMap[item.name]) wcDeliveredProductMap[item.name] = { qty:0, revenue:0 };
+          wcDeliveredProductMap[item.name].qty     += item.quantity || 0;
+          wcDeliveredProductMap[item.name].revenue += itemRevenue;
         }
       }
     }
@@ -248,6 +255,7 @@ function processOrders(todayOrders: any[], deliveredOrders: any[], sfDeliveredId
     cancelAmount: Math.round(cancelled.amount),
     products: Object.entries(productMap).map(([name,v])=>({name,qty:v.qty,revenue:Math.round(v.revenue)})).sort((a,b)=>b.revenue-a.revenue),
     sfDeliveredProducts: Object.entries(sfProductMap).map(([name,v])=>({name,qty:v.qty,revenue:Math.round(v.revenue)})).sort((a,b)=>b.revenue-a.revenue),
+    wcDeliveredProducts: Object.entries(wcDeliveredProductMap).map(([name,v])=>({name,qty:v.qty,revenue:Math.round(v.revenue)})).sort((a,b)=>b.revenue-a.revenue),
     channels: Object.entries(channelMap).map(([name,v])=>({name,orders:v.orders,revenue:Math.round(v.revenue)})).sort((a,b)=>b.orders-a.orders),
     stages: ["Pending","Processing","In Courier","Delivered","Cancelled"].filter(s=>stageMap[s]).map(s=>({name:s,...stageMap[s],amount:Math.round(stageMap[s].amount)})),
     sources: Object.entries(sourceMap).map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count),

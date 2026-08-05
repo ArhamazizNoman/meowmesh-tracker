@@ -286,13 +286,13 @@
     <div class="col-panel">
       <div class="col-title">
         <span>Cost of Goods Sold</span>
-        <span class="col-badge badge-cogs">SF Delivered × Cost</span>
+        <span class="col-badge badge-cogs">WC Delivered × Cost</span>
       </div>
       <div class="tbl-wrap" style="flex:1">
         <table class="cogs-table">
           <thead><tr>
             <th style="width:42%">Product</th>
-            <th style="width:14%" class="num">Del <span style="font-weight:400;color:#926A00" title="Steadfast-delivered units. Click to edit.">✎</span></th>
+            <th style="width:14%" class="num">Del <span style="font-weight:400;color:#926A00" title="WooCommerce-delivered units (orders marked completed / delivered). Click to edit.">✎</span></th>
             <th style="width:20%" class="num">Cost/Unit (৳)</th>
             <th style="width:24%" class="num">Total</th>
           </tr></thead>
@@ -623,7 +623,7 @@ function renderCOGS() {
         <input type="number" class="cogs-qty" value="${qty}" min="0" style="width:52px;text-align:right;
           font-family:'DM Sans',sans-serif;font-size:11px;border:1px solid ${isOverridden?'#C8553D':'transparent'};
           background:${isOverridden?'#FFF8F0':'transparent'};border-radius:4px;padding:1px 3px;outline:none;"
-          title="Steadfast delivered: ${p.qty}. Edit to override."
+          title="WooCommerce delivered: ${p.qty}. Edit to override."
           data-product="${p.name.replace(/"/g,'&quot;')}" data-original="${p.qty}"
           oninput="onQtyInput(this)" onfocus="this.style.borderColor='#C8553D';this.style.background='#FBF6EC'"
           onblur="this.style.borderColor=(qtyOverrides[this.dataset.product]!=null?'#C8553D':'transparent');this.style.background=(qtyOverrides[this.dataset.product]!=null?'#FFF8F0':'transparent')"/>
@@ -1028,8 +1028,12 @@ async function loadRevenue() {
     const d = await res.json();
     revenue    = d.orders?.totalSales || 0;
     orderCount = d.orders?.orderCount || 0;
+    // Delivered units for COGS: prefer WooCommerce's own delivered status,
+    // then Steadfast-delivered, then all non-cancelled products as a fallback.
+    const wcDel   = d.orders?.wcDeliveredProducts || [];
     const sfProds = d.orders?.sfDeliveredProducts || [];
-    wcProducts = (sfProds.length ? sfProds : (d.orders?.products || [])).filter(p => p.qty > 0);
+    const source  = wcDel.length ? wcDel : (sfProds.length ? sfProds : (d.orders?.products || []));
+    wcProducts = source.filter(p => p.qty > 0);
     qtyOverrides = {};
 
     adsBDT    = Math.round((d.ads?.spendToday || 0) * BDT_PER_USD);
