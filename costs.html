@@ -364,7 +364,7 @@
           <!-- Delivery cost -->
           <div class="pl-sec">Delivery cost</div>
           <div class="pl-row" style="border-top:none">
-            <span class="pl-lbl i">Courier — delivered</span>
+            <span class="pl-lbl i">Steadfast COD charge (1%)</span>
             <span class="pl-amt red" id="pl-cour-del">—</span>
             <span class="pl-pct" id="pl-cour-del-p">—</span>
             <span class="pl-src">SF auto</span>
@@ -885,7 +885,7 @@ function renderPL() {
   const knownFixed = salAmt + foundAmt + rentAmt + swAmt;
   const otherFixed = getRows('fixed').reduce((s, r) => s + (r.amount || 0), 0) - knownFixed;
   const otherVar   = getRows('variable').filter(r =>
-    !['Meta Ads spend (auto)', 'Steadfast COD & delivery charges (auto)'].includes(r.desc)
+    !['Meta Ads spend (auto)', 'Steadfast COD charge · 1% of sales (auto)', 'Steadfast COD & delivery charges (auto)'].includes(r.desc)
   ).reduce((s, r) => s + (r.amount || 0), 0);
   const otherOverhead = Math.max(0, otherFixed) + otherVar;
   const totalOverhead = knownFixed + otherOverhead;
@@ -1049,13 +1049,13 @@ async function loadRevenue() {
     // Kick off prev-month comparison in background (non-blocking)
     loadPrevMonth(ym).catch(() => {});
 
-    // Steadfast COD & delivery charges auto-row
-    const sfCharges = Math.round((d.steadfast?.payout?.shipping || 0) + (d.steadfast?.payout?.codFee || 0));
+    // Steadfast COD charge auto-row — 1% of total product (sales) amount
+    const sfCharges = Math.round(revenue * 0.01);
     const sfManualSaved = parseInt(localStorage.getItem(`sf-manual-${ym}`) || '0') || 0;
     let sfAutoRow = document.getElementById('sf-auto-row');
     if (!sfAutoRow) {
       addRow('variable', {
-        desc: 'Steadfast COD & delivery charges (auto)',
+        desc: 'Steadfast COD charge · 1% of sales (auto)',
         category: 'Operations', amount: sfCharges,
         locked: true, rowId: 'sf-auto-row', amtId: 'sf-amt'
       });
@@ -1155,7 +1155,7 @@ async function loadMonthlyCosts() {
       const data = await res.json();
       if (data.length && Array.isArray(data[0].rows) && data[0].rows.length) {
         // Skip auto-generated rows — they're re-added by loadRevenue() to avoid duplication
-        const AUTO_DESCS = ['Meta Ads spend (auto)', 'Steadfast COD & delivery charges (auto)'];
+        const AUTO_DESCS = ['Meta Ads spend (auto)', 'Steadfast COD charge · 1% of sales (auto)', 'Steadfast COD & delivery charges (auto)'];
         data[0].rows
           .filter(r => !AUTO_DESCS.includes(r.desc))
           .forEach(r => addRow(r.type === 'fixed' ? 'fixed' : 'variable', r));
