@@ -526,42 +526,41 @@ function render(D) {
 
     <div class="row row-3 section-gap">
 
-      <!-- Delivered today -->
+      <!-- Delivered this month -->
       <div class="card">
-        <h3 style="font-size:15px;margin-bottom:14px">Delivered Today</h3>
+        <h3 style="font-size:15px;margin-bottom:14px">Delivered This Month</h3>
         <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
-          <span style="font-family:'Fraunces',serif;font-size:32px;font-weight:700;color:#4F7060">${sf.deliveredToday.parcels}</span>
+          <span id="sf-m-parcels" style="font-family:'Fraunces',serif;font-size:32px;font-weight:700;color:#4F7060">…</span>
           <span style="font-size:13px;color:#6B6255">parcels</span>
         </div>
-        <div style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:#23201A">${tk(sf.deliveredToday.cod)}</div>
-        <div style="font-size:11px;color:#6B6255;margin-top:2px">Gross COD collected</div>
+        <div id="sf-m-cod" style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:#23201A">…</div>
+        <div style="font-size:11px;color:#6B6255;margin-top:2px">Gross COD collected this month</div>
       </div>
 
-      <!-- Payout breakdown -->
+      <!-- Payout breakdown (this month) -->
       <div class="card">
-        <h3 style="font-size:15px;margin-bottom:14px">Payout Breakdown</h3>
-        ${sf.pluginInstalled === false ? `<div style="background:#FEF3EF;border:1px solid #F5C9BB;border-radius:8px;padding:10px 12px;font-size:12px;color:#A8422F;margin-bottom:12px">⚠ Install the <strong>Steadfast WooCommerce plugin</strong> and book shipments through it to see real payout data.</div>` : ""}
+        <h3 style="font-size:15px;margin-bottom:14px">Payout Breakdown <span style="font-size:11px;font-weight:400;color:#6B6255;font-family:'DM Sans',sans-serif">this month</span></h3>
+        <div id="sf-m-plugin-warn"></div>
         <div>
           <div class="payout-row">
             <span style="color:#6B6255">Gross COD</span>
-            <span>${tk(gross)}</span>
+            <span id="sf-m-gross">…</span>
           </div>
           <div class="payout-row">
             <span style="color:#6B6255">Shipping charges</span>
-            <span class="payout-neg">−${tk(sf.payout.shipping)}</span>
+            <span class="payout-neg" id="sf-m-shipping">…</span>
           </div>
           <div class="payout-row">
             <span style="color:#6B6255">COD fee (1%)</span>
-            <span class="payout-neg">−${tk(sf.payout.codFee)}</span>
+            <span class="payout-neg" id="sf-m-codfee">…</span>
           </div>
-          ${sf.payout.returns > 0 ? `
-          <div class="payout-row">
+          <div class="payout-row" id="sf-m-returns-row" style="display:none">
             <span style="color:#6B6255">Returns</span>
-            <span class="payout-neg">−${tk(sf.payout.returns)}</span>
-          </div>` : ""}
+            <span class="payout-neg" id="sf-m-returns">…</span>
+          </div>
           <div class="payout-row">
             <span>Net in hand</span>
-            <span class="payout-total">${tk(netInHand)} <span style="font-size:11px;color:#6B6255;font-family:'DM Sans'">(${netPct}%)</span></span>
+            <span class="payout-total"><span id="sf-m-net">…</span> <span id="sf-m-netpct" style="font-size:11px;color:#6B6255;font-family:'DM Sans'"></span></span>
           </div>
         </div>
       </div>
@@ -574,7 +573,7 @@ function render(D) {
           <div style="font-size:11px;color:#6B6255;margin-top:6px">Available to withdraw from Steadfast portal</div>
         </div>
         <div style="margin-top:16px;padding-top:12px;border-top:1px solid #F3EADB">
-          <div style="font-size:11px;color:#6B6255">Note: Steadfast delivered today = prior orders now confirmed. Not the same as today's orders.</div>
+          <div style="font-size:11px;color:#6B6255">Note: Delivered &amp; payout totals cover all parcels booked this month, using live Steadfast delivery status. Balance is your current portal balance.</div>
         </div>
       </div>
     </div>
@@ -670,6 +669,9 @@ function render(D) {
       }
     </div>
   `;
+
+  // Fill the monthly Steadfast cards (data arrives from loadMonthStrip)
+  applyMonthlySteadfast();
 }
 
 const SUPABASE_URL     = "https://dicanelropavoaqisebh.supabase.co";
@@ -771,12 +773,46 @@ const BDT_PER_USD = 140; // 1 USD = 140 BDT
 
 const MONTH_GOAL = 300000;
 
+// Monthly Steadfast payout (independent of the top date filter) — filled by
+// loadMonthStrip and re-applied on every render() since render rebuilds #page.
+let monthlySteadfast = null;
+function applyMonthlySteadfast() {
+  const sf = monthlySteadfast;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  if (!sf) return;
+  const parcels = sf.deliveredToday?.parcels || 0; // for a month range this is the month's delivered
+  const cod     = sf.deliveredToday?.cod || 0;
+  const p       = sf.payout || {};
+  const net     = p.netInHand || 0;
+  const netPct  = cod > 0 ? Math.round(net / cod * 100) : 0;
+
+  set("sf-m-parcels", parcels);
+  set("sf-m-cod", tk(cod));
+  set("sf-m-gross", tk(cod));
+  set("sf-m-shipping", "−" + tk(p.shipping || 0));
+  set("sf-m-codfee", "−" + tk(p.codFee || 0));
+  const rrow = document.getElementById("sf-m-returns-row");
+  if (rrow) {
+    if ((p.returns || 0) > 0) { rrow.style.display = ""; set("sf-m-returns", "−" + tk(p.returns)); }
+    else rrow.style.display = "none";
+  }
+  set("sf-m-net", tk(net));
+  set("sf-m-netpct", "(" + netPct + "%)");
+
+  const warn = document.getElementById("sf-m-plugin-warn");
+  if (warn) warn.innerHTML = sf.pluginInstalled === false
+    ? `<div style="background:#FEF3EF;border:1px solid #F5C9BB;border-radius:8px;padding:10px 12px;font-size:12px;color:#A8422F;margin-bottom:12px">⚠ Install the <strong>Steadfast WooCommerce plugin</strong> and book shipments through it to see real payout data.</div>`
+    : "";
+}
+
 async function loadMonthStrip() {
   const t    = bdtToday();
   const from = fmt(new Date(t.getFullYear(), t.getMonth(), 1));
   const to   = fmt(t);
   try {
     const data = await fetchFresh(from, to);
+    monthlySteadfast = data?.steadfast || null;
+    applyMonthlySteadfast();
     const sales   = data?.orders?.totalSales  || 0;
     const orders  = data?.orders?.orderCount  || 0;
     const spend   = data?.ads?.spendToday     || 0;
