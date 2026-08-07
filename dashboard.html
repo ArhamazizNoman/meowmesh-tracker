@@ -187,6 +187,13 @@
     <div style="height:5px;background:#2D5442;border-radius:999px;overflow:hidden">
       <div id="mk-goal-bar" style="height:100%;background:linear-gradient(90deg,#4F8C6A,#7EB89A);border-radius:999px;width:0%;transition:width 0.6s ease"></div>
     </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:#4F8C6A;margin:6px 0 4px">
+      <span>Month Elapsed</span>
+      <span><span id="mk-month-day" style="color:#E8F5EE;font-weight:700">—</span> <span style="color:#4F8C6A">days left</span> &nbsp;·&nbsp; <span id="mk-month-pct" style="color:#D9BD7E;font-weight:700">—</span></span>
+    </div>
+    <div style="height:5px;background:#2D5442;border-radius:999px;overflow:hidden">
+      <div id="mk-month-bar" style="height:100%;background:linear-gradient(90deg,#B7935A,#D9BD7E);border-radius:999px;width:0%;transition:width 0.6s ease"></div>
+    </div>
   </div>
 </div>
 
@@ -961,10 +968,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initDashboard();
   loadMonthStrip();
+  renderMonthElapsed();
+
   loadSparkline();
   loadWeekdayChart();
   loadMonthDayChart();
 });
+
+// ── Month-elapsed bar (time progress, independent of API) ─────────────────────
+function renderMonthElapsed() {
+  const now  = bdtToday();
+  const day  = now.getDate();
+  const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(); // days in month
+  const pct  = Math.min(100, Math.round(day / days * 100));
+  const left = Math.max(0, days - day);
+
+  const bar = document.getElementById("mk-month-bar");
+  const pel = document.getElementById("mk-month-pct");
+  const dEl = document.getElementById("mk-month-day");
+  if (bar) bar.style.width = pct + "%";
+  if (pel) pel.textContent = pct + "%";
+  if (dEl) dEl.textContent = left;
+}
 </script>
 
 </body>
