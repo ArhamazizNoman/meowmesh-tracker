@@ -288,22 +288,24 @@
         <span>Cost of Goods Sold</span>
         <span class="col-badge badge-cogs">WC Delivered × Cost</span>
       </div>
-      <div class="tbl-wrap" style="flex:1">
-        <table class="cogs-table">
+      <div class="tbl-wrap" style="flex:1;overflow-x:auto">
+        <table class="cogs-table" style="min-width:460px">
           <thead><tr>
-            <th style="width:42%">Product</th>
-            <th style="width:14%" class="num">Del <span style="font-weight:400;color:#926A00" title="WooCommerce-delivered units (orders marked completed / delivered). Click to edit.">✎</span></th>
-            <th style="width:20%" class="num">Cost/Unit (৳)</th>
-            <th style="width:24%" class="num">Total</th>
+            <th style="width:26%">Product</th>
+            <th style="width:11%" class="num">Del <span style="font-weight:400;color:#926A00" title="WooCommerce-delivered units (orders marked completed / delivered). Click to edit.">✎</span></th>
+            <th style="width:15%" class="num">Cost/U (৳)</th>
+            <th style="width:15%" class="num">COGS</th>
+            <th style="width:15%" class="num">Sell/U (৳)</th>
+            <th style="width:18%" class="num">Sales</th>
           </tr></thead>
           <tbody id="cogs-body">
-            <tr><td colspan="4" class="cogs-empty">Loading…</td></tr>
+            <tr><td colspan="6" class="cogs-empty">Loading…</td></tr>
           </tbody>
         </table>
       </div>
       <div class="table-footer">
         <button class="btn-add" onclick="addManualCOGS()">+ Product</button>
-        <span class="subtotal" id="cogs-total">COGS: ৳0</span>
+        <span class="subtotal" id="cogs-total">COGS ৳0 · Sales ৳0</span>
       </div>
     </div>
 
@@ -536,8 +538,9 @@ let revenue = null, orderCount = 0;
 let prevRevenue = null, prevNet = null;
 let adsBDT = 0, sfReturns = 0;
 let wcProducts = [];
-let manualCogsProducts = []; // [{name, qty, cost}] — persisted in localStorage per month
+let manualCogsProducts = []; // [{name, qty, cost, sell}] — persisted in localStorage per month
 let productCosts = {};
+let productSellPrices = {};   // per-product sell-price overrides (localStorage); default = WC actual
 let qtyOverrides = {};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -599,28 +602,33 @@ function addRow(type, row = {}) {
 function renderCOGS() {
   const tbody = document.getElementById('cogs-body');
   if (!wcProducts.length && !manualCogsProducts.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="cogs-empty">No products found. Click + Product to add manually.</td></tr>`;
-    document.getElementById('cogs-total').textContent = 'COGS: ৳0';
+    tbody.innerHTML = `<tr><td colspan="6" class="cogs-empty">No products found. Click + Product to add manually.</td></tr>`;
+    document.getElementById('cogs-total').textContent = 'COGS ৳0 · Sales ৳0';
     render(); return;
   }
 
   tbody.innerHTML = '';
-  let totalCOGS = 0;
+  let totalCOGS = 0, totalSales = 0;
 
   // SF / auto product rows
   for (const p of wcProducts) {
     const cost = productCosts[p.name] || 0;
     const qty  = effectiveQty(p);
+    const sell = effectiveSell(p);
     const isOverridden = qtyOverrides[p.name] != null;
-    const lineTotal = cost * qty;
-    totalCOGS += lineTotal;
+    const isSellOverridden = productSellPrices[p.name] != null;
+    const lineCost  = cost * qty;
+    const lineSales = sell * qty;
+    totalCOGS  += lineCost;
+    totalSales += lineSales;
+    const enc = encodeURIComponent(p.name);
 
     const tr = document.createElement('tr');
     tr.dataset.product = p.name;
     tr.innerHTML = `
       <td style="font-size:11px">${p.name}</td>
       <td class="num" style="white-space:nowrap">
-        <input type="number" class="cogs-qty" value="${qty}" min="0" style="width:52px;text-align:right;
+        <input type="number" class="cogs-qty" value="${qty}" min="0" style="width:44px;text-align:right;
           font-family:'DM Sans',sans-serif;font-size:11px;border:1px solid ${isOverridden?'#C8553D':'transparent'};
           background:${isOverridden?'#FFF8F0':'transparent'};border-radius:4px;padding:1px 3px;outline:none;"
           title="WooCommerce delivered: ${p.qty}. Edit to override."
@@ -630,11 +638,18 @@ function renderCOGS() {
         ${isOverridden ? `<span title="Reset (${p.qty})" style="cursor:pointer;color:#C8553D;font-size:10px;margin-left:1px" onclick="resetQty('${p.name.replace(/'/g,"\\'")}')">↺</span>` : ''}
       </td>
       <td class="num">
-        <input type="number" class="cogs-cost" value="${cost||''}" placeholder="0" min="0"
+        <input type="number" class="cogs-cost" value="${cost||''}" placeholder="0" min="0" style="width:48px"
           data-product="${p.name.replace(/"/g,'&quot;')}"
           oninput="onCostInput(this)"/>
       </td>
-      <td class="num row-total" id="cogs-line-${encodeURIComponent(p.name)}">${cost ? tk(lineTotal) : '—'}</td>`;
+      <td class="num row-total" id="cogs-line-${enc}">${cost ? tk(lineCost) : '—'}</td>
+      <td class="num">
+        <input type="number" class="cogs-sell" value="${sell||''}" placeholder="0" min="0" style="width:48px;${isSellOverridden?'border-color:#4F7060;background:#EAF1EC;':''}"
+          title="Avg WooCommerce sale price${p.qty>0?': '+tk(defaultSell(p))+'/unit':''}. Edit to override."
+          data-product="${p.name.replace(/"/g,'&quot;')}"
+          oninput="onSellInput(this)"/>
+      </td>
+      <td class="num row-total" id="cogs-sales-${enc}" style="color:#4F7060">${sell ? tk(lineSales) : '—'}</td>`;
     tbody.appendChild(tr);
   }
 
@@ -643,8 +658,11 @@ function renderCOGS() {
     const mp = manualCogsProducts[i];
     const cost = mp.cost || 0;
     const qty  = mp.qty  || 0;
-    const lineTotal = cost * qty;
-    totalCOGS += lineTotal;
+    const sell = mp.sell || 0;
+    const lineCost  = cost * qty;
+    const lineSales = sell * qty;
+    totalCOGS  += lineCost;
+    totalSales += lineSales;
 
     const tr = document.createElement('tr');
     tr.dataset.manualIdx = i;
@@ -652,21 +670,27 @@ function renderCOGS() {
     tr.innerHTML = `
       <td><input type="text" value="${(mp.name||'').replace(/"/g,'&quot;')}" placeholder="Product name"
         style="font-family:'DM Sans',sans-serif;font-size:11px;border:1px solid #C8D4F0;border-radius:4px;
-        padding:1px 4px;width:100%;outline:none;background:transparent;"
+        padding:1px 4px;width:100%;min-width:70px;outline:none;background:transparent;"
         data-idx="${i}" oninput="onManualNameInput(this)"/></td>
       <td class="num">
         <input type="number" value="${qty}" min="0" placeholder="0"
-          style="width:52px;text-align:right;font-family:'DM Sans',sans-serif;font-size:11px;
+          style="width:44px;text-align:right;font-family:'DM Sans',sans-serif;font-size:11px;
           border:1px solid #C8D4F0;background:transparent;border-radius:4px;padding:1px 3px;outline:none;"
           data-idx="${i}" oninput="onManualQtyInput(this)"/>
       </td>
       <td class="num">
         <input type="number" class="cogs-cost" value="${cost||''}" placeholder="0" min="0"
-          style="background:transparent;border-color:#C8D4F0;"
+          style="background:transparent;border-color:#C8D4F0;width:48px"
           data-idx="${i}" data-manual="true" oninput="onManualCostInput(this)"/>
       </td>
+      <td class="num row-total" id="cogs-manual-line-${i}">${cost && qty ? tk(lineCost) : '—'}</td>
+      <td class="num">
+        <input type="number" class="cogs-sell" value="${sell||''}" placeholder="0" min="0"
+          style="background:transparent;border-color:#C8D4F0;width:48px"
+          data-idx="${i}" oninput="onManualSellInput(this)"/>
+      </td>
       <td class="num" style="white-space:nowrap">
-        <span class="row-total" id="cogs-manual-line-${i}">${cost && qty ? tk(lineTotal) : '—'}</span>
+        <span class="row-total" id="cogs-manual-sales-${i}" style="color:#4F7060">${sell && qty ? tk(lineSales) : '—'}</span>
         <button class="btn-del" onclick="removeManualCOGS(${i})">×</button>
       </td>`;
     tbody.appendChild(tr);
@@ -675,19 +699,29 @@ function renderCOGS() {
   const tfoot = document.createElement('tr');
   tfoot.className = 'cogs-total-row';
   tfoot.innerHTML = `
-    <td colspan="2">Total COGS</td>
+    <td colspan="3">Total</td>
+    <td class="num" id="cogs-total-cell">${totalCOGS > 0 ? tk(totalCOGS) : '—'}</td>
     <td></td>
-    <td class="num" id="cogs-total-cell">${totalCOGS > 0 ? tk(totalCOGS) : '—'}</td>`;
+    <td class="num" id="sales-total-cell" style="color:#4F7060">${totalSales > 0 ? tk(totalSales) : '—'}</td>`;
   tbody.appendChild(tfoot);
 
-  document.getElementById('cogs-total').textContent = `COGS: ${tk(totalCOGS)}`;
+  document.getElementById('cogs-total').textContent = `COGS ${tk(totalCOGS)} · Sales ${tk(totalSales)}`;
   render();
 }
 
 function addManualCOGS() {
-  manualCogsProducts.push({ name: '', qty: 0, cost: 0 });
+  manualCogsProducts.push({ name: '', qty: 0, cost: 0, sell: 0 });
   saveManualCogsToStorage();
   renderCOGS();
+}
+
+// Update a manual row's COGS + Sales line cells from current state
+function updateManualRow(i) {
+  const mp = manualCogsProducts[i]; if (!mp) return;
+  const cEl = document.getElementById(`cogs-manual-line-${i}`);
+  if (cEl) cEl.textContent = (mp.cost && mp.qty) ? tk(mp.cost * mp.qty) : '—';
+  const sEl = document.getElementById(`cogs-manual-sales-${i}`);
+  if (sEl) sEl.textContent = (mp.sell && mp.qty) ? tk(mp.sell * mp.qty) : '—';
 }
 
 function removeManualCOGS(i) {
@@ -704,13 +738,8 @@ function onManualNameInput(input) {
 function onManualQtyInput(input) {
   const i = parseInt(input.dataset.idx);
   manualCogsProducts[i].qty = parseInt(input.value) || 0;
-  const mp = manualCogsProducts[i];
-  const lineEl = document.getElementById(`cogs-manual-line-${i}`);
-  if (lineEl) lineEl.textContent = (mp.cost && mp.qty) ? tk(mp.cost * mp.qty) : '—';
-  const total = getCOGS();
-  const cell = document.getElementById('cogs-total-cell');
-  if (cell) cell.textContent = total > 0 ? tk(total) : '—';
-  document.getElementById('cogs-total').textContent = `COGS: ${tk(total)}`;
+  updateManualRow(i);
+  updateCogsFooter();
   saveManualCogsToStorage();
   render();
 }
@@ -718,13 +747,17 @@ function onManualQtyInput(input) {
 function onManualCostInput(input) {
   const i = parseInt(input.dataset.idx);
   manualCogsProducts[i].cost = parseFloat(input.value) || 0;
-  const mp = manualCogsProducts[i];
-  const lineEl = document.getElementById(`cogs-manual-line-${i}`);
-  if (lineEl) lineEl.textContent = (mp.cost && mp.qty) ? tk(mp.cost * mp.qty) : '—';
-  const total = getCOGS();
-  const cell = document.getElementById('cogs-total-cell');
-  if (cell) cell.textContent = total > 0 ? tk(total) : '—';
-  document.getElementById('cogs-total').textContent = `COGS: ${tk(total)}`;
+  updateManualRow(i);
+  updateCogsFooter();
+  saveManualCogsToStorage();
+  render();
+}
+
+function onManualSellInput(input) {
+  const i = parseInt(input.dataset.idx);
+  manualCogsProducts[i].sell = parseFloat(input.value) || 0;
+  updateManualRow(i);
+  updateCogsFooter();
   saveManualCogsToStorage();
   render();
 }
@@ -748,13 +781,14 @@ function onQtyInput(input) {
   else delete qtyOverrides[name];
   const p = wcProducts.find(x => x.name === name);
   const cost = productCosts[name] || 0;
-  const qty = effectiveQty(p || { name, qty: original });
-  const lineEl = document.getElementById('cogs-line-' + encodeURIComponent(name));
-  if (lineEl) lineEl.textContent = (cost && qty) ? tk(cost * qty) : '—';
-  const total = getCOGS();
-  const cell = document.getElementById('cogs-total-cell');
-  if (cell) cell.textContent = total > 0 ? tk(total) : '—';
-  document.getElementById('cogs-total').textContent = `COGS: ${tk(total)}`;
+  const qty  = effectiveQty(p || { name, qty: original });
+  const sell = effectiveSell(p || { name, qty: original, revenue: 0 });
+  const enc = encodeURIComponent(name);
+  const costEl  = document.getElementById('cogs-line-' + enc);
+  if (costEl)  costEl.textContent  = (cost && qty) ? tk(cost * qty) : '—';
+  const salesEl = document.getElementById('cogs-sales-' + enc);
+  if (salesEl) salesEl.textContent = (sell && qty) ? tk(sell * qty) : '—';
+  updateCogsFooter();
   render();
 }
 
@@ -769,13 +803,28 @@ function onCostInput(input) {
   productCosts[name] = cost;
   const p = wcProducts.find(x => x.name === name);
   const qty = effectiveQty(p || { name, qty: 0 });
-  const lineTotal = p ? cost * qty : 0;
   const lineEl = document.getElementById('cogs-line-' + encodeURIComponent(name));
-  if (lineEl) lineEl.textContent = (cost && p) ? tk(lineTotal) : '—';
-  const total = getCOGS();
-  const cell = document.getElementById('cogs-total-cell');
-  if (cell) cell.textContent = total > 0 ? tk(total) : '—';
-  document.getElementById('cogs-total').textContent = `COGS: ${tk(total)}`;
+  if (lineEl) lineEl.textContent = (cost && p) ? tk(cost * qty) : '—';
+  updateCogsFooter();
+  render();
+}
+
+function onSellInput(input) {
+  const name = input.dataset.product;
+  const p = wcProducts.find(x => x.name === name);
+  const val = parseFloat(input.value);
+  const def = defaultSell(p || { name, qty: 0, revenue: 0 });
+  if (!isNaN(val) && val !== def) productSellPrices[name] = val;
+  else delete productSellPrices[name];
+  saveSellPrices();
+  const qty  = effectiveQty(p || { name, qty: 0 });
+  const sell = effectiveSell(p || { name, qty: 0, revenue: 0 });
+  const salesEl = document.getElementById('cogs-sales-' + encodeURIComponent(name));
+  if (salesEl) salesEl.textContent = (sell && qty) ? tk(sell * qty) : '—';
+  // reflect override styling
+  input.style.borderColor = productSellPrices[name] != null ? '#4F7060' : '';
+  input.style.background   = productSellPrices[name] != null ? '#EAF1EC' : '';
+  updateCogsFooter();
   render();
 }
 
@@ -807,6 +856,30 @@ function getCOGS() {
   const auto   = wcProducts.reduce((s, p) => s + (productCosts[p.name]||0) * effectiveQty(p), 0);
   const manual = manualCogsProducts.reduce((s, p) => s + (p.cost||0) * (p.qty||0), 0);
   return auto + manual;
+}
+
+// ── Sales value (sell price × delivered qty) ─────────────────────────────────
+// Default sell price = actual average WooCommerce sale price (revenue / units).
+function defaultSell(p) { return p && p.qty > 0 ? Math.round((p.revenue || 0) / p.qty) : 0; }
+function effectiveSell(p) { return productSellPrices[p.name] != null ? productSellPrices[p.name] : defaultSell(p); }
+function getSales() {
+  const auto   = wcProducts.reduce((s, p) => s + effectiveSell(p) * effectiveQty(p), 0);
+  const manual = manualCogsProducts.reduce((s, p) => s + (p.sell||0) * (p.qty||0), 0);
+  return auto + manual;
+}
+function loadSellPrices() {
+  try { productSellPrices = JSON.parse(localStorage.getItem('product-sell-prices') || '{}'); }
+  catch(_) { productSellPrices = {}; }
+}
+function saveSellPrices() { localStorage.setItem('product-sell-prices', JSON.stringify(productSellPrices)); }
+
+// Recompute the COGS-table footer totals (COGS, Sales) from current state
+function updateCogsFooter() {
+  const c = getCOGS(), s = getSales();
+  const cc = document.getElementById('cogs-total-cell'); if (cc) cc.textContent = c > 0 ? tk(c) : '—';
+  const sc = document.getElementById('sales-total-cell'); if (sc) sc.textContent = s > 0 ? tk(s) : '—';
+  const foot = document.getElementById('cogs-total');
+  if (foot) foot.textContent = `COGS ${tk(c)} · Sales ${tk(s)}`;
 }
 
 // ── P&L panel helpers ────────────────────────────────────────────────────────
@@ -1217,6 +1290,7 @@ async function applyMonth() {
   document.getElementById('s-rev-prev').textContent = '';
   document.getElementById('s-net-prev').textContent = '';
   loadManualCogsFromStorage();
+  loadSellPrices();
   loadPlManuals();
   await loadMonthlyCosts();
   await loadRevenue();
@@ -1228,6 +1302,7 @@ document.getElementById('p-month').addEventListener('change', applyMonth);
 (async () => {
   await loadProductCosts();
   loadManualCogsFromStorage();
+  loadSellPrices();
   loadPlManuals();
   await loadMonthlyCosts();
   loadRevenue();
