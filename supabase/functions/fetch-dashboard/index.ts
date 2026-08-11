@@ -58,31 +58,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Daily job (called by a scheduled workflow): refresh Steadfast delivery
-    // status for recent orders and cache it in steadfast_consignments. Writes
-    // status only — charges/COD from the CSV import are preserved on conflict.
-    if (mode === "sync-steadfast") {
-      const days  = Math.min(120, parseInt(url.searchParams.get("days") || "45") || 45);
-      const start = new Date(bdtNow.getFullYear(), bdtNow.getMonth(), bdtNow.getDate() - days);
-      const fromD = fmtDate(start);
-      const detail = await fetchOrdersDetail(cfg, fromD, todayStr, sb);
-      const rows = detail
-        .filter((o: any) => o.consignment_id && o.sf_status)
-        .map((o: any) => ({ tracking_code: o.consignment_id, wc_order_id: o.id, delivery_status: o.sf_status }));
-      let synced = 0, error: string | null = null;
-      if (rows.length) {
-        const { error: e } = await sb
-          .from("steadfast_consignments")
-          .upsert(rows, { onConflict: "tracking_code" });
-        if (e) error = e.message; else synced = rows.length;
-      }
-      return new Response(JSON.stringify({
-        synced, matched: rows.length, scanned: detail.length,
-        unbooked: detail.filter((o: any) => !o.consignment_id).length,
-        from: fromD, to: todayStr, error,
-      }), { headers: { ...CORS, "Content-Type": "application/json" } });
-    }
-
     // Fetch WC + consignment IDs in parallel with Meta
     const [wcRaw, sfIds, meta] = await Promise.allSettled([
       fetchWooCommerce(cfg, from, to),
@@ -494,15 +469,15 @@ async function fetchOrdersDetail(cfg: Record<string,string>, from: string, to: s
       // Priority: Supabase DB → WP endpoint → WC total
       const cod = dbEntry != null ? dbEntry.cod : (sfCod > 0 ? sfCod : wcCod);
 
-      // Priority: Supabase DB → ৳120 fallback
-      const shippingCharge = cid ? (dbEntry != null ? dbEntry.shipping : DELIVERY_CHARGE) : 0;
-
-      // Priority: Supabase DB (exact) → 1% of COD
-      const codFee = cid ? (dbEntry != null ? dbEntry.cod_fee : Math.round(cod * 0.01)) : 0;
+      // Charges: prefer the Supabase row (from the Steadfast CSV export) even
+      // when no consignment id resolved; fall back to estimates only when the
+      // order actually has a consignment id.
+      const shippingCharge = dbEntry != null ? dbEntry.shipping : (cid ? DELIVERY_CHARGE : 0);
+      const codFee         = dbEntry != null ? dbEntry.cod_fee  : (cid ? Math.round(cod * 0.01) : 0);
 
       // Status: live Steadfast API → Supabase DB snapshot
       const sfStatus   = sfParcel?.status || dbEntry?.status || null;
-      const receivable = cid ? cod - shippingCharge - codFee : 0;
+      const receivable = (dbEntry != null || cid) ? cod - shippingCharge - codFee : 0;
       return {
         id:              o.id,
         customer:        (`${o.billing?.first_name || ""} ${o.billing?.last_name || ""}`).trim() || "Guest",
