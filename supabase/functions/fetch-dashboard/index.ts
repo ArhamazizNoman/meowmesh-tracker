@@ -58,6 +58,31 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Daily job (called by a scheduled workflow): refresh Steadfast delivery
+    // status for recent orders and cache it in steadfast_consignments. Writes
+    // status only — charges/COD from the CSV import are preserved on conflict.
+    if (mode === "sync-steadfast") {
+      const days  = Math.min(120, parseInt(url.searchParams.get("days") || "45") || 45);
+      const start = new Date(bdtNow.getFullYear(), bdtNow.getMonth(), bdtNow.getDate() - days);
+      const fromD = fmtDate(start);
+      const detail = await fetchOrdersDetail(cfg, fromD, todayStr, sb);
+      const rows = detail
+        .filter((o: any) => o.consignment_id && o.sf_status)
+        .map((o: any) => ({ tracking_code: o.consignment_id, wc_order_id: o.id, delivery_status: o.sf_status }));
+      let synced = 0, error: string | null = null;
+      if (rows.length) {
+        const { error: e } = await sb
+          .from("steadfast_consignments")
+          .upsert(rows, { onConflict: "tracking_code" });
+        if (e) error = e.message; else synced = rows.length;
+      }
+      return new Response(JSON.stringify({
+        synced, matched: rows.length, scanned: detail.length,
+        unbooked: detail.filter((o: any) => !o.consignment_id).length,
+        from: fromD, to: todayStr, error,
+      }), { headers: { ...CORS, "Content-Type": "application/json" } });
+    }
+
     // Fetch WC + consignment IDs in parallel with Meta
     const [wcRaw, sfIds, meta] = await Promise.allSettled([
       fetchWooCommerce(cfg, from, to),
