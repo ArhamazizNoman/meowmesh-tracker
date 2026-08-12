@@ -292,8 +292,10 @@ function renderTable(orders) {
   }
 
   body.innerHTML = orders.map(o => {
-    const booked = !!o.consignment_id;
     const sf = sfStatusLabel(o.sf_status);
+    // Show charges whenever Steadfast data exists (status or charges from the
+    // imported CSV), not only when a live consignment id resolved.
+    const hasSfData = !!o.consignment_id || !!o.sf_status || o.shipping_charge > 0 || o.cod_fee > 0;
     return `
     <tr>
       <td><span class="order-id">#${o.id}</span></td>
@@ -303,9 +305,9 @@ function renderTable(orders) {
       <td><span class="pill ${statusPill(o.wc_status)}">${statusLabel(o.wc_status)}</span></td>
       <td>${sf ? `<span class="pill ${sf.cls}">${sf.label}</span>` : '<span class="no-cid">not booked</span>'}</td>
       <td class="right">${tk(o.cod)}</td>
-      <td class="right">${booked ? `<span style="color:#C8553D">${tk(o.shipping_charge)}</span>` : '<span class="no-cid">—</span>'}</td>
-      <td class="right">${booked ? `<span style="color:#926A00">${tk(o.cod_fee)}</span>` : '<span class="no-cid">—</span>'}</td>
-      <td class="right">${booked ? `<span style="color:#4F7060">${tk(o.receivable)}</span>` : '<span class="no-cid">—</span>'}</td>
+      <td class="right">${hasSfData ? `<span style="color:#C8553D">${tk(o.shipping_charge)}</span>` : '<span class="no-cid">—</span>'}</td>
+      <td class="right">${hasSfData ? `<span style="color:#926A00">${tk(o.cod_fee)}</span>` : '<span class="no-cid">—</span>'}</td>
+      <td class="right">${hasSfData ? `<span style="color:#4F7060">${tk(o.receivable)}</span>` : '<span class="no-cid">—</span>'}</td>
     </tr>`;
   }).join("");
 
