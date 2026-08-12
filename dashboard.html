@@ -78,6 +78,20 @@
     .bar-track { height: 6px; background: #F3EADB; border-radius: 999px; overflow: hidden; }
     .bar-fill  { height: 100%; border-radius: 999px; transition: width .4s; }
 
+    /* Graphical order-stage flow */
+    .stage-flow { display: flex; align-items: center; gap: 2px; }
+    .stage-node { flex: 1; text-align: center; padding: 4px 2px; }
+    .stage-icon { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 21px; margin: 0 auto 8px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.04); }
+    .stage-count { font-family: 'Fraunces', serif; font-size: 27px; font-weight: 700; line-height: 1; }
+    .stage-name { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #6B6255; margin-top: 5px; }
+    .stage-amt { font-size: 11px; color: #6B6255; margin-top: 2px; }
+    .stage-conn { flex: 0 0 auto; color: #CBBDA7; font-size: 16px; padding: 0 1px; align-self: flex-start; margin-top: 14px; }
+    .stage-div { flex: 0 0 1px; align-self: stretch; background: #EFE6D6; margin: 6px 4px; }
+    .stage-split { display: flex; height: 9px; border-radius: 999px; overflow: hidden; background: #EEE3D2; margin: 18px 0 9px; }
+    .stage-split > div { height: 100%; transition: width .4s; }
+    .stage-legend { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 10px; font-size: 10.5px; color: #6B6255; }
+    .stage-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+
     /* Divider between major sections */
     .section-gap { margin-bottom: 32px; }
 
@@ -372,19 +386,43 @@ function render(D) {
 
       <!-- Stages -->
       <div class="card">
-        <h3 style="font-size:15px;margin-bottom:14px">Order Stage</h3>
-        <div>
-          ${o.stages.map(s => `
-          <div class="bar-row">
-            <div class="bar-header" style="align-items:center">
-              <span class="pill ${STAGE_PILLS[s.name] || 'pill-amber'}">${s.name}</span>
-              <span style="font-size:12px;color:#6B6255">${s.orders} · ${tk(s.amount)}</span>
-            </div>
-            <div class="bar-track" style="margin-top:5px">
-              <div class="bar-fill" style="width:${pct(s.orders, maxStageCnt)}%;background:${STAGE_COLORS[s.name] || '#E2D6C2'}"></div>
-            </div>
-          </div>`).join("")}
-        </div>
+        <h3 style="font-size:15px;margin-bottom:16px">Order Stage</h3>
+        ${(() => {
+          const byName = Object.fromEntries((o.stages || []).map(s => [s.name, s]));
+          const sum = names => names.reduce((a, n) => {
+            const s = byName[n]; return { orders: a.orders + (s?.orders || 0), amount: a.amount + (s?.amount || 0) };
+          }, { orders: 0, amount: 0 });
+          const proc = sum(["Pending", "Processing", "In Courier"]);
+          const del  = byName["Delivered"] || { orders: 0, amount: 0 };
+          const can  = byName["Cancelled"] || { orders: 0, amount: 0 };
+          const tot  = proc.orders + del.orders + can.orders || 1;
+          const p = n => Math.round(n / tot * 100);
+          const node = (icon, bg, fg, name, s) => `
+            <div class="stage-node">
+              <div class="stage-icon" style="background:${bg};color:${fg}">${icon}</div>
+              <div class="stage-count" style="color:${fg}">${s.orders}</div>
+              <div class="stage-name">${name}</div>
+              <div class="stage-amt">${tk(s.amount)}</div>
+            </div>`;
+          return `
+          <div class="stage-flow">
+            ${node("🧶", "#FBEFD6", "#B7860B", "Processing", proc)}
+            <div class="stage-conn">→</div>
+            ${node("📦", "#E5EFE9", "#3D5C4F", "Delivered", del)}
+            <div class="stage-div"></div>
+            ${node("🚫", "#FAE7E1", "#C8553D", "Cancelled", can)}
+          </div>
+          <div class="stage-split" title="Share of orders by stage">
+            <div style="width:${proc.orders / tot * 100}%;background:#E8A838"></div>
+            <div style="width:${del.orders / tot * 100}%;background:#4F7060"></div>
+            <div style="width:${can.orders / tot * 100}%;background:#C8553D"></div>
+          </div>
+          <div class="stage-legend">
+            <span><i style="background:#E8A838"></i>Processing ${p(proc.orders)}%</span>
+            <span><i style="background:#4F7060"></i>Delivered ${p(del.orders)}%</span>
+            <span><i style="background:#C8553D"></i>Cancelled ${p(can.orders)}%</span>
+          </div>`;
+        })()}
       </div>
     </div>
 
