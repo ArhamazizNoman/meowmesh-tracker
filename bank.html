@@ -96,8 +96,8 @@
     <span class="period-label">Month</span>
     <input type="month" id="p-month" />
     <div class="topbar-right">
-      <input type="file" id="file-input" accept=".csv,text/csv" style="display:none" />
-      <button class="btn-import" onclick="document.getElementById('file-input').click()">⬆ Import statement</button>
+      <input type="file" id="file-input" accept=".csv,.pdf,text/csv,application/pdf" style="display:none" />
+      <button class="btn-import" onclick="document.getElementById('file-input').click()" title="Upload a bank statement — CSV, or a City Bank PDF">⬆ Import statement</button>
       <span class="store-tag store-local" id="store-tag">local</span>
     </div>
   </div>
@@ -253,10 +253,104 @@ function parseCSV(text) {
 // ── File load + mapping UI ───────────────────────────────────────────────────
 document.getElementById('file-input').addEventListener('change', e => {
   const f = e.target.files[0]; if (!f) return;
+  const isPdf = /\.pdf$/i.test(f.name) || f.type === 'application/pdf';
   const reader = new FileReader();
-  reader.onload = () => { openImport(String(reader.result), f.name); e.target.value = ''; };
-  reader.readAsText(f);
+  if (isPdf) {
+    reader.onload = () => { handlePdf(reader.result, f.name); e.target.value = ''; };
+    reader.readAsArrayBuffer(f);
+  } else {
+    reader.onload = () => { openImport(String(reader.result), f.name); e.target.value = ''; };
+    reader.readAsText(f);
+  }
 });
+
+// ── PDF statement import (City Bank / CityTouch format) ──────────────────────
+let pdfjsReady = null;
+function loadPdfJs() {
+  if (pdfjsReady) return pdfjsReady;
+  pdfjsReady = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; resolve(window.pdfjsLib); };
+    s.onerror = () => reject(new Error('Could not load the PDF reader — check your connection and try again.'));
+    document.head.appendChild(s);
+  });
+  return pdfjsReady;
+}
+
+async function handlePdf(buf, name) {
+  let lib;
+  try { lib = await loadPdfJs(); } catch (e) { alert(e.message); return; }
+  let lines;
+  try { lines = await readPdfLines(lib, buf); } catch (e) { alert('Could not read that PDF: ' + e.message); return; }
+  const rows = parseCityBank(lines);
+  if (!rows || !rows.length) {
+    alert('Could not recognize this as a City Bank statement PDF. If it is a different bank, export a CSV and import that instead.');
+    return;
+  }
+  commitRows(rows, { name });
+}
+
+// Reconstruct text lines from a PDF by grouping items on the same y-position.
+async function readPdfLines(lib, buf) {
+  const pdf = await lib.getDocument({ data: buf }).promise;
+  const lines = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const tc = await (await pdf.getPage(p)).getTextContent();
+    const byY = {};
+    for (const it of tc.items) {
+      if (!it.str) continue;
+      const y = Math.round(it.transform[5]);
+      (byY[y] = byY[y] || []).push({ x: it.transform[4], s: it.str });
+    }
+    Object.keys(byY).map(Number).sort((a, b) => b - a).forEach(y => {
+      const line = byY[y].sort((a, b) => a.x - b.x).map(o => o.s).join(' ').replace(/\s+/g, ' ').trim();
+      if (line) lines.push(line);
+    });
+  }
+  return lines;
+}
+
+// Parse the City Bank statement layout. Direction (in/out) is derived exactly
+// from the running balance, so it never depends on guessing from the wording.
+function parseCityBank(lines) {
+  const text = lines.join('\n');
+  const om = text.match(/Opening Balance\s*:\s*([\d,]+\.\d{2})/i);
+  if (!om) return null;
+  let prev = parseFloat(om[1].replace(/,/g, ''));
+  const rre = /^(\d{2})-(\d{2})-(\d{4})\s+(.*?)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})$/;
+  const rows = [];
+  for (const ln of lines) {
+    const m = ln.match(rre);
+    if (!m) continue;
+    const [, dd, mm, yy, desc, amtS, balS] = m;
+    const amt = Math.round(parseFloat(amtS.replace(/,/g, '')));
+    const bal = parseFloat(balS.replace(/,/g, ''));
+    if (!amt) continue;
+    const dir = (bal - prev) > 0 ? 'in' : 'out';
+    prev = bal;
+    const date = `${yy}-${mm}-${dd}`;
+    const d = desc.trim().slice(0, 180);
+    rows.push({ id: hashId([date, dir, amt, d, Math.round(bal)].join('|')), txn_date: date, description: d, direction: dir, amount: amt, balance: Math.round(bal), ref: '' });
+  }
+  return rows;
+}
+
+// Shared: merge new rows (dedupe by id), persist, jump to their month, report.
+async function commitRows(added, opts = {}) {
+  const seen = new Set(txns.map(t => t.id));
+  const fresh = added.filter(t => !seen.has(t.id));
+  txns = txns.concat(fresh);
+  saveLocal();
+  if (cloudOK && fresh.length) await cloudInsertMany(fresh);
+  const months = [...new Set(added.map(t => t.txn_date.slice(0, 7)))].sort();
+  if (months.length && !months.includes(selMonth())) document.getElementById('p-month').value = months[months.length - 1];
+  render();
+  const dupes = added.length - fresh.length;
+  alert(`Imported ${fresh.length} transaction(s)` + (opts.name ? ` from ${opts.name}` : '') + '.'
+    + (opts.skipped ? ` Skipped ${opts.skipped} row(s) with no date/amount.` : '')
+    + (dupes ? ` ${dupes} were already imported.` : ''));
+}
 
 function openImport(text, name) {
   const all = parseCSV(text);
@@ -327,19 +421,8 @@ async function runImport() {
   }
   if (!added.length) { err.textContent = 'No valid rows found with that mapping — check the Date and amount columns.'; return; }
 
-  // merge (dedupe by id), persist
-  const seen = new Set(txns.map(t => t.id));
-  const fresh = added.filter(t => !seen.has(t.id));
-  txns = txns.concat(fresh);
-  saveLocal();
-  if (cloudOK && fresh.length) await cloudInsertMany(fresh);
-
   closeImport();
-  // jump to the month of the imported data if it differs
-  const months = [...new Set(added.map(t => t.txn_date.slice(0,7)))].sort();
-  if (months.length && !months.includes(selMonth())) document.getElementById('p-month').value = months[months.length-1];
-  render();
-  alert(`Imported ${fresh.length} transaction(s).` + (skipped?` Skipped ${skipped} row(s) that had no date/amount.`:'') + (added.length-fresh.length?` ${added.length-fresh.length} were already imported.`:''));
+  commitRows(added, { skipped });
 }
 
 // ── Storage ──────────────────────────────────────────────────────────────────
