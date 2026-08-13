@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MeowMesh — Bank</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: #FBF6EC; color: #23201A; font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+    h1,h2,h3 { font-family: 'Fraunces', serif; margin: 0; }
+    .green { color: #4F7060; } .red { color: #C8553D; } .amber { color: #926A00; }
+
+    .topbar { background: #F3EADB; border-bottom: 1px solid #E2D6C2; }
+    .topbar-inner { max-width: 1100px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .topbar-brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .clay { color: #C8553D; }
+    .nav-links { display: flex; gap: 6px; }
+    .nav-link { font-size: 12px; font-weight: 600; color: #6B6255; padding: 6px 13px; border-radius: 999px; border: 1px solid #E2D6C2; background: #fff; text-decoration: none; }
+    .nav-link.active { background: #23201A; color: #FBF6EC; border-color: #23201A; }
+    .sep { width: 1px; height: 20px; background: #D8CCBA; }
+    .period-label { font-size: 12px; font-weight: 600; color: #6B6255; }
+    #p-month { font-size: 12px; border: 1px solid #E2D6C2; border-radius: 6px; padding: 5px 8px; background: #fff; color: #23201A; outline: none; }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .store-tag { font-size: 9px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+    .store-cloud { background: #EAF1EC; color: #3D5C4F; }
+    .store-local { background: #FBF0E8; color: #A8422F; }
+    .btn-import { all: unset; cursor: pointer; font-size: 12px; font-weight: 700; background: #4F7060; color: #fff; padding: 7px 15px; border-radius: 999px; }
+    .btn-import:hover { background: #3D5C4F; }
+
+    .page { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+    .kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+    .kpi { background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; padding: 14px 16px; border-top: 3px solid; }
+    .kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #6B6255; margin-bottom: 5px; }
+    .kpi-val { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700; line-height: 1.1; }
+    .kpi-sub { font-size: 11px; color: #6B6255; margin-top: 3px; }
+
+    .recon { background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; padding: 12px 18px; margin-bottom: 18px; display: flex; align-items: center; gap: 8px 24px; flex-wrap: wrap; }
+    .recon-item { font-size: 12px; color: #6B6255; }
+    .recon-item b { font-family: 'Fraunces', serif; font-size: 15px; color: #23201A; font-weight: 700; margin-left: 4px; }
+    .recon-note { font-size: 11px; color: #6B6255; margin-left: auto; }
+
+    .table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid #E2D6C2; background: #fff; }
+    table { width: 100%; border-collapse: collapse; min-width: 640px; }
+    thead th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6B6255; padding: 10px 14px; background: #F9F4EE; border-bottom: 1px solid #E2D6C2; text-align: left; white-space: nowrap; }
+    thead th.right { text-align: right; }
+    tbody tr { border-bottom: 1px solid #F0E9DC; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #FAF5EE; }
+    tbody td { padding: 9px 14px; font-size: 13px; vertical-align: middle; }
+    tbody td.right { text-align: right; font-variant-numeric: tabular-nums; }
+    tbody td.amt { font-family: 'Fraunces', serif; font-weight: 600; }
+    .daygroup td { background: #FCF8F1; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #926A00; padding: 5px 14px; }
+    .btn-del { all: unset; cursor: pointer; color: #C8553D; font-size: 15px; padding: 1px 6px; border-radius: 4px; }
+    .btn-del:hover { background: #FEE; }
+    .empty { text-align: center; padding: 40px 20px; color: #6B6255; font-size: 14px; }
+    .empty strong { display: block; font-family: 'Fraunces', serif; font-size: 18px; color: #23201A; margin-bottom: 6px; }
+
+    /* Import modal */
+    #imp-modal { position: fixed; inset: 0; background: rgba(35,32,26,.45); z-index: 50; display: none; align-items: center; justify-content: center; padding: 20px; }
+    #imp-modal.show { display: flex; }
+    .imp-box { background: #fff; border: 1px solid #E2D6C2; border-radius: 16px; width: 640px; max-width: 100%; max-height: 90vh; overflow: auto; padding: 20px 22px; }
+    .imp-box h3 { font-size: 18px; margin-bottom: 4px; }
+    .imp-box p { font-size: 12px; color: #6B6255; margin: 0 0 14px; }
+    .map-grid { display: grid; grid-template-columns: 140px 1fr; gap: 8px 12px; align-items: center; margin-bottom: 14px; }
+    .map-grid label { font-size: 12px; font-weight: 600; color: #23201A; }
+    .map-grid select { font-family: 'DM Sans', sans-serif; font-size: 12px; border: 1px solid #E2D6C2; background: #FBF6EC; border-radius: 8px; padding: 6px 8px; outline: none; width: 100%; }
+    .preview { overflow-x: auto; border: 1px solid #EFE6D6; border-radius: 8px; margin-bottom: 14px; }
+    .preview table { min-width: 0; font-size: 11px; }
+    .preview th, .preview td { padding: 4px 8px; border-bottom: 1px solid #F0E9DC; white-space: nowrap; text-align: left; }
+    .imp-err { font-size: 11px; color: #C8553D; min-height: 14px; margin-bottom: 8px; }
+    .imp-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .imp-btn { all: unset; cursor: pointer; font-size: 13px; font-weight: 700; padding: 9px 18px; border-radius: 9px; }
+    .imp-btn.primary { background: #23201A; color: #FBF6EC; }
+    .imp-btn.primary:hover { background: #4F7060; }
+    .imp-btn.ghost { background: #F3EADB; color: #6B6255; }
+
+    @media (max-width: 640px) { .kpi-strip { grid-template-columns: repeat(2, 1fr); } .map-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-brand"><h1>Meow<span class="clay">Mesh</span></h1></div>
+    <div class="nav-links">
+      <a class="nav-link" href="dashboard.html">Dashboard</a>
+      <a class="nav-link" href="orders.html">Orders</a>
+      <a class="nav-link" href="costs.html">Costs</a>
+      <a class="nav-link" href="operations.html">Daily</a>
+      <a class="nav-link active" href="bank.html">Bank</a>
+    </div>
+    <div class="sep"></div>
+    <span class="period-label">Month</span>
+    <input type="month" id="p-month" />
+    <div class="topbar-right">
+      <input type="file" id="file-input" accept=".csv,text/csv" style="display:none" />
+      <button class="btn-import" onclick="document.getElementById('file-input').click()">⬆ Import statement</button>
+      <span class="store-tag store-local" id="store-tag">local</span>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+
+  <div class="kpi-strip">
+    <div class="kpi" style="border-top-color:#4F7060">
+      <div class="kpi-label">Money In</div>
+      <div class="kpi-val green" id="k-in">৳0</div>
+      <div class="kpi-sub" id="k-in-sub">— credits</div>
+    </div>
+    <div class="kpi" style="border-top-color:#C8553D">
+      <div class="kpi-label">Money Out</div>
+      <div class="kpi-val red" id="k-out">৳0</div>
+      <div class="kpi-sub" id="k-out-sub">— debits</div>
+    </div>
+    <div class="kpi" style="border-top-color:#23201A">
+      <div class="kpi-label">Net Movement</div>
+      <div class="kpi-val" id="k-net">৳0</div>
+      <div class="kpi-sub">in − out</div>
+    </div>
+    <div class="kpi" style="border-top-color:#926A00">
+      <div class="kpi-label">Closing Balance</div>
+      <div class="kpi-val amber" id="k-bal">—</div>
+      <div class="kpi-sub" id="k-bal-sub">last statement balance</div>
+    </div>
+  </div>
+
+  <div class="recon" id="recon" style="display:none">
+    <span class="recon-item">Net bank movement <b id="rc-bank">—</b></span>
+    <span class="recon-item">Steadfast net payout <b id="rc-sf">—</b></span>
+    <span class="recon-item">Difference <b id="rc-diff">—</b></span>
+    <span class="recon-note">Money that landed in the bank vs. what Steadfast paid out this month.</span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th style="width:16%">Date</th>
+        <th>Description</th>
+        <th class="right" style="width:14%">In</th>
+        <th class="right" style="width:14%">Out</th>
+        <th class="right" style="width:16%">Balance</th>
+        <th style="width:5%"></th>
+      </tr></thead>
+      <tbody id="tbody">
+        <tr><td colspan="6" class="empty">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Import modal -->
+<div id="imp-modal">
+  <div class="imp-box">
+    <h3>Import bank statement</h3>
+    <p id="imp-file">Match your statement's columns to the fields below, then import. Duplicate rows are skipped automatically.</p>
+    <div class="preview" id="imp-preview"></div>
+    <div class="map-grid">
+      <label>Date column</label>            <select id="map-date"></select>
+      <label>Description</label>            <select id="map-desc"></select>
+      <label>Money out (Debit)</label>      <select id="map-out"></select>
+      <label>Money in (Credit)</label>      <select id="map-in"></select>
+      <label>Single Amount col</label>      <select id="map-amt"></select>
+      <label>Balance (optional)</label>     <select id="map-bal"></select>
+      <label>Reference (optional)</label>   <select id="map-ref"></select>
+    </div>
+    <p style="font-size:11px;color:#6B6255;margin:-4px 0 8px">
+      Use <b>Debit/Credit</b> columns if your statement has separate money-out and money-in columns.
+      Use <b>Single Amount</b> if it has one signed column (negative = out).
+    </p>
+    <div class="imp-err" id="imp-err"></div>
+    <div class="imp-actions">
+      <button class="imp-btn ghost" onclick="closeImport()">Cancel</button>
+      <button class="imp-btn primary" id="imp-go" onclick="runImport()">Import</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL  = 'https://dicanelropavoaqisebh.supabase.co/functions/v1/fetch-dashboard';
+const API_KEY  = 'sb_publishable_dO4YNs6kZZhzIKQQ2Q8UuQ_BLSe2OaW';
+const SB_URL   = 'https://dicanelropavoaqisebh.supabase.co';
+const SB_ANON  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpY2FuZWxyb3Bhdm9hcWlzZWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5ODExMDYsImV4cCI6MjA5NjU1NzEwNn0.EwDW8At3lgaRN0M3pJr1zwCFyu5jwyX2OwB9JPRgWdE';
+const SB_HDR   = { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}`, 'Content-Type': 'application/json' };
+const LS_KEY   = 'meowmesh-bank-txns';
+const tk = n => '৳' + Math.round(n).toLocaleString('en-IN');
+
+let txns = [];        // all transactions (all months)
+let cloudOK = false;
+let parsed = null;    // { headers:[], rows:[[]] } from the uploaded file
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function todayBD() { return new Date(Date.now() + 6 * 3600000).toISOString().slice(0,10); }
+function currentMonth() { return todayBD().slice(0,7); }
+function selMonth() { return document.getElementById('p-month').value; }
+function inMonth(d, ym) { return (d || '').slice(0,7) === ym; }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function hashId(s) { let h = 5381; for (let i=0;i<s.length;i++) h = ((h<<5)+h) ^ s.charCodeAt(i); return 'b' + (h>>>0).toString(36); }
+
+// parse a money string: "1,200.50", "1200 Dr", "(500)", "৳300" -> number (>=0)
+function money(v) {
+  if (v == null) return NaN;
+  let s = String(v).trim();
+  if (!s) return NaN;
+  const neg = /^\(.*\)$/.test(s) || /(^-)|dr$/i.test(s.replace(/\s/g,''));
+  s = s.replace(/[^0-9.]/g, '');
+  if (!s) return NaN;
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : (neg ? -n : n);
+}
+// parse many date formats -> YYYY-MM-DD
+function parseDate(v) {
+  if (v == null) return null;
+  let s = String(v).trim();
+  if (!s) return null;
+  let m;
+  if ((m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)))   return `${m[1]}-${p2(m[2])}-${p2(m[3])}`;
+  if ((m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/))) { const y = m[3].length===2?'20'+m[3]:m[3]; return `${y}-${p2(m[2])}-${p2(m[1])}`; }
+  const MON = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  if ((m = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[A-Za-z]*[-\s](\d{2,4})/))) {
+    const mo = MON[m[2].toLowerCase()]; const y = m[3].length===2?'20'+m[3]:m[3];
+    if (mo) return `${y}-${p2(mo)}-${p2(m[1])}`;
+  }
+  const d = new Date(s);
+  return isNaN(d) ? null : d.toISOString().slice(0,10);
+}
+function p2(n){ return String(n).padStart(2,'0'); }
+
+// ── CSV parsing ──────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i=0;i<text.length;i++){
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i+1] === '"') { cur+='"'; i++; } else q = false; }
+      else cur += c;
+    } else {
+      if (c === '"') q = true;
+      else if (c === ',') { row.push(cur); cur=''; }
+      else if (c === '\n') { row.push(cur); rows.push(row); row=[]; cur=''; }
+      else if (c === '\r') { /* skip */ }
+      else cur += c;
+    }
+  }
+  if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+  // drop fully-empty rows
+  return rows.filter(r => r.some(c => String(c).trim() !== ''));
+}
+
+// ── File load + mapping UI ───────────────────────────────────────────────────
+document.getElementById('file-input').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => { openImport(String(reader.result), f.name); e.target.value = ''; };
+  reader.readAsText(f);
+});
+
+function openImport(text, name) {
+  const all = parseCSV(text);
+  if (all.length < 2) { alert('Could not read any rows from that file. Make sure it is a CSV export.'); return; }
+  const headers = all[0].map(h => String(h).trim());
+  const rows = all.slice(1);
+  parsed = { headers, rows };
+
+  document.getElementById('imp-file').textContent = `${name} — ${rows.length} rows. Match the columns, then import.`;
+
+  // preview first 3 rows
+  const prev = ['<table><thead><tr>' + headers.map(h=>`<th>${esc(h)}</th>`).join('') + '</tr></thead><tbody>'];
+  rows.slice(0,3).forEach(r => prev.push('<tr>' + headers.map((_,i)=>`<td>${esc(String(r[i]??''))}</td>`).join('') + '</tr>'));
+  prev.push('</tbody></table>');
+  document.getElementById('imp-preview').innerHTML = prev.join('');
+
+  // fill selects
+  const opts = ['<option value="-1">(none)</option>'].concat(headers.map((h,i)=>`<option value="${i}">${esc(h)}</option>`)).join('');
+  ['map-date','map-desc','map-out','map-in','map-amt','map-bal','map-ref'].forEach(id => document.getElementById(id).innerHTML = opts);
+
+  // auto-detect
+  const find = re => headers.findIndex(h => re.test(h));
+  setSel('map-date', find(/date|tarikh/i));
+  setSel('map-desc', find(/desc|narration|particular|details|remark|transaction/i));
+  setSel('map-out',  find(/debit|withdraw|paid ?out|dr\b/i));
+  setSel('map-in',   find(/credit|deposit|paid ?in|cr\b/i));
+  setSel('map-amt',  find(/^amount$|txn amount|transaction amount/i));
+  setSel('map-bal',  find(/balance/i));
+  setSel('map-ref',  find(/ref|cheque|utr|trx|trans.*id/i));
+
+  document.getElementById('imp-err').textContent = '';
+  document.getElementById('imp-modal').classList.add('show');
+}
+function setSel(id, idx) { if (idx != null && idx >= 0) document.getElementById(id).value = String(idx); }
+function closeImport() { document.getElementById('imp-modal').classList.remove('show'); parsed = null; }
+
+async function runImport() {
+  if (!parsed) return;
+  const gi = id => parseInt(document.getElementById(id).value);
+  const di = gi('map-date'), de = gi('map-desc'), oi = gi('map-out'), ii = gi('map-in'),
+        ai = gi('map-amt'), bi = gi('map-bal'), ri = gi('map-ref');
+  const err = document.getElementById('imp-err');
+  if (di < 0) { err.textContent = 'Pick the Date column.'; return; }
+  if (oi < 0 && ii < 0 && ai < 0) { err.textContent = 'Pick either Debit + Credit columns, or a single Amount column.'; return; }
+
+  const added = [];
+  let skipped = 0;
+  for (const r of parsed.rows) {
+    const date = parseDate(r[di]);
+    if (!date) { skipped++; continue; }
+    let direction = null, amount = NaN;
+    if (ai >= 0 && String(r[ai]??'').trim() !== '') {
+      const v = money(r[ai]);
+      if (!isNaN(v) && v !== 0) { direction = v < 0 ? 'out' : 'in'; amount = Math.abs(v); }
+    }
+    if (direction == null) {
+      const out = oi >= 0 ? money(r[oi]) : NaN;
+      const inn = ii >= 0 ? money(r[ii]) : NaN;
+      if (!isNaN(out) && out !== 0) { direction = 'out'; amount = Math.abs(out); }
+      else if (!isNaN(inn) && inn !== 0) { direction = 'in'; amount = Math.abs(inn); }
+    }
+    if (direction == null || !amount) { skipped++; continue; }
+    const desc = de >= 0 ? String(r[de]??'').trim() : '';
+    const bal  = bi >= 0 ? money(r[bi]) : NaN;
+    const ref  = ri >= 0 ? String(r[ri]??'').trim() : '';
+    const id = hashId([date, direction, Math.round(amount), desc, isNaN(bal)?'':Math.round(bal)].join('|'));
+    added.push({ id, txn_date: date, description: desc, direction, amount: Math.round(amount), balance: isNaN(bal)?null:Math.round(bal), ref });
+  }
+  if (!added.length) { err.textContent = 'No valid rows found with that mapping — check the Date and amount columns.'; return; }
+
+  // merge (dedupe by id), persist
+  const seen = new Set(txns.map(t => t.id));
+  const fresh = added.filter(t => !seen.has(t.id));
+  txns = txns.concat(fresh);
+  saveLocal();
+  if (cloudOK && fresh.length) await cloudInsertMany(fresh);
+
+  closeImport();
+  // jump to the month of the imported data if it differs
+  const months = [...new Set(added.map(t => t.txn_date.slice(0,7)))].sort();
+  if (months.length && !months.includes(selMonth())) document.getElementById('p-month').value = months[months.length-1];
+  render();
+  alert(`Imported ${fresh.length} transaction(s).` + (skipped?` Skipped ${skipped} row(s) that had no date/amount.`:'') + (added.length-fresh.length?` ${added.length-fresh.length} were already imported.`:''));
+}
+
+// ── Storage ──────────────────────────────────────────────────────────────────
+function saveLocal() { localStorage.setItem(LS_KEY, JSON.stringify(txns)); }
+function loadLocal() { try { txns = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch(_) { txns = []; } }
+
+async function loadCloud() {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/bank_transactions?select=id,txn_date,description,direction,amount,balance,ref&order=txn_date.desc`, {
+      headers: { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}` }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const cloud = await res.json();
+    cloudOK = true;
+    const cloudIds = new Set(cloud.map(t => t.id));
+    const localOnly = txns.filter(t => !cloudIds.has(t.id));
+    if (localOnly.length) await cloudInsertMany(localOnly);
+    txns = [...cloud, ...localOnly];
+    saveLocal();
+  } catch(_) {
+    cloudOK = false;
+    loadLocal();
+  }
+  setStoreTag();
+}
+function setStoreTag() {
+  const t = document.getElementById('store-tag');
+  if (cloudOK) { t.textContent = 'cloud synced'; t.className = 'store-tag store-cloud'; }
+  else         { t.textContent = 'saved on this device'; t.className = 'store-tag store-local'; }
+}
+async function cloudInsertMany(list) {
+  try {
+    await fetch(`${SB_URL}/rest/v1/bank_transactions`, {
+      method: 'POST', headers: { ...SB_HDR, 'Prefer': 'return=minimal,resolution=merge-duplicates' },
+      body: JSON.stringify(list),
+    });
+  } catch(_) {}
+}
+async function cloudDelete(id) {
+  if (!cloudOK) return;
+  try { await fetch(`${SB_URL}/rest/v1/bank_transactions?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: SB_HDR }); } catch(_) {}
+}
+
+function removeTxn(id) {
+  txns = txns.filter(t => t.id !== id);
+  saveLocal();
+  cloudDelete(id);
+  render();
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const ym = selMonth();
+  const list = txns.filter(t => inMonth(t.txn_date, ym))
+                   .sort((a,b) => b.txn_date.localeCompare(a.txn_date) || (b.id > a.id ? 1 : -1));
+  const moneyIn  = list.filter(t => t.direction === 'in').reduce((s,t) => s + t.amount, 0);
+  const moneyOut = list.filter(t => t.direction === 'out').reduce((s,t) => s + t.amount, 0);
+  const net = moneyIn - moneyOut;
+  const inCount = list.filter(t => t.direction === 'in').length;
+  const outCount = list.filter(t => t.direction === 'out').length;
+
+  document.getElementById('k-in').textContent  = tk(moneyIn);
+  document.getElementById('k-in-sub').textContent  = `${inCount} credit${inCount===1?'':'s'}`;
+  document.getElementById('k-out').textContent = tk(moneyOut);
+  document.getElementById('k-out-sub').textContent = `${outCount} debit${outCount===1?'':'s'}`;
+  const netEl = document.getElementById('k-net');
+  netEl.textContent = tk(net);
+  netEl.className = 'kpi-val ' + (net >= 0 ? 'green' : 'red');
+
+  // closing balance = balance of the most recent txn that has one
+  const withBal = list.filter(t => t.balance != null);
+  const closing = withBal.length ? withBal[0].balance : null;
+  document.getElementById('k-bal').textContent = closing != null ? tk(closing) : '—';
+
+  renderTable(list);
+  renderRecon(net);
+}
+
+function renderTable(list) {
+  const tb = document.getElementById('tbody');
+  if (!list.length) {
+    tb.innerHTML = `<tr><td colspan="6" class="empty"><strong>No bank transactions this month</strong>Click “Import statement” to upload your bank's CSV export.</td></tr>`;
+    return;
+  }
+  const byDate = {};
+  list.forEach(t => (byDate[t.txn_date] = byDate[t.txn_date] || []).push(t));
+  const dates = Object.keys(byDate).sort((a,b) => b.localeCompare(a));
+  let html = '';
+  for (const d of dates) {
+    const dObj = new Date(d + 'T00:00:00');
+    html += `<tr class="daygroup"><td colspan="6">${dObj.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</td></tr>`;
+    for (const t of byDate[d]) {
+      const isIn = t.direction === 'in';
+      html += `<tr>
+        <td class="muted" style="color:#6B6255;font-size:12px">${t.txn_date}</td>
+        <td>${t.description ? esc(t.description) : '<span style="color:#B8A48A">—</span>'}${t.ref ? `<span style="color:#B8A48A;font-size:11px"> · ${esc(t.ref)}</span>`:''}</td>
+        <td class="right amt green">${isIn ? '+'+tk(t.amount) : ''}</td>
+        <td class="right amt red">${!isIn ? '−'+tk(t.amount) : ''}</td>
+        <td class="right" style="color:#6B6255">${t.balance != null ? tk(t.balance) : ''}</td>
+        <td class="right"><button class="btn-del" title="Delete" onclick="removeTxn('${t.id}')">×</button></td>
+      </tr>`;
+    }
+  }
+  tb.innerHTML = html;
+}
+
+// ── Reconciliation vs Steadfast net payout ───────────────────────────────────
+async function renderRecon(netBank) {
+  const box = document.getElementById('recon');
+  document.getElementById('rc-bank').textContent = tk(netBank);
+  document.getElementById('rc-bank').className = netBank >= 0 ? 'green' : 'red';
+  try {
+    const ym = selMonth();
+    const [y,m] = ym.split('-').map(Number);
+    const from = `${ym}-01`;
+    const to = todayBD() < `${ym}-28` ? todayBD() : `${ym}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
+    const res = await fetch(`${API_URL}?from=${from}&to=${to}`, { headers: { Authorization: `Bearer ${API_KEY}` } });
+    if (!res.ok) throw new Error();
+    const d = await res.json();
+    const sfNet = Math.round(d.steadfast?.payout?.netInHand || 0);
+    box.style.display = 'flex';
+    document.getElementById('rc-sf').textContent = tk(sfNet);
+    const diff = netBank - sfNet;
+    const de = document.getElementById('rc-diff');
+    de.textContent = (diff >= 0 ? '+' : '−') + tk(Math.abs(diff));
+    de.className = Math.abs(diff) < 1 ? 'green' : 'amber';
+  } catch(_) {
+    // keep the bank figure; hide the SF comparison if unavailable
+    document.getElementById('rc-sf').textContent = '—';
+    document.getElementById('rc-diff').textContent = '—';
+    box.style.display = 'flex';
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+document.getElementById('p-month').value = currentMonth();
+document.getElementById('p-month').addEventListener('change', render);
+document.getElementById('imp-modal').addEventListener('click', e => { if (e.target.id === 'imp-modal') closeImport(); });
+
+(async () => {
+  loadLocal();
+  render();
+  await loadCloud();
+  render();
+})();
+</script>
+</body>
+</html>
