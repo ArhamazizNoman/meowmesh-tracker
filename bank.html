@@ -74,6 +74,11 @@
     .cat-select { font-family: 'DM Sans', sans-serif; font-size: 11px; border: 1px solid #E2D6C2; background: #FBF6EC; color: #23201A; border-radius: 6px; padding: 3px 6px; outline: none; max-width: 130px; }
     .cat-select:focus { border-color: #C8553D; background: #fff; }
     .drag-dot { color: #C9BBA6; cursor: grab; font-size: 13px; margin-right: 4px; }
+    .spend-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; margin: 4px 2px 5px; }
+    .spend-track { display: flex; height: 13px; border-radius: 999px; overflow: hidden; background: #EEE3D2; }
+    .spend-track > div { height: 100%; }
+    .spend-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 10.5px; color: #6B6255; margin-top: 7px; }
+    .spend-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
 
     /* Import modal */
     #imp-modal { position: fixed; inset: 0; background: rgba(35,32,26,.45); z-index: 50; display: none; align-items: center; justify-content: center; padding: 20px; }
@@ -157,6 +162,7 @@
   <div class="cat-boxes" id="cat-boxes-in"></div>
   <div class="cat-sub-head" style="margin-top:12px"><span style="color:#C8553D">▼</span> Expense</div>
   <div class="cat-boxes" id="cat-boxes-out"></div>
+  <div id="spend-bar" style="margin:2px 2px 18px"></div>
 
   <div class="table-wrap">
     <table>
@@ -392,6 +398,7 @@ async function commitRows(added, opts = {}) {
   if (cloudOK && fresh.length) await cloudInsertMany(fresh);
   const months = [...new Set(added.map(t => t.txn_date.slice(0, 7)))].sort();
   if (months.length && !months.includes(selMonth())) document.getElementById('p-month').value = months[months.length - 1];
+  defaultToUnfiled();
   render();
   const dupes = added.length - fresh.length;
   alert(`Imported ${fresh.length} transaction(s)` + (opts.name ? ` from ${opts.name}` : '') + '.'
@@ -568,6 +575,7 @@ function render() {
   document.getElementById('k-bal').textContent = closing != null ? tk(closing) : '—';
 
   renderCatBoxes(list);
+  renderSpendBar(list);
   const shown =
       catFilter === ''         ? list
     : catFilter === '__unc_in' ? list.filter(t => t.direction === 'in'  && !t.category)
@@ -603,6 +611,32 @@ function renderCatBoxes(list) {
   let outHtml = EXPENSE_CATS.map(c => box(c.name, c.name, c.color, sums[c.name]||0, counts[c.name]||0)).join('');
   outHtml += box('Unfiled expense', '__unc_out', '#C9BBA6', uncOutAmt, uncOutCount);
   document.getElementById('cat-boxes-out').innerHTML = outHtml;
+}
+
+// "Where the money went": expense buckets as a share of the month's total spend.
+function renderSpendBar(list) {
+  const wrap = document.getElementById('spend-bar');
+  const outs = list.filter(t => t.direction === 'out');
+  const total = outs.reduce((s, t) => s + t.amount, 0);
+  if (!total) { wrap.innerHTML = ''; return; }
+  const sums = {}; let unc = 0;
+  outs.forEach(t => { if (t.category) sums[t.category] = (sums[t.category]||0) + t.amount; else unc += t.amount; });
+  const used = EXPENSE_CATS.filter(c => sums[c.name]);
+  const pct = a => Math.round(a / total * 100);
+  const segs = used.map(c => `<div style="width:${sums[c.name]/total*100}%;background:${c.color}" title="${esc(c.name)}: ${tk(sums[c.name])}"></div>`).join('')
+             + (unc ? `<div style="width:${unc/total*100}%;background:#DDD3C4" title="Unfiled: ${tk(unc)}"></div>` : '');
+  const legend = used.map(c => `<span><i style="background:${c.color}"></i>${esc(c.name)} ${pct(sums[c.name])}%</span>`).join('')
+              + (unc ? `<span><i style="background:#DDD3C4"></i>Unfiled ${pct(unc)}%</span>` : '');
+  wrap.innerHTML = `<div class="spend-head">Where the money went — ${tk(total)} spent</div>
+    <div class="spend-track">${segs}</div><div class="spend-legend">${legend}</div>`;
+}
+
+// Land on the month's unfiled items so they're easy to clear; falls back to All.
+function defaultToUnfiled() {
+  const month = txns.filter(t => inMonth(t.txn_date, selMonth()));
+  if (month.some(t => t.direction === 'out' && !t.category)) catFilter = '__unc_out';
+  else if (month.some(t => t.direction === 'in' && !t.category)) catFilter = '__unc_in';
+  else catFilter = '';
 }
 
 function toggleFilter(cat) { catFilter = (catFilter === cat) ? '' : cat; render(); }
@@ -697,13 +731,14 @@ async function renderRecon(netBank) {
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 document.getElementById('p-month').value = currentMonth();
-document.getElementById('p-month').addEventListener('change', render);
+document.getElementById('p-month').addEventListener('change', () => { defaultToUnfiled(); render(); });
 document.getElementById('imp-modal').addEventListener('click', e => { if (e.target.id === 'imp-modal') closeImport(); });
 
 (async () => {
   loadLocal();
   render();
   await loadCloud();
+  defaultToUnfiled();
   render();
 })();
 </script>
