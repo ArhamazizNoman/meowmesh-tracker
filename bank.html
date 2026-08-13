@@ -58,6 +58,22 @@
     .empty { text-align: center; padding: 40px 20px; color: #6B6255; font-size: 14px; }
     .empty strong { display: block; font-family: 'Fraunces', serif; font-size: 18px; color: #23201A; margin-bottom: 6px; }
 
+    /* Category buckets */
+    .cat-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; margin: 2px 2px 8px; }
+    .cat-boxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
+    .cat-box { background: #fff; border: 1px solid #E2D6C2; border-radius: 12px; padding: 10px 12px; border-left: 4px solid #9A8C98; cursor: pointer; transition: box-shadow .12s, background .12s; }
+    .cat-box:hover { background: #FAF5EE; }
+    .cat-box.active { box-shadow: 0 0 0 2px #23201A inset; }
+    .cat-box.drop-hover { background: #EAF1EC; box-shadow: 0 0 0 2px #4F7060 inset; }
+    .cat-box .cb-name { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6B6255; }
+    .cat-box .cb-amt { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; margin-top: 3px; }
+    .cat-box .cb-sub { font-size: 10px; color: #6B6255; margin-top: 1px; }
+    tbody tr[draggable="true"] { cursor: grab; }
+    tbody tr.dragging { opacity: .4; }
+    .cat-select { font-family: 'DM Sans', sans-serif; font-size: 11px; border: 1px solid #E2D6C2; background: #FBF6EC; color: #23201A; border-radius: 6px; padding: 3px 6px; outline: none; max-width: 130px; }
+    .cat-select:focus { border-color: #C8553D; background: #fff; }
+    .drag-dot { color: #C9BBA6; cursor: grab; font-size: 13px; margin-right: 4px; }
+
     /* Import modal */
     #imp-modal { position: fixed; inset: 0; background: rgba(35,32,26,.45); z-index: 50; display: none; align-items: center; justify-content: center; padding: 20px; }
     #imp-modal.show { display: flex; }
@@ -135,18 +151,22 @@
     <span class="recon-note">Money that landed in the bank vs. what Steadfast paid out this month.</span>
   </div>
 
+  <div class="cat-head">Cost buckets <span style="font-weight:400;text-transform:none;letter-spacing:0">— drag a transaction onto a box, or use the tag menu on each row. Click a box to filter.</span></div>
+  <div class="cat-boxes" id="cat-boxes"></div>
+
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th style="width:16%">Date</th>
+        <th style="width:15%">Date</th>
         <th>Description</th>
-        <th class="right" style="width:14%">In</th>
-        <th class="right" style="width:14%">Out</th>
-        <th class="right" style="width:16%">Balance</th>
-        <th style="width:5%"></th>
+        <th style="width:18%">Bucket</th>
+        <th class="right" style="width:13%">In</th>
+        <th class="right" style="width:13%">Out</th>
+        <th class="right" style="width:14%">Balance</th>
+        <th style="width:4%"></th>
       </tr></thead>
       <tbody id="tbody">
-        <tr><td colspan="6" class="empty">Loading…</td></tr>
+        <tr><td colspan="7" class="empty">Loading…</td></tr>
       </tbody>
     </table>
   </div>
@@ -188,7 +208,24 @@ const SB_HDR   = { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}`, 'Con
 const LS_KEY   = 'meowmesh-bank-txns';
 const tk = n => '৳' + Math.round(n).toLocaleString('en-IN');
 
+// Cost buckets a transaction can be filed into. name -> colour.
+const CATEGORIES = [
+  { name: 'Manufacturing', color: '#C8553D' },
+  { name: 'Salary',        color: '#8A6BA8' },
+  { name: 'Marketing',     color: '#E0A458' },
+  { name: 'Inventory',     color: '#B08968' },
+  { name: 'Delivery',      color: '#3E7CB1' },
+  { name: 'Rent & Bills',  color: '#5B8C7B' },
+  { name: 'Owner draw',    color: '#926A00' },
+  { name: 'Fees',          color: '#9CA3AF' },
+  { name: 'Sales income',  color: '#4F7060' },
+  { name: 'Other',         color: '#9A8C98' },
+];
+const catColor = c => (CATEGORIES.find(x => x.name === c) || {}).color || '#C9BBA6';
+
 let txns = [];        // all transactions (all months)
+let catFilter = '';   // '' = all; or a category name; or '__unc' for uncategorized
+let dragId = null;    // id of the transaction being dragged
 let cloudOK = false;
 let parsed = null;    // { headers:[], rows:[[]] } from the uploaded file
 
@@ -431,16 +468,25 @@ function loadLocal() { try { txns = JSON.parse(localStorage.getItem(LS_KEY) || '
 
 async function loadCloud() {
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/bank_transactions?select=id,txn_date,description,direction,amount,balance,ref&order=txn_date.desc`, {
+    // select=* so a missing "category" column (before its migration is run) never 400s
+    const res = await fetch(`${SB_URL}/rest/v1/bank_transactions?select=*&order=txn_date.desc`, {
       headers: { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}` }
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const cloud = await res.json();
     cloudOK = true;
+    const localById = Object.fromEntries(txns.map(t => [t.id, t]));
     const cloudIds = new Set(cloud.map(t => t.id));
     const localOnly = txns.filter(t => !cloudIds.has(t.id));
     if (localOnly.length) await cloudInsertMany(localOnly);
-    txns = [...cloud, ...localOnly];
+    // Merge: keep a locally-set category if the cloud row doesn't have one yet,
+    // and push that category up so it syncs after the category migration is run.
+    txns = cloud.map(c => {
+      const localCat = localById[c.id] && localById[c.id].category;
+      const category = c.category || localCat || '';
+      if (!c.category && localCat) cloudUpdate(c.id, { category: localCat });
+      return { ...c, category };
+    }).concat(localOnly);
     saveLocal();
   } catch(_) {
     cloudOK = false;
@@ -464,6 +510,20 @@ async function cloudInsertMany(list) {
 async function cloudDelete(id) {
   if (!cloudOK) return;
   try { await fetch(`${SB_URL}/rest/v1/bank_transactions?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: SB_HDR }); } catch(_) {}
+}
+async function cloudUpdate(id, patch) {
+  if (!cloudOK) return;
+  try { await fetch(`${SB_URL}/rest/v1/bank_transactions?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: { ...SB_HDR, 'Prefer': 'return=minimal' }, body: JSON.stringify(patch) }); } catch(_) {}
+}
+
+// Assign a transaction to a cost bucket ('' clears it)
+function assignCat(id, cat) {
+  const t = txns.find(x => x.id === id);
+  if (!t) return;
+  t.category = cat || '';
+  saveLocal();
+  cloudUpdate(id, { category: t.category });
+  render();
 }
 
 function removeTxn(id) {
@@ -497,14 +557,61 @@ function render() {
   const closing = withBal.length ? withBal[0].balance : null;
   document.getElementById('k-bal').textContent = closing != null ? tk(closing) : '—';
 
-  renderTable(list);
+  renderCatBoxes(list);
+  const shown = catFilter === '' ? list
+    : catFilter === '__unc' ? list.filter(t => !t.category)
+    : list.filter(t => t.category === catFilter);
+  renderTable(shown);
   renderRecon(net);
+}
+
+// Cost-bucket tiles: totals per category for the month, drop targets + filter.
+function renderCatBoxes(list) {
+  const wrap = document.getElementById('cat-boxes');
+  const sums = {}; const counts = {};
+  let uncAmt = 0, uncCount = 0;
+  list.forEach(t => {
+    if (t.category) { sums[t.category] = (sums[t.category]||0) + t.amount; counts[t.category] = (counts[t.category]||0)+1; }
+    else { uncAmt += t.amount; uncCount++; }
+  });
+  const box = (name, cat, color, amt, count) => `
+    <div class="cat-box ${catFilter===cat?'active':''}" style="border-left-color:${color}"
+         data-cat="${cat}" onclick="toggleFilter('${cat}')"
+         ondragover="event.preventDefault();this.classList.add('drop-hover')"
+         ondragleave="this.classList.remove('drop-hover')"
+         ondrop="onDrop(event,'${cat==='__unc'?'':cat}')">
+      <div class="cb-name">${esc(name)}</div>
+      <div class="cb-amt" style="color:${color}">${amt?tk(amt):'৳0'}</div>
+      <div class="cb-sub">${count} txn${count===1?'':'s'}${catFilter===cat?' · filtering':''}</div>
+    </div>`;
+  let html = CATEGORIES.map(c => box(c.name, c.name, c.color, sums[c.name]||0, counts[c.name]||0)).join('');
+  html += box('Uncategorized', '__unc', '#C9BBA6', uncAmt, uncCount);
+  wrap.innerHTML = html;
+}
+
+function toggleFilter(cat) { catFilter = (catFilter === cat) ? '' : cat; render(); }
+
+function onDrop(ev, cat) {
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drop-hover');
+  const id = dragId || (ev.dataTransfer && ev.dataTransfer.getData('text/plain'));
+  if (id) assignCat(id, cat);
+  dragId = null;
+}
+function onDragStart(ev, id) { dragId = id; ev.dataTransfer.setData('text/plain', id); ev.dataTransfer.effectAllowed = 'move'; ev.currentTarget.classList.add('dragging'); }
+function onDragEnd(ev) { ev.currentTarget.classList.remove('dragging'); dragId = null; }
+
+function catOptions(sel) {
+  return ['<option value="">— bucket —</option>']
+    .concat(CATEGORIES.map(c => `<option value="${c.name}"${c.name===sel?' selected':''}>${c.name}</option>`))
+    .join('');
 }
 
 function renderTable(list) {
   const tb = document.getElementById('tbody');
   if (!list.length) {
-    tb.innerHTML = `<tr><td colspan="6" class="empty"><strong>No bank transactions this month</strong>Click “Import statement” to upload your bank's CSV export.</td></tr>`;
+    const msg = catFilter ? 'No transactions in this bucket for the month.' : "Click “Import statement” to upload your bank's CSV or PDF.";
+    tb.innerHTML = `<tr><td colspan="7" class="empty"><strong>Nothing to show</strong>${msg}</td></tr>`;
     return;
   }
   const byDate = {};
@@ -513,12 +620,13 @@ function renderTable(list) {
   let html = '';
   for (const d of dates) {
     const dObj = new Date(d + 'T00:00:00');
-    html += `<tr class="daygroup"><td colspan="6">${dObj.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</td></tr>`;
+    html += `<tr class="daygroup"><td colspan="7">${dObj.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</td></tr>`;
     for (const t of byDate[d]) {
       const isIn = t.direction === 'in';
-      html += `<tr>
-        <td class="muted" style="color:#6B6255;font-size:12px">${t.txn_date}</td>
+      html += `<tr draggable="true" ondragstart="onDragStart(event,'${t.id}')" ondragend="onDragEnd(event)">
+        <td class="muted" style="color:#6B6255;font-size:12px"><span class="drag-dot" title="Drag onto a bucket">⠿</span>${t.txn_date}</td>
         <td>${t.description ? esc(t.description) : '<span style="color:#B8A48A">—</span>'}${t.ref ? `<span style="color:#B8A48A;font-size:11px"> · ${esc(t.ref)}</span>`:''}</td>
+        <td><select class="cat-select" onchange="assignCat('${t.id}', this.value)" style="border-left:3px solid ${t.category?catColor(t.category):'#E2D6C2'}">${catOptions(t.category||'')}</select></td>
         <td class="right amt green">${isIn ? '+'+tk(t.amount) : ''}</td>
         <td class="right amt red">${!isIn ? '−'+tk(t.amount) : ''}</td>
         <td class="right" style="color:#6B6255">${t.balance != null ? tk(t.balance) : ''}</td>
