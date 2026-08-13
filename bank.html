@@ -60,6 +60,7 @@
 
     /* Category buckets */
     .cat-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; margin: 2px 2px 8px; }
+    .cat-sub-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; margin: 0 2px 6px; }
     .cat-boxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
     .cat-box { background: #fff; border: 1px solid #E2D6C2; border-radius: 12px; padding: 10px 12px; border-left: 4px solid #9A8C98; cursor: pointer; transition: box-shadow .12s, background .12s; }
     .cat-box:hover { background: #FAF5EE; }
@@ -151,8 +152,11 @@
     <span class="recon-note">Money that landed in the bank vs. what Steadfast paid out this month.</span>
   </div>
 
-  <div class="cat-head">Cost buckets <span style="font-weight:400;text-transform:none;letter-spacing:0">— drag a transaction onto a box, or use the tag menu on each row. Click a box to filter.</span></div>
-  <div class="cat-boxes" id="cat-boxes"></div>
+  <div class="cat-head">Buckets <span style="font-weight:400;text-transform:none;letter-spacing:0">— drag a transaction onto a box, or use the tag menu on each row. Click a box to filter.</span></div>
+  <div class="cat-sub-head"><span style="color:#4F7060">▲</span> Income</div>
+  <div class="cat-boxes" id="cat-boxes-in"></div>
+  <div class="cat-sub-head" style="margin-top:12px"><span style="color:#C8553D">▼</span> Expense</div>
+  <div class="cat-boxes" id="cat-boxes-out"></div>
 
   <div class="table-wrap">
     <table>
@@ -208,20 +212,26 @@ const SB_HDR   = { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}`, 'Con
 const LS_KEY   = 'meowmesh-bank-txns';
 const tk = n => '৳' + Math.round(n).toLocaleString('en-IN');
 
-// Cost buckets a transaction can be filed into. name -> colour.
-const CATEGORIES = [
+// Buckets, split into income (for credits) and expense (for debits).
+const INCOME_CATS = [
+  { name: 'Sales income',  color: '#4F7060' },
+  { name: 'Owner deposit', color: '#6B9AB8' },
+  { name: 'Other income',  color: '#5B8C7B' },
+];
+const EXPENSE_CATS = [
   { name: 'Manufacturing', color: '#C8553D' },
   { name: 'Salary',        color: '#8A6BA8' },
   { name: 'Marketing',     color: '#E0A458' },
   { name: 'Inventory',     color: '#B08968' },
   { name: 'Delivery',      color: '#3E7CB1' },
-  { name: 'Rent & Bills',  color: '#5B8C7B' },
+  { name: 'Rent & Bills',  color: '#7A9E8E' },
   { name: 'Owner draw',    color: '#926A00' },
   { name: 'Fees',          color: '#9CA3AF' },
-  { name: 'Sales income',  color: '#4F7060' },
   { name: 'Other',         color: '#9A8C98' },
 ];
-const catColor = c => (CATEGORIES.find(x => x.name === c) || {}).color || '#C9BBA6';
+const ALL_CATS = [...INCOME_CATS, ...EXPENSE_CATS];
+const catColor = c => (ALL_CATS.find(x => x.name === c) || {}).color || '#C9BBA6';
+const catsFor = dir => dir === 'in' ? INCOME_CATS : EXPENSE_CATS;
 
 let txns = [];        // all transactions (all months)
 let catFilter = '';   // '' = all; or a category name; or '__unc' for uncategorized
@@ -558,52 +568,72 @@ function render() {
   document.getElementById('k-bal').textContent = closing != null ? tk(closing) : '—';
 
   renderCatBoxes(list);
-  const shown = catFilter === '' ? list
-    : catFilter === '__unc' ? list.filter(t => !t.category)
-    : list.filter(t => t.category === catFilter);
+  const shown =
+      catFilter === ''         ? list
+    : catFilter === '__unc_in' ? list.filter(t => t.direction === 'in'  && !t.category)
+    : catFilter === '__unc_out'? list.filter(t => t.direction === 'out' && !t.category)
+    :                            list.filter(t => t.category === catFilter);
   renderTable(shown);
   renderRecon(net);
 }
 
-// Cost-bucket tiles: totals per category for the month, drop targets + filter.
+// Income boxes (from credits) and Expense boxes (from debits): totals + drop + filter.
 function renderCatBoxes(list) {
-  const wrap = document.getElementById('cat-boxes');
-  const sums = {}; const counts = {};
-  let uncAmt = 0, uncCount = 0;
+  const sums = {}, counts = {};
+  let uncInAmt = 0, uncInCount = 0, uncOutAmt = 0, uncOutCount = 0;
   list.forEach(t => {
     if (t.category) { sums[t.category] = (sums[t.category]||0) + t.amount; counts[t.category] = (counts[t.category]||0)+1; }
-    else { uncAmt += t.amount; uncCount++; }
+    else if (t.direction === 'in') { uncInAmt += t.amount; uncInCount++; }
+    else { uncOutAmt += t.amount; uncOutCount++; }
   });
   const box = (name, cat, color, amt, count) => `
     <div class="cat-box ${catFilter===cat?'active':''}" style="border-left-color:${color}"
          data-cat="${cat}" onclick="toggleFilter('${cat}')"
          ondragover="event.preventDefault();this.classList.add('drop-hover')"
          ondragleave="this.classList.remove('drop-hover')"
-         ondrop="onDrop(event,'${cat==='__unc'?'':cat}')">
+         ondrop="onDrop(event,'${cat.startsWith('__unc')?'':cat}')">
       <div class="cb-name">${esc(name)}</div>
       <div class="cb-amt" style="color:${color}">${amt?tk(amt):'৳0'}</div>
       <div class="cb-sub">${count} txn${count===1?'':'s'}${catFilter===cat?' · filtering':''}</div>
     </div>`;
-  let html = CATEGORIES.map(c => box(c.name, c.name, c.color, sums[c.name]||0, counts[c.name]||0)).join('');
-  html += box('Uncategorized', '__unc', '#C9BBA6', uncAmt, uncCount);
-  wrap.innerHTML = html;
+  let inHtml = INCOME_CATS.map(c => box(c.name, c.name, c.color, sums[c.name]||0, counts[c.name]||0)).join('');
+  inHtml += box('Unfiled income', '__unc_in', '#C9BBA6', uncInAmt, uncInCount);
+  document.getElementById('cat-boxes-in').innerHTML = inHtml;
+
+  let outHtml = EXPENSE_CATS.map(c => box(c.name, c.name, c.color, sums[c.name]||0, counts[c.name]||0)).join('');
+  outHtml += box('Unfiled expense', '__unc_out', '#C9BBA6', uncOutAmt, uncOutCount);
+  document.getElementById('cat-boxes-out').innerHTML = outHtml;
 }
 
 function toggleFilter(cat) { catFilter = (catFilter === cat) ? '' : cat; render(); }
+
+// A drop onto an income box only accepts credits; an expense box only debits.
+function catValidFor(cat, dir) {
+  if (!cat) return true;
+  return dir === 'in' ? INCOME_CATS.some(c => c.name === cat) : EXPENSE_CATS.some(c => c.name === cat);
+}
 
 function onDrop(ev, cat) {
   ev.preventDefault();
   ev.currentTarget.classList.remove('drop-hover');
   const id = dragId || (ev.dataTransfer && ev.dataTransfer.getData('text/plain'));
-  if (id) assignCat(id, cat);
+  if (id) {
+    const t = txns.find(x => x.id === id);
+    if (cat && t && !catValidFor(cat, t.direction)) {
+      alert(`“${cat}” is ${INCOME_CATS.some(c=>c.name===cat)?'an income':'an expense'} bucket — this is a ${t.direction === 'in' ? 'credit (money in)' : 'debit (money out)'}.`);
+    } else {
+      assignCat(id, cat);
+    }
+  }
   dragId = null;
 }
 function onDragStart(ev, id) { dragId = id; ev.dataTransfer.setData('text/plain', id); ev.dataTransfer.effectAllowed = 'move'; ev.currentTarget.classList.add('dragging'); }
 function onDragEnd(ev) { ev.currentTarget.classList.remove('dragging'); dragId = null; }
 
-function catOptions(sel) {
+// Dropdown shows only the buckets that match the transaction's direction.
+function catOptions(sel, dir) {
   return ['<option value="">— bucket —</option>']
-    .concat(CATEGORIES.map(c => `<option value="${c.name}"${c.name===sel?' selected':''}>${c.name}</option>`))
+    .concat(catsFor(dir).map(c => `<option value="${c.name}"${c.name===sel?' selected':''}>${c.name}</option>`))
     .join('');
 }
 
@@ -626,7 +656,7 @@ function renderTable(list) {
       html += `<tr draggable="true" ondragstart="onDragStart(event,'${t.id}')" ondragend="onDragEnd(event)">
         <td class="muted" style="color:#6B6255;font-size:12px"><span class="drag-dot" title="Drag onto a bucket">⠿</span>${t.txn_date}</td>
         <td>${t.description ? esc(t.description) : '<span style="color:#B8A48A">—</span>'}${t.ref ? `<span style="color:#B8A48A;font-size:11px"> · ${esc(t.ref)}</span>`:''}</td>
-        <td><select class="cat-select" onchange="assignCat('${t.id}', this.value)" style="border-left:3px solid ${t.category?catColor(t.category):'#E2D6C2'}">${catOptions(t.category||'')}</select></td>
+        <td><select class="cat-select" onchange="assignCat('${t.id}', this.value)" style="border-left:3px solid ${t.category?catColor(t.category):'#E2D6C2'}">${catOptions(t.category||'', t.direction)}</select></td>
         <td class="right amt green">${isIn ? '+'+tk(t.amount) : ''}</td>
         <td class="right amt red">${!isIn ? '−'+tk(t.amount) : ''}</td>
         <td class="right" style="color:#6B6255">${t.balance != null ? tk(t.balance) : ''}</td>
