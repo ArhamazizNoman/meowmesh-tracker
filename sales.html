@@ -269,15 +269,22 @@ async function load() {
   document.getElementById('tbody').innerHTML = `<tr><td colspan="7" class="state">Loading…</td></tr>`;
   document.getElementById('tfoot').innerHTML = '';
   try {
-    const res = await fetch(`${API_URL}?mode=daily&from=${from}&to=${to}`, { headers: { Authorization: `Bearer ${API_KEY}` } });
+    const res = await fetch(`${API_URL}?mode=daily&from=${from}&to=${to}`, {
+      headers: { Authorization: `Bearer ${API_KEY}` },
+      signal: AbortSignal.timeout(45000),
+    });
     if (!res.ok) throw new Error('API ' + res.status);
     const d = await res.json();
-    render(d.days || []);
+    if (!Array.isArray(d.days)) throw new Error('unexpected response');
+    render(d.days);
     st.textContent = '✓';
     loadPrev(ym).catch(() => {});
   } catch (e) {
     st.textContent = 'Error';
-    document.getElementById('tbody').innerHTML = `<tr><td colspan="7" class="state">Couldn't load sales — ${e.message}. The dashboard API may be unreachable; try again.</td></tr>`;
+    const msg = (e.name === 'TimeoutError')
+      ? 'The request took too long and timed out. Tap the month to retry.'
+      : `Couldn't load sales — ${e.message}. The API may be unreachable; try again.`;
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="7" class="state">${msg}</td></tr>`;
   }
 }
 
