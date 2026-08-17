@@ -146,7 +146,7 @@ async function wcFetchAllPages(url: string, hdrs: Record<string,string>): Promis
   const all: any[] = [];
   let page = 1;
   while (true) {
-    const res = await fetch(`${url}&page=${page}`, { headers: hdrs });
+    const res = await fetch(`${url}&page=${page}`, { headers: hdrs, signal: AbortSignal.timeout(20000) });
     if (!res.ok) { if (page === 1) throw new Error(`WooCommerce ${res.status}`); break; }
     const batch = parseWpJson(await res.text());
     if (!Array.isArray(batch) || batch.length === 0) break;
@@ -562,7 +562,8 @@ async function fetchMetaDaily({ metaToken, metaAccountId }: Record<string,string
   const url = `https://graph.facebook.com/v19.0/act_${metaAccountId}/insights`
     + `?fields=spend&level=account&time_increment=1&time_range=${timeRange}`
     + `&access_token=${encodeURIComponent(metaToken)}`;
-  const res = await fetch(url);
+  // Hard timeout so a slow/hanging Meta response can never stall the whole request.
+  const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
   if (!res.ok) return {} as Record<string, number>;
   const d = await res.json();
   const map: Record<string, number> = {};
