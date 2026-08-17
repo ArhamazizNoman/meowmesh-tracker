@@ -33,6 +33,15 @@
     .kpi-sub { font-size: 11px; color: #6B6255; margin-top: 3px; }
     .kpi-sub.delta { font-weight: 600; margin-top: 2px; }
 
+    .charts { display: grid; grid-template-columns: 1.7fr 1fr; gap: 14px; margin-bottom: 18px; }
+    .chart-card { background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; padding: 14px 16px; }
+    .chart-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #6B6255; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .chart-legend { font-size: 10.5px; color: #6B6255; font-weight: 400; text-transform: none; letter-spacing: 0; }
+    .chart-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin: 0 4px 0 10px; vertical-align: middle; }
+    .chart-legend i.line { width: 12px; height: 3px; border-radius: 2px; }
+    .chart-x { display: flex; justify-content: space-between; font-size: 9px; color: #9B9286; margin-top: 5px; }
+    @media (max-width: 720px) { .charts { grid-template-columns: 1fr; } }
+
     .table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid #E2D6C2; background: #fff; }
     table { width: 100%; border-collapse: collapse; min-width: 720px; }
     thead th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6B6255; padding: 11px 14px; background: #F9F4EE; border-bottom: 1px solid #E2D6C2; text-align: left; white-space: nowrap; }
@@ -110,6 +119,25 @@
     </div>
   </div>
 
+  <div class="charts">
+    <div class="chart-card">
+      <div class="chart-title">
+        <span>Daily sales &amp; ad spend</span>
+        <span class="chart-legend"><i style="background:#C8553D"></i>Sales <i class="line" style="background:#E8A838"></i>Ad spend</span>
+      </div>
+      <div id="chart-sales"></div>
+      <div class="chart-x" id="chart-sales-x"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">
+        <span>ROAS by day</span>
+        <span class="chart-legend"><i class="line" style="background:#6B9AB8"></i>ROAS · ⋯ 1×</span>
+      </div>
+      <div id="chart-roas"></div>
+      <div class="chart-x" id="chart-roas-x"></div>
+    </div>
+  </div>
+
   <div class="table-wrap">
     <table>
       <thead><tr>
@@ -148,6 +176,50 @@ function fmtDay(d) {
   return { dow: dt.toLocaleDateString('en-GB', { weekday:'short' }), day: dt.toLocaleDateString('en-GB', { day:'numeric', month:'short' }) };
 }
 const roasColor = r => r == null ? '' : (r >= 3 ? 'green' : r >= 1.5 ? 'amber' : 'red');
+
+// ── Inline-SVG charts ─────────────────────────────────────────────────────────
+function svgSalesSpend(series) {
+  const W = 600, H = 168, n = series.length || 1;
+  const maxY = Math.max(1, ...series.map(s => Math.max(s.sales, s.spendBdt)));
+  const xc = i => (i + 0.5) * (W / n);
+  const yy = v => H - (v / maxY) * (H - 6);
+  const bw = Math.max(1.5, (W / n) * 0.6);
+  const bars = series.map((s, i) => {
+    const by = yy(s.sales);
+    return `<rect x="${(xc(i)-bw/2).toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${(H-by).toFixed(1)}" fill="#C8553D"><title>${s.date}: ${tk(s.sales)} sales</title></rect>`;
+  }).join('');
+  const line = `<polyline points="${series.map((s,i)=>`${xc(i).toFixed(1)},${yy(s.spendBdt).toFixed(1)}`).join(' ')}" fill="none" stroke="#E8A838" stroke-width="2.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="168" preserveAspectRatio="none" style="display:block">${bars}${line}</svg>`;
+}
+function svgRoas(series) {
+  const pts = series.map((s, i) => ({ i, r: s.roas })).filter(p => p.r != null);
+  if (!pts.length) return '<div style="font-size:11px;color:#9B9286;padding:66px 0;text-align:center">No ad-spend days to chart.</div>';
+  const W = 320, H = 168, n = series.length || 1;
+  const maxR = Math.max(2, ...pts.map(p => p.r));
+  const xc = i => (i + 0.5) * (W / n);
+  const yy = r => H - (r / maxR) * (H - 6);
+  const ref = `<line x1="0" y1="${yy(1).toFixed(1)}" x2="${W}" y2="${yy(1).toFixed(1)}" stroke="#DDD3C4" stroke-width="1" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>`;
+  const line = `<polyline points="${pts.map(p=>`${xc(p.i).toFixed(1)},${yy(p.r).toFixed(1)}`).join(' ')}" fill="none" stroke="#6B9AB8" stroke-width="2.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="168" preserveAspectRatio="none" style="display:block">${ref}${line}</svg>`;
+}
+function renderCharts(rows) {
+  const ym = document.getElementById('p-month').value;
+  const { from, to } = monthRange(ym);
+  const byDate = {}; rows.forEach(r => byDate[r.date] = r);
+  const series = []; let cur = from;
+  while (cur <= to) {
+    series.push(byDate[cur] || { date: cur, sales: 0, spendBdt: 0, roas: null });
+    const d = new Date(cur + 'T00:00:00'); d.setDate(d.getDate() + 1); cur = d.toISOString().slice(0, 10);
+  }
+  document.getElementById('chart-sales').innerHTML = svgSalesSpend(series);
+  document.getElementById('chart-roas').innerHTML = svgRoas(series);
+  const dnum = s => parseInt(s.date.slice(8));
+  const first = series[0], mid = series[Math.floor(series.length/2)], last = series[series.length-1];
+  const mon = new Date(last.date + 'T00:00:00').toLocaleDateString('en-GB', { month:'short' });
+  const xlab = `<span>${dnum(first)}</span><span>${dnum(mid)}</span><span>${dnum(last)} ${mon}</span>`;
+  document.getElementById('chart-sales-x').innerHTML = xlab;
+  document.getElementById('chart-roas-x').innerHTML = xlab;
+}
 
 let curT = null; // current-month totals, for the vs-last-month comparison
 
@@ -228,6 +300,8 @@ function render(days) {
   const activeSalesDays = active.filter(r => r.sales > 0).length;
   const maxSales = Math.max(1, ...active.map(r => r.sales));
   const bestDay = active.reduce((b,r) => r.sales > (b?.sales||0) ? r : b, null);
+
+  renderCharts(rows);
 
   document.getElementById('k-sales').textContent = tk(totSales);
   document.getElementById('k-sales-sub').textContent = `${totOrders} order${totOrders===1?'':'s'} · ${totItems} items`;
