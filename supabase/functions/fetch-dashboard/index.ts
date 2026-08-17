@@ -58,6 +58,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Day-by-day sales breakdown for the range (one row per day).
+    if (mode === "daily") {
+      const [wcRaw, metaDaily] = await Promise.allSettled([
+        fetchWooCommerce(cfg, from, to),
+        fetchMetaDaily(cfg, from, to),
+      ]);
+      const orders     = wcRaw.status === "fulfilled" ? wcRaw.value.orders : [];
+      const spendByDay = metaDaily.status === "fulfilled" ? metaDaily.value : {};
+      const days = buildDailyBreakdown(orders, spendByDay);
+      return new Response(JSON.stringify({ days, from, to }), {
+        headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
+
     // Fetch WC + consignment IDs in parallel with Meta
     const [wcRaw, sfIds, meta] = await Promise.allSettled([
       fetchWooCommerce(cfg, from, to),
@@ -538,6 +552,51 @@ async function fetchMeta({ metaToken, metaAccountId }: Record<string,string>, fr
       .filter((c:any)=>c.spend>0)
       .sort((a:any,b:any)=>b.spend-a.spend),
   };
+}
+
+// ── Daily sales breakdown (mode=daily) ────────────────────────────────────────
+
+// Meta ad spend per day (USD), keyed by YYYY-MM-DD.
+async function fetchMetaDaily({ metaToken, metaAccountId }: Record<string,string>, from: string, to: string) {
+  const timeRange = encodeURIComponent(JSON.stringify({ since: from, until: to }));
+  const url = `https://graph.facebook.com/v19.0/act_${metaAccountId}/insights`
+    + `?fields=spend&level=account&time_increment=1&time_range=${timeRange}`
+    + `&access_token=${encodeURIComponent(metaToken)}`;
+  const res = await fetch(url);
+  if (!res.ok) return {} as Record<string, number>;
+  const d = await res.json();
+  const map: Record<string, number> = {};
+  for (const row of (d.data || [])) {
+    if (row.date_start) map[row.date_start] = parseFloat(row.spend || "0") || 0;
+  }
+  return map;
+}
+
+// One row per day: orders, items, sales (non-cancelled), cancelled count, ad spend (USD).
+function buildDailyBreakdown(orders: any[], spendByDay: Record<string, number>) {
+  const map: Record<string, { date:string, orders:number, items:number, sales:number, cancelled:number }> = {};
+  const ensure = (d: string) => (map[d] = map[d] || { date:d, orders:0, items:0, sales:0, cancelled:0 });
+
+  for (const o of orders) {
+    const gmt = o.date_created_gmt || o.date_created || "";
+    if (!gmt) continue;
+    const utcMs = new Date(gmt.endsWith("Z") ? gmt : gmt + "Z").getTime();
+    const bdt = new Date(utcMs + 6 * 3600000);
+    const dk = `${bdt.getUTCFullYear()}-${String(bdt.getUTCMonth()+1).padStart(2,"0")}-${String(bdt.getUTCDate()).padStart(2,"0")}`;
+    const row = ensure(dk);
+    if (mapStage(o.status) === "Cancelled") { row.cancelled++; continue; }
+    row.orders++;
+    for (const it of (o.line_items || [])) {
+      row.sales += parseFloat(it.total) || 0;
+      row.items += it.quantity || 0;
+    }
+  }
+
+  const dates = new Set<string>([...Object.keys(map), ...Object.keys(spendByDay)]);
+  return [...dates].sort().map(d => {
+    const r = map[d] || { date:d, orders:0, items:0, sales:0, cancelled:0 };
+    return { date:d, orders:r.orders, items:r.items, sales:Math.round(r.sales), cancelled:r.cancelled, spendUsd: spendByDay[d] || 0 };
+  });
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

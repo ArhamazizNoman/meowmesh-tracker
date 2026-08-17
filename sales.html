@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MeowMesh — Daily Sales</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: #FBF6EC; color: #23201A; font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+    h1,h2,h3 { font-family: 'Fraunces', serif; margin: 0; }
+    .green { color: #4F7060; } .red { color: #C8553D; } .amber { color: #926A00; }
+
+    .topbar { background: #F3EADB; border-bottom: 1px solid #E2D6C2; }
+    .topbar-inner { max-width: 1100px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .topbar-brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .clay { color: #C8553D; }
+    .nav-links { display: flex; gap: 6px; flex-wrap: wrap; }
+    .nav-link { font-size: 12px; font-weight: 600; color: #6B6255; padding: 6px 13px; border-radius: 999px; border: 1px solid #E2D6C2; background: #fff; text-decoration: none; }
+    .nav-link.active { background: #23201A; color: #FBF6EC; border-color: #23201A; }
+    .sep { width: 1px; height: 20px; background: #D8CCBA; }
+    .period-label { font-size: 12px; font-weight: 600; color: #6B6255; }
+    #p-month { font-size: 12px; border: 1px solid #E2D6C2; border-radius: 6px; padding: 5px 8px; background: #fff; color: #23201A; outline: none; }
+    #status { font-size: 11px; color: #6B6255; margin-left: auto; }
+
+    .page { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+    .kpi-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px; }
+    .kpi { background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; padding: 13px 15px; border-top: 3px solid; }
+    .kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; margin-bottom: 4px; }
+    .kpi-val { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700; line-height: 1.1; }
+    .kpi-sub { font-size: 11px; color: #6B6255; margin-top: 3px; }
+
+    .table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid #E2D6C2; background: #fff; }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; }
+    thead th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6B6255; padding: 11px 14px; background: #F9F4EE; border-bottom: 1px solid #E2D6C2; text-align: left; white-space: nowrap; }
+    thead th.right { text-align: right; }
+    tbody tr { border-bottom: 1px solid #F0E9DC; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #FAF5EE; }
+    tbody td { padding: 10px 14px; font-size: 13px; vertical-align: middle; }
+    tbody td.right { text-align: right; font-variant-numeric: tabular-nums; }
+    tbody td.sales { font-family: 'Fraunces', serif; font-size: 14px; font-weight: 600; }
+    .daylabel { font-weight: 600; }
+    .dow { color: #9B9286; font-size: 11px; }
+    .bar { height: 5px; background: #F0E9DC; border-radius: 999px; overflow: hidden; margin-top: 4px; }
+    .bar > div { height: 100%; background: #C8553D; border-radius: 999px; }
+    .pill { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; }
+    .pill-best { background: #EAF1EC; color: #3D6B4F; }
+    tfoot td { padding: 11px 14px; font-size: 13px; font-weight: 700; background: #F9F4EE; border-top: 2px solid #E2D6C2; }
+    tfoot td.right { text-align: right; font-family: 'Fraunces', serif; font-size: 14px; }
+    .state { text-align: center; padding: 44px 20px; color: #6B6255; font-size: 14px; }
+
+    @media (max-width: 720px) { .kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-brand"><h1>Meow<span class="clay">Mesh</span></h1></div>
+    <div class="nav-links">
+      <a class="nav-link" href="dashboard.html">Dashboard</a>
+      <a class="nav-link" href="orders.html">Orders</a>
+      <a class="nav-link" href="costs.html">Costs</a>
+      <a class="nav-link" href="operations.html">Daily</a>
+      <a class="nav-link" href="bank.html">Bank</a>
+      <a class="nav-link active" href="sales.html">Sales</a>
+    </div>
+    <div class="sep"></div>
+    <span class="period-label">Month</span>
+    <input type="month" id="p-month" />
+    <span id="status"></span>
+  </div>
+</div>
+
+<div class="page">
+
+  <div class="kpi-strip">
+    <div class="kpi" style="border-top-color:#C8553D">
+      <div class="kpi-label">Total Sales</div>
+      <div class="kpi-val" id="k-sales">—</div>
+      <div class="kpi-sub" id="k-sales-sub">— orders</div>
+    </div>
+    <div class="kpi" style="border-top-color:#E8A838">
+      <div class="kpi-label">Ad Spend</div>
+      <div class="kpi-val amber" id="k-spend">—</div>
+      <div class="kpi-sub" id="k-spend-sub">Meta ads</div>
+    </div>
+    <div class="kpi" style="border-top-color:#6B9AB8">
+      <div class="kpi-label">ROAS</div>
+      <div class="kpi-val" id="k-roas">—</div>
+      <div class="kpi-sub">sales ÷ spend</div>
+    </div>
+    <div class="kpi" style="border-top-color:#4F7060">
+      <div class="kpi-label">Net After Spend</div>
+      <div class="kpi-val" id="k-net">—</div>
+      <div class="kpi-sub">sales − ad spend</div>
+    </div>
+    <div class="kpi" style="border-top-color:#926A00">
+      <div class="kpi-label">Avg / Day</div>
+      <div class="kpi-val" id="k-avg">—</div>
+      <div class="kpi-sub" id="k-avg-sub">active days</div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th style="width:20%">Day</th>
+        <th class="right">Orders</th>
+        <th class="right">Items</th>
+        <th class="right" style="width:22%">Sales</th>
+        <th class="right">Ad Spend</th>
+        <th class="right">ROAS</th>
+        <th class="right">Net</th>
+      </tr></thead>
+      <tbody id="tbody"><tr><td colspan="7" class="state">Loading…</td></tr></tbody>
+      <tfoot id="tfoot"></tfoot>
+    </table>
+  </div>
+</div>
+
+<script>
+const API_URL = 'https://dicanelropavoaqisebh.supabase.co/functions/v1/fetch-dashboard';
+const API_KEY = 'sb_publishable_dO4YNs6kZZhzIKQQ2Q8UuQ_BLSe2OaW';
+const BDT_PER_USD = 140;
+const tk = n => '৳' + Math.round(n).toLocaleString('en-IN');
+
+function todayBD() { return new Date(Date.now() + 6 * 3600000).toISOString().slice(0,10); }
+function currentMonth() { return todayBD().slice(0,7); }
+function monthRange(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  let to = `${ym}-${String(lastDay).padStart(2,'0')}`;
+  const t = todayBD();
+  if (to > t) to = t;
+  return { from: `${ym}-01`, to };
+}
+function fmtDay(d) {
+  const dt = new Date(d + 'T00:00:00');
+  return { dow: dt.toLocaleDateString('en-GB', { weekday:'short' }), day: dt.toLocaleDateString('en-GB', { day:'numeric', month:'short' }) };
+}
+const roasColor = r => r == null ? '' : (r >= 3 ? 'green' : r >= 1.5 ? 'amber' : 'red');
+
+async function load() {
+  const ym = document.getElementById('p-month').value;
+  const { from, to } = monthRange(ym);
+  const st = document.getElementById('status');
+  st.textContent = 'Loading…';
+  document.getElementById('tbody').innerHTML = `<tr><td colspan="7" class="state">Loading…</td></tr>`;
+  document.getElementById('tfoot').innerHTML = '';
+  try {
+    const res = await fetch(`${API_URL}?mode=daily&from=${from}&to=${to}`, { headers: { Authorization: `Bearer ${API_KEY}` } });
+    if (!res.ok) throw new Error('API ' + res.status);
+    const d = await res.json();
+    render(d.days || []);
+    st.textContent = '✓';
+  } catch (e) {
+    st.textContent = 'Error';
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="7" class="state">Couldn't load sales — ${e.message}. The dashboard API may be unreachable; try again.</td></tr>`;
+  }
+}
+
+function render(days) {
+  // enrich with BDT spend / roas / net
+  const rows = days.map(r => {
+    const spendBdt = Math.round((r.spendUsd || 0) * BDT_PER_USD);
+    const roas = spendBdt > 0 ? r.sales / spendBdt : null;
+    return { ...r, spendBdt, roas, net: r.sales - spendBdt };
+  });
+  const active = rows.filter(r => r.sales > 0 || r.orders > 0 || r.spendBdt > 0);
+
+  const totSales = active.reduce((s,r) => s + r.sales, 0);
+  const totSpend = active.reduce((s,r) => s + r.spendBdt, 0);
+  const totOrders = active.reduce((s,r) => s + r.orders, 0);
+  const totItems = active.reduce((s,r) => s + r.items, 0);
+  const totRoas = totSpend > 0 ? totSales / totSpend : null;
+  const activeSalesDays = active.filter(r => r.sales > 0).length;
+  const maxSales = Math.max(1, ...active.map(r => r.sales));
+  const bestDay = active.reduce((b,r) => r.sales > (b?.sales||0) ? r : b, null);
+
+  document.getElementById('k-sales').textContent = tk(totSales);
+  document.getElementById('k-sales-sub').textContent = `${totOrders} order${totOrders===1?'':'s'} · ${totItems} items`;
+  document.getElementById('k-spend').textContent = tk(totSpend);
+  document.getElementById('k-roas').textContent = totRoas != null ? totRoas.toFixed(2) + 'x' : '—';
+  document.getElementById('k-roas').className = 'kpi-val ' + roasColor(totRoas);
+  const net = totSales - totSpend;
+  document.getElementById('k-net').textContent = tk(net);
+  document.getElementById('k-net').className = 'kpi-val ' + (net >= 0 ? 'green' : 'red');
+  document.getElementById('k-avg').textContent = activeSalesDays ? tk(totSales / activeSalesDays) : '৳0';
+  document.getElementById('k-avg-sub').textContent = `${activeSalesDays} selling day${activeSalesDays===1?'':'s'}`;
+
+  const tb = document.getElementById('tbody');
+  if (!active.length) {
+    tb.innerHTML = `<tr><td colspan="7" class="state">No sales recorded this month yet.</td></tr>`;
+    document.getElementById('tfoot').innerHTML = '';
+    return;
+  }
+  // newest first
+  active.sort((a,b) => b.date.localeCompare(a.date));
+  tb.innerHTML = active.map(r => {
+    const f = fmtDay(r.date);
+    const isBest = bestDay && r.date === bestDay.date && r.sales > 0;
+    return `<tr>
+      <td><span class="daylabel">${f.day}</span> <span class="dow">${f.dow}</span>${isBest?' <span class="pill pill-best">Best</span>':''}</td>
+      <td class="right">${r.orders || '—'}</td>
+      <td class="right">${r.items || '—'}</td>
+      <td class="right sales">${r.sales ? tk(r.sales) : '—'}<div class="bar"><div style="width:${Math.round(r.sales/maxSales*100)}%"></div></div></td>
+      <td class="right amber">${r.spendBdt ? tk(r.spendBdt) : '—'}</td>
+      <td class="right ${roasColor(r.roas)}">${r.roas != null ? r.roas.toFixed(2)+'x' : '—'}</td>
+      <td class="right ${r.net>=0?'green':'red'}">${(r.sales||r.spendBdt) ? tk(r.net) : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tfoot').innerHTML = `<tr>
+    <td>Month total · ${activeSalesDays} selling days</td>
+    <td class="right">${totOrders}</td>
+    <td class="right">${totItems}</td>
+    <td class="right">${tk(totSales)}</td>
+    <td class="right">${tk(totSpend)}</td>
+    <td class="right">${totRoas != null ? totRoas.toFixed(2)+'x' : '—'}</td>
+    <td class="right ${net>=0?'green':'red'}">${tk(net)}</td>
+  </tr>`;
+}
+
+document.getElementById('p-month').value = currentMonth();
+document.getElementById('p-month').addEventListener('change', load);
+load();
+</script>
+</body>
+</html>
