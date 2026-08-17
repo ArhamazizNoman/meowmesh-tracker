@@ -31,6 +31,7 @@
     .kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; margin-bottom: 4px; }
     .kpi-val { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700; line-height: 1.1; }
     .kpi-sub { font-size: 11px; color: #6B6255; margin-top: 3px; }
+    .kpi-sub.delta { font-weight: 600; margin-top: 2px; }
 
     .table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid #E2D6C2; background: #fff; }
     table { width: 100%; border-collapse: collapse; min-width: 720px; }
@@ -82,21 +83,25 @@
       <div class="kpi-label">Total Sales</div>
       <div class="kpi-val" id="k-sales">—</div>
       <div class="kpi-sub" id="k-sales-sub">— orders</div>
+      <div class="kpi-sub delta" id="d-sales"></div>
     </div>
     <div class="kpi" style="border-top-color:#E8A838">
       <div class="kpi-label">Ad Spend</div>
       <div class="kpi-val amber" id="k-spend">—</div>
       <div class="kpi-sub" id="k-spend-sub">Meta ads</div>
+      <div class="kpi-sub delta" id="d-spend"></div>
     </div>
     <div class="kpi" style="border-top-color:#6B9AB8">
       <div class="kpi-label">ROAS</div>
       <div class="kpi-val" id="k-roas">—</div>
       <div class="kpi-sub">sales ÷ spend</div>
+      <div class="kpi-sub delta" id="d-roas"></div>
     </div>
     <div class="kpi" style="border-top-color:#4F7060">
       <div class="kpi-label">Net After Spend</div>
       <div class="kpi-val" id="k-net">—</div>
       <div class="kpi-sub">sales − ad spend</div>
+      <div class="kpi-sub delta" id="d-net"></div>
     </div>
     <div class="kpi" style="border-top-color:#926A00">
       <div class="kpi-label">Avg / Day</div>
@@ -144,6 +149,46 @@ function fmtDay(d) {
 }
 const roasColor = r => r == null ? '' : (r >= 3 ? 'green' : r >= 1.5 ? 'amber' : 'red');
 
+let curT = null; // current-month totals, for the vs-last-month comparison
+
+function prevMonthYm(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+// higherGood: true = up is good (green), false = up is bad, null = neutral (amber)
+function setDelta(id, cur, prev, higherGood = true) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (prev == null || cur == null) { el.textContent = ''; return; }
+  if (prev === 0) { el.textContent = cur > 0 ? 'new vs last mo' : ''; el.style.color = '#4F7060'; return; }
+  const p = Math.round((cur - prev) / prev * 100);
+  const up = p >= 0;
+  el.textContent = `${up ? '▲' : '▼'} ${Math.abs(p)}% vs last mo`;
+  el.style.color = higherGood == null ? '#926A00'
+    : p === 0 ? '#6B6255'
+    : ((higherGood ? up : !up) ? '#4F7060' : '#C8553D');
+}
+
+async function loadPrev(ym) {
+  const p = prevMonthYm(ym);
+  const [y, m] = p.split('-').map(Number);
+  const from = `${p}-01`, to = `${p}-${String(new Date(y, m, 0).getDate()).padStart(2,'0')}`;
+  try {
+    const res = await fetch(`${API_URL}?mode=daily&from=${from}&to=${to}`, { headers: { Authorization: `Bearer ${API_KEY}` } });
+    if (!res.ok) return;
+    const d = await res.json();
+    const sales = (d.days||[]).reduce((s,r) => s + (r.sales||0), 0);
+    const spend = Math.round((d.days||[]).reduce((s,r) => s + (r.spendUsd||0), 0) * BDT_PER_USD);
+    const prev = { sales, spend, net: sales - spend, roas: spend > 0 ? sales/spend : null };
+    if (!curT) return;
+    setDelta('d-sales', curT.sales, prev.sales, true);
+    setDelta('d-spend', curT.spend, prev.spend, null);
+    setDelta('d-roas',  curT.roas,  prev.roas,  true);
+    setDelta('d-net',   curT.net,   prev.net,   true);
+  } catch(_) {}
+}
+
 async function load() {
   const ym = document.getElementById('p-month').value;
   const { from, to } = monthRange(ym);
@@ -157,6 +202,7 @@ async function load() {
     const d = await res.json();
     render(d.days || []);
     st.textContent = '✓';
+    loadPrev(ym).catch(() => {});
   } catch (e) {
     st.textContent = 'Error';
     document.getElementById('tbody').innerHTML = `<tr><td colspan="7" class="state">Couldn't load sales — ${e.message}. The dashboard API may be unreachable; try again.</td></tr>`;
@@ -177,6 +223,8 @@ function render(days) {
   const totOrders = active.reduce((s,r) => s + r.orders, 0);
   const totItems = active.reduce((s,r) => s + r.items, 0);
   const totRoas = totSpend > 0 ? totSales / totSpend : null;
+  curT = { sales: totSales, spend: totSpend, net: totSales - totSpend, roas: totRoas };
+  ['d-sales','d-spend','d-roas','d-net'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
   const activeSalesDays = active.filter(r => r.sales > 0).length;
   const maxSales = Math.max(1, ...active.map(r => r.sales));
   const bestDay = active.reduce((b,r) => r.sales > (b?.sales||0) ? r : b, null);
