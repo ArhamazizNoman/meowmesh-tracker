@@ -58,15 +58,26 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Day-by-day sales breakdown for the range (one row per day).
+    // Day-by-day sales breakdown for the range (one row per day), cached in
+    // daily_stats so only recent/missing days hit WooCommerce + Meta.
     if (mode === "daily") {
-      const [wcRaw, metaDaily] = await Promise.allSettled([
-        fetchWooCommerce(cfg, from, to),
-        fetchMetaDaily(cfg, from, to),
-      ]);
-      const orders     = wcRaw.status === "fulfilled" ? wcRaw.value.orders : [];
-      const spendByDay = metaDaily.status === "fulfilled" ? metaDaily.value : {};
-      const days = buildDailyBreakdown(orders, spendByDay);
+      let days;
+      try {
+        days = await getDailyBreakdownCached(cfg, sb, from, to, todayStr);
+      } catch (_) {
+        // Fallback: fully live (no cache) so the page still works if the table
+        // migration hasn't been run or anything above fails.
+        const [wcRaw, metaDaily] = await Promise.allSettled([
+          fetchWooCommerce(cfg, from, to),
+          fetchMetaDaily(cfg, from, to),
+        ]);
+        const agg = aggregateWcByDay(wcRaw.status === "fulfilled" ? wcRaw.value.orders : []);
+        const spend = metaDaily.status === "fulfilled" ? metaDaily.value : {};
+        days = [...eachDate(from, to)].map(d => {
+          const w = agg[d] || { orders:0, items:0, sales:0, cancelled:0 };
+          return { date:d, orders:w.orders, items:w.items, sales:w.sales, cancelled:w.cancelled, spendUsd: spend[d] || 0 };
+        });
+      }
       return new Response(JSON.stringify({ days, from, to }), {
         headers: { ...CORS, "Content-Type": "application/json" },
       });
@@ -563,7 +574,7 @@ async function fetchMetaDaily({ metaToken, metaAccountId }: Record<string,string
     + `?fields=spend&level=account&time_increment=1&time_range=${timeRange}`
     + `&access_token=${encodeURIComponent(metaToken)}`;
   // Hard timeout so a slow/hanging Meta response can never stall the whole request.
-  const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!res.ok) return {} as Record<string, number>;
   const d = await res.json();
   const map: Record<string, number> = {};
@@ -573,30 +584,74 @@ async function fetchMetaDaily({ metaToken, metaAccountId }: Record<string,string
   return map;
 }
 
-// One row per day: orders, items, sales (non-cancelled), cancelled count, ad spend (USD).
-function buildDailyBreakdown(orders: any[], spendByDay: Record<string, number>) {
-  const map: Record<string, { date:string, orders:number, items:number, sales:number, cancelled:number }> = {};
-  const ensure = (d: string) => (map[d] = map[d] || { date:d, orders:0, items:0, sales:0, cancelled:0 });
-
+// Aggregate WooCommerce orders into per-day {orders, items, sales, cancelled}.
+function aggregateWcByDay(orders: any[]) {
+  const map: Record<string, { orders:number, items:number, sales:number, cancelled:number }> = {};
   for (const o of orders) {
     const gmt = o.date_created_gmt || o.date_created || "";
     if (!gmt) continue;
     const utcMs = new Date(gmt.endsWith("Z") ? gmt : gmt + "Z").getTime();
     const bdt = new Date(utcMs + 6 * 3600000);
     const dk = `${bdt.getUTCFullYear()}-${String(bdt.getUTCMonth()+1).padStart(2,"0")}-${String(bdt.getUTCDate()).padStart(2,"0")}`;
-    const row = ensure(dk);
-    if (mapStage(o.status) === "Cancelled") { row.cancelled++; continue; }
-    row.orders++;
-    for (const it of (o.line_items || [])) {
-      row.sales += parseFloat(it.total) || 0;
-      row.items += it.quantity || 0;
+    const r = map[dk] = map[dk] || { orders:0, items:0, sales:0, cancelled:0 };
+    if (mapStage(o.status) === "Cancelled") { r.cancelled++; continue; }
+    r.orders++;
+    for (const it of (o.line_items || [])) { r.sales += parseFloat(it.total) || 0; r.items += it.quantity || 0; }
+  }
+  for (const k in map) map[k].sales = Math.round(map[k].sales);
+  return map;
+}
+
+function* eachDate(from: string, to: string) {
+  let c = from;
+  while (c <= to) {
+    yield c;
+    const d = new Date(c + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1); c = d.toISOString().slice(0, 10);
+  }
+}
+function addDaysStr(s: string, n: number) {
+  const d = new Date(s + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10);
+}
+
+// Cached daily breakdown: serve historical days from daily_stats, and only
+// refetch WooCommerce + Meta for missing days, days with no spend yet, and the
+// last 3 days (which can still change). Fresh results are upserted to the cache.
+async function getDailyBreakdownCached(cfg: Record<string,string>, sb: any, from: string, to: string, todayStr: string) {
+  const cachedByDate: Record<string, any> = {};
+  const { data } = await sb.from("daily_stats").select("*").gte("date", from).lte("date", to);
+  for (const r of (data || [])) cachedByDate[r.date] = r;
+
+  const recentCut = addDaysStr(todayStr, -2); // today and the 2 days before it
+  const allDates = [...eachDate(from, to)];
+  const needed = allDates.filter(d =>
+    !cachedByDate[d] || cachedByDate[d].spend_usd == null || d >= recentCut
+  );
+
+  const freshByDate: Record<string, any> = {};
+  if (needed.length) {
+    const refreshFrom = needed[0];
+    const [wcRes, metaRes] = await Promise.allSettled([
+      fetchWooCommerce(cfg, refreshFrom, to),
+      fetchMetaDaily(cfg, refreshFrom, to),
+    ]);
+    const agg   = aggregateWcByDay(wcRes.status === "fulfilled" ? wcRes.value.orders : []);
+    const metaOk = metaRes.status === "fulfilled";
+    const spend  = metaOk ? metaRes.value : {};
+    for (const d of eachDate(refreshFrom, to)) {
+      const w = agg[d] || { orders:0, items:0, sales:0, cancelled:0 };
+      let sp: number | null;
+      if (metaOk) sp = spend[d] != null ? spend[d] : 0;                 // queried → omitted means 0
+      else sp = cachedByDate[d]?.spend_usd != null ? Number(cachedByDate[d].spend_usd) : null; // keep cache
+      freshByDate[d] = { date:d, orders:w.orders, items:w.items, sales:w.sales, cancelled:w.cancelled, spend_usd: sp };
     }
+    const ups = Object.values(freshByDate).map((r: any) => ({ ...r, updated_at: new Date().toISOString() }));
+    if (ups.length) { try { await sb.from("daily_stats").upsert(ups, { onConflict: "date" }); } catch (_) {} }
   }
 
-  const dates = new Set<string>([...Object.keys(map), ...Object.keys(spendByDay)]);
-  return [...dates].sort().map(d => {
-    const r = map[d] || { date:d, orders:0, items:0, sales:0, cancelled:0 };
-    return { date:d, orders:r.orders, items:r.items, sales:Math.round(r.sales), cancelled:r.cancelled, spendUsd: spendByDay[d] || 0 };
+  return allDates.map(d => {
+    const r = freshByDate[d] || cachedByDate[d];
+    if (!r) return { date:d, orders:0, items:0, sales:0, cancelled:0, spendUsd:0 };
+    return { date:d, orders:r.orders||0, items:r.items||0, sales:r.sales||0, cancelled:r.cancelled||0, spendUsd: r.spend_usd == null ? 0 : Number(r.spend_usd) };
   });
 }
 
