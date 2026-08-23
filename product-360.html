@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>360° Product Viewer — Demo · MeowMesh</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FBF6EC; --ink:#2C2A26; --muted:#7A756C; --line:#E7DFCF;
+    --card:#FFFDF8; --clay:#C8553D; --green:#4F7060; --amber:#926A00; --blue:#6B9AB8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'DM Sans',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.5}
+  .wrap{max-width:920px;margin:0 auto;padding:32px 20px 64px}
+  h1{font-family:'Fraunces',serif;font-weight:600;font-size:30px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:15px;margin:0 0 28px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;
+    box-shadow:0 1px 3px rgba(0,0,0,.03)}
+  .stage{position:relative;width:100%;max-width:520px;margin:0 auto;aspect-ratio:1/1;
+    background:radial-gradient(ellipse at 50% 70%, #F3EAD6 0%, #FBF6EC 70%);
+    border-radius:16px;overflow:hidden;cursor:grab;touch-action:pan-y;user-select:none}
+  .stage.dragging{cursor:grabbing}
+  .stage canvas{width:100%;height:100%;display:block}
+  .hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
+    background:rgba(44,42,38,.82);color:#fff;font-size:13px;font-weight:500;
+    padding:7px 14px;border-radius:999px;display:flex;align-items:center;gap:7px;
+    pointer-events:none;transition:opacity .4s;white-space:nowrap}
+  .hint.hide{opacity:0}
+  .spinico{display:inline-block;animation:sp 2.4s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .controls{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:18px}
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);
+    font-family:inherit;font-size:14px;font-weight:600;padding:9px 16px;border-radius:10px;
+    cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{border-color:var(--clay);color:var(--clay)}
+  .btn.on{background:var(--clay);color:#fff;border-color:var(--clay)}
+  .slider{flex:1;max-width:240px;accent-color:var(--clay)}
+  .note{margin-top:26px;font-size:14px;color:var(--muted);line-height:1.65}
+  .note b{color:var(--ink);font-weight:600}
+  .tag{display:inline-block;background:#F3EAD6;color:var(--amber);font-size:12px;font-weight:600;
+    padding:3px 10px;border-radius:999px;margin-bottom:14px}
+  ol{padding-left:20px;margin:10px 0 0}
+  ol li{margin-bottom:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="tag">DEMO · generated frames</div>
+  <h1>360° Product Viewer</h1>
+  <p class="sub">Drag to spin. This demo uses computer-generated frames so you can feel the interaction — the real version will use photos of your actual product.</p>
+
+  <div class="card">
+    <div class="stage" id="stage">
+      <canvas id="view" width="520" height="520"></canvas>
+      <div class="hint" id="hint"><span class="spinico">↻</span> Drag to rotate</div>
+    </div>
+    <div class="controls">
+      <button class="btn" id="spinBtn">▶ Auto-spin</button>
+      <input type="range" min="0" max="35" value="0" class="slider" id="slider" aria-label="Rotation">
+    </div>
+  </div>
+
+  <div class="note">
+    <p><b>How the real one works:</b> a 360° spin is just a sequence of photos shown one after another as you drag — exactly like this demo, but with real pictures of your cat tree.</p>
+    <p><b>To make it for a real product:</b></p>
+    <ol>
+      <li>Put the product on something that turns (a lazy-susan / turntable, or a stool you rotate).</li>
+      <li>Keep your phone still on a tripod, same distance, even lighting, plain background.</li>
+      <li>Take about <b>30–36 photos</b>, rotating the product a little between each until it's gone all the way around.</li>
+      <li>Send me that folder — I'll drop them into this exact viewer.</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+(function(){
+  const FRAMES = 36;
+  const SIZE = 520;
+  const cache = [];
+  const view = document.getElementById('view');
+  const vctx = view.getContext('2d');
+
+  // ---- 3D helpers: build a simple cat-tree-like object and render each angle ----
+  function rotY(p, a){
+    const c=Math.cos(a), s=Math.sin(a);
+    return {x:p.x*c - p.z*s, y:p.y, z:p.x*s + p.z*c};
+  }
+  function project(p){
+    const d = 3.2;                       // camera distance (perspective)
+    const f = d/(d - p.z*0.55);
+    return {x: SIZE/2 + p.x*f*115, y: SIZE/2 - p.y*f*115 - 20, s:f};
+  }
+  // an axis-aligned box centered at (cx,cy,cz) with half-sizes
+  function box(cx,cy,cz,hx,hy,hz){
+    const v=[];
+    for(const sx of [-1,1]) for(const sy of [-1,1]) for(const sz of [-1,1])
+      v.push({x:cx+sx*hx, y:cy+sy*hy, z:cz+sz*hz});
+    // faces as vertex indices (v order: 000,001,010,011,100,101,110,111)
+    const F=[[0,1,3,2],[4,6,7,5],[0,4,5,1],[2,3,7,6],[0,2,6,4],[1,5,7,3]];
+    return {v,F};
+  }
+  function drawBox(ctx,b,angle,base){
+    const rv = b.v.map(p=>rotY(p,angle));
+    const faces = b.F.map(idx=>{
+      const zc = idx.reduce((s,i)=>s+rv[i].z,0)/idx.length;
+      return {idx, z:zc};
+    }).sort((a,b)=>a.z-b.z);
+    for(const face of faces){
+      const pts = face.idx.map(i=>project(rv[i]));
+      // shade by average depth
+      const shade = Math.max(0, Math.min(1,(face.z+1.2)/2.4));
+      const [r,g,bl]=base;
+      const k = 0.55 + shade*0.45;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x,pts[0].y);
+      for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+      ctx.closePath();
+      ctx.fillStyle=`rgb(${r*k|0},${g*k|0},${bl*k|0})`;
+      ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,.12)'; ctx.lineWidth=1; ctx.stroke();
+    }
+  }
+  function renderFrame(angle){
+    const c=document.createElement('canvas'); c.width=SIZE; c.height=SIZE;
+    const ctx=c.getContext('2d');
+    // soft ground shadow
+    ctx.save();
+    ctx.translate(SIZE/2, SIZE/2+150);
+    ctx.scale(1,0.28);
+    ctx.beginPath(); ctx.arc(0,0,150,0,Math.PI*2);
+    ctx.fillStyle='rgba(80,60,40,.16)'; ctx.fill();
+    ctx.restore();
+
+    // cat-tree parts (bottom -> top), drawn far-to-near via each box's own sort
+    const carpet=[196,166,120], post=[168,120,86], plat=[212,186,140], ball=[200,85,61];
+    // base
+    drawBox(ctx, box(0,-1.15,0, 0.85,0.12,0.85), angle, carpet);
+    // main post
+    drawBox(ctx, box(0,-0.35,0, 0.16,0.7,0.16), angle, post);
+    // mid platform
+    drawBox(ctx, box(0.0,0.35,0, 0.6,0.1,0.6), angle, plat);
+    // upper post (offset)
+    drawBox(ctx, box(0.28,0.75,0, 0.13,0.4,0.13), angle, post);
+    // top platform
+    drawBox(ctx, box(0.28,1.2,0, 0.5,0.1,0.5), angle, carpet);
+    // dangling ball
+    const bp=project(rotY({x:-0.35,y:0.55,z:0}, angle));
+    ctx.beginPath(); ctx.arc(bp.x,bp.y,14*bp.s,0,Math.PI*2);
+    ctx.fillStyle=`rgb(${ball[0]},${ball[1]},${ball[2]})`; ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,.15)'; ctx.stroke();
+    return c;
+  }
+
+  for(let i=0;i<FRAMES;i++) cache.push(renderFrame(i/FRAMES*Math.PI*2));
+
+  let frame=0;
+  function show(f){
+    frame=((f%FRAMES)+FRAMES)%FRAMES;
+    vctx.clearRect(0,0,SIZE,SIZE);
+    vctx.drawImage(cache[frame],0,0);
+    slider.value=frame;
+  }
+
+  // ---- drag to rotate ----
+  const stage=document.getElementById('stage');
+  const hint=document.getElementById('hint');
+  const slider=document.getElementById('slider');
+  let dragging=false, lastX=0, moved=false;
+  function down(x){dragging=true;lastX=x;moved=false;stage.classList.add('dragging');stopSpin();}
+  function move(x){
+    if(!dragging) return;
+    const dx=x-lastX;
+    if(Math.abs(dx)>4){
+      show(frame - Math.round(dx/10));   // drag right -> spin one way
+      lastX=x; moved=true;
+      if(!moved) return;
+      hint.classList.add('hide');
+    }
+  }
+  function up(){dragging=false;stage.classList.remove('dragging');}
+  stage.addEventListener('mousedown',e=>down(e.clientX));
+  window.addEventListener('mousemove',e=>move(e.clientX));
+  window.addEventListener('mouseup',up);
+  stage.addEventListener('touchstart',e=>{down(e.touches[0].clientX);},{passive:true});
+  stage.addEventListener('touchmove',e=>{move(e.touches[0].clientX);},{passive:true});
+  stage.addEventListener('touchend',up);
+  slider.addEventListener('input',()=>{show(+slider.value);hint.classList.add('hide');});
+
+  // ---- auto-spin ----
+  let spinning=false, raf=null, acc=0;
+  const spinBtn=document.getElementById('spinBtn');
+  function tick(){
+    acc+=0.35;
+    if(acc>=1){show(frame+1);acc=0;}
+    raf=requestAnimationFrame(tick);
+  }
+  function startSpin(){spinning=true;spinBtn.classList.add('on');spinBtn.textContent='⏸ Stop';hint.classList.add('hide');raf=requestAnimationFrame(tick);}
+  function stopSpin(){if(!spinning)return;spinning=false;spinBtn.classList.remove('on');spinBtn.textContent='▶ Auto-spin';cancelAnimationFrame(raf);}
+  spinBtn.addEventListener('click',()=>spinning?stopSpin():startSpin());
+
+  show(0);
+})();
+</script>
+</body>
+</html>
