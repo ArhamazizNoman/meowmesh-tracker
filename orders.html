@@ -130,6 +130,11 @@
       <div class="kpi-val" id="k-orders">—</div>
       <div class="kpi-sub" id="k-orders-sub">in range</div>
     </div>
+    <div class="kpi" style="border-top-color:#7C6F5B">
+      <div class="kpi-label">Product Price</div>
+      <div class="kpi-val" id="k-wctotal">—</div>
+      <div class="kpi-sub">WooCommerce order total</div>
+    </div>
     <div class="kpi" style="border-top-color:#C8553D">
       <div class="kpi-label">Total COD</div>
       <div class="kpi-val" id="k-cod">—</div>
@@ -365,8 +370,10 @@ function updateKpis(orders) {
   const delCOD      = delivered.reduce((s, o) => s + o.cod, 0);
   const procCOD     = processing.reduce((s, o) => s + o.cod, 0);
 
+  const totWcTotal = orders.reduce((s, o) => s + (o.wc_total || o.cod), 0);
   document.getElementById("k-orders").textContent  = orders.length;
   document.getElementById("k-orders-sub").textContent = isSample ? "sample data" : "in range";
+  document.getElementById("k-wctotal").textContent  = tk(totWcTotal);
   document.getElementById("k-cod").textContent      = tk(totCOD);
   document.getElementById("k-shipping").textContent = tk(totShipping);
   document.getElementById("k-codfee").textContent   = tk(totFee);

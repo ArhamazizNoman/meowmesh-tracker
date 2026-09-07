@@ -510,6 +510,7 @@ async function fetchOrdersDetail(cfg: Record<string,string>, from: string, to: s
         wc_status:       o.status,
         sf_status:       sfStatus,
         cod,
+        wc_total:        wcCod,
         consignment_id:  cid,
         shipping_charge: shippingCharge,
         cod_fee:         codFee,
