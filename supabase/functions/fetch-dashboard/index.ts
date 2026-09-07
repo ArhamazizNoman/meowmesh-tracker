@@ -490,6 +490,7 @@ async function fetchOrdersDetail(cfg: Record<string,string>, from: string, to: s
 
       const sfCod = cidRow ? Math.round(cidRow.cod_amount || 0) : 0;
       const wcCod = Math.round(parseFloat(o.total) || 0);
+      const wcShipping = Math.round(parseFloat(o.shipping_total) || 0);
 
       // Priority: Supabase DB → WP endpoint → WC total
       const cod = dbEntry != null ? dbEntry.cod : (sfCod > 0 ? sfCod : wcCod);
@@ -511,6 +512,7 @@ async function fetchOrdersDetail(cfg: Record<string,string>, from: string, to: s
         sf_status:       sfStatus,
         cod,
         wc_total:        wcCod,
+        wc_shipping:     wcShipping,
         consignment_id:  cid,
         shipping_charge: shippingCharge,
         cod_fee:         codFee,

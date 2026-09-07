@@ -170,6 +170,11 @@
       <div class="kpi-val" id="k-cancelled" style="color:#C8553D">—</div>
       <div class="kpi-sub" id="k-cancelled-sub">orders lost</div>
     </div>
+    <div class="kpi" style="border-top-color:#4F7060">
+      <div class="kpi-label">Shipping Profit</div>
+      <div class="kpi-val" id="k-shippingprofit" style="color:#4F7060">—</div>
+      <div class="kpi-sub">customer crg − Steadfast crg</div>
+    </div>
   </div>
 
   <!-- Toolbar -->
@@ -370,10 +375,14 @@ function updateKpis(orders) {
   const delCOD      = delivered.reduce((s, o) => s + o.cod, 0);
   const procCOD     = processing.reduce((s, o) => s + o.cod, 0);
 
-  const totWcTotal = orders.reduce((s, o) => s + (o.wc_total || o.cod), 0);
+  const totWcTotal      = orders.reduce((s, o) => s + (o.wc_total || o.cod), 0);
+  const totWcShipping   = orders.reduce((s, o) => s + (o.wc_shipping || 0), 0);
+  const totSfShipping   = orders.reduce((s, o) => s + o.shipping_charge, 0);
+  const shippingProfit  = totWcShipping - totSfShipping;
   document.getElementById("k-orders").textContent  = orders.length;
   document.getElementById("k-orders-sub").textContent = isSample ? "sample data" : "in range";
-  document.getElementById("k-wctotal").textContent  = tk(totWcTotal);
+  document.getElementById("k-wctotal").textContent       = tk(totWcTotal);
+  document.getElementById("k-shippingprofit").textContent = tk(shippingProfit);
   document.getElementById("k-cod").textContent      = tk(totCOD);
   document.getElementById("k-shipping").textContent = tk(totShipping);
   document.getElementById("k-codfee").textContent   = tk(totFee);
