@@ -147,6 +147,21 @@
       <div class="kpi-val" id="k-receivable" style="color:#4F7060">—</div>
       <div class="kpi-sub">net amount to owner</div>
     </div>
+    <div class="kpi" style="border-top-color:#4F7060">
+      <div class="kpi-label">Delivered Amount</div>
+      <div class="kpi-val" id="k-delivered" style="color:#4F7060">—</div>
+      <div class="kpi-sub" id="k-delivered-sub">actually delivered COD</div>
+    </div>
+    <div class="kpi" style="border-top-color:#E8A838">
+      <div class="kpi-label">Processing Amount</div>
+      <div class="kpi-val" id="k-processing">—</div>
+      <div class="kpi-sub" id="k-processing-sub">COD at stake</div>
+    </div>
+    <div class="kpi" style="border-top-color:#EF4444">
+      <div class="kpi-label">Cancelled</div>
+      <div class="kpi-val" id="k-cancelled" style="color:#C8553D">—</div>
+      <div class="kpi-sub" id="k-cancelled-sub">orders lost</div>
+    </div>
   </div>
 
   <!-- Toolbar -->
@@ -330,12 +345,26 @@ function updateKpis(orders) {
   const totShipping = orders.reduce((s, o) => s + o.shipping_charge, 0);
   const totFee      = orders.reduce((s, o) => s + o.cod_fee, 0);
   const totRec      = orders.reduce((s, o) => s + o.receivable, 0);
+
+  const allWithCancelled = allOrders;
+  const cancelled   = allWithCancelled.filter(o => normalizeStatus(o.wc_status) === "cancelled");
+  const delivered   = allWithCancelled.filter(o => normalizeStatus(o.wc_status) === "completed");
+  const processing  = allWithCancelled.filter(o => normalizeStatus(o.wc_status) === "processing");
+  const delCOD      = delivered.reduce((s, o) => s + o.cod, 0);
+  const procCOD     = processing.reduce((s, o) => s + o.cod, 0);
+
   document.getElementById("k-orders").textContent  = orders.length;
   document.getElementById("k-orders-sub").textContent = isSample ? "sample data" : "in range";
   document.getElementById("k-cod").textContent      = tk(totCOD);
   document.getElementById("k-shipping").textContent = tk(totShipping);
   document.getElementById("k-codfee").textContent   = tk(totFee);
   document.getElementById("k-receivable").textContent = tk(totRec);
+  document.getElementById("k-delivered").textContent  = tk(delCOD);
+  document.getElementById("k-delivered-sub").textContent = `${delivered.length} orders delivered`;
+  document.getElementById("k-processing").textContent = tk(procCOD);
+  document.getElementById("k-processing-sub").textContent = `${processing.length} orders pending`;
+  document.getElementById("k-cancelled").textContent  = cancelled.length;
+  document.getElementById("k-cancelled-sub").textContent = `৳${cancelled.reduce((s,o)=>s+o.cod,0).toLocaleString()} lost`;
 }
 
 // ── Fetch ──────────────────────────────────────────────────────────────────
