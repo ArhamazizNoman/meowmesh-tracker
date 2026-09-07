@@ -276,7 +276,8 @@ function sfStatusLabel(s) {
 function applyFilters() {
   const q = document.getElementById("searchBox").value.toLowerCase().trim();
   const filtered = allOrders.filter(o => {
-    const statusMatch = activeStatus === "all" || normalizeStatus(o.wc_status) === activeStatus;
+    const norm = normalizeStatus(o.wc_status);
+    const statusMatch = activeStatus === "all" ? norm !== "cancelled" : norm === activeStatus;
     const searchMatch = !q || String(o.id).includes(q) || o.customer.toLowerCase().includes(q) || (o.phone||"").includes(q);
     return statusMatch && searchMatch;
   });
@@ -362,7 +363,7 @@ async function loadOrders(from, to) {
       : "Sample data (API unavailable)";
   }
 
-  updateKpis(allOrders);
+  updateKpis(allOrders.filter(o => normalizeStatus(o.wc_status) !== "cancelled"));
   applyFilters();
 }
 
