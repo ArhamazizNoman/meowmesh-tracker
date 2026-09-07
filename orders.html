@@ -108,6 +108,9 @@
     <button class="preset-btn" data-preset="week">This Week</button>
     <button class="preset-btn" data-preset="lastweek">Last Week</button>
     <button class="preset-btn" data-preset="month">This Month</button>
+    <button class="preset-btn" data-preset="m0" id="btn-m0"></button>
+    <button class="preset-btn" data-preset="m1" id="btn-m1"></button>
+    <button class="preset-btn" data-preset="m2" id="btn-m2"></button>
     <div style="display:flex;align-items:center;gap:6px;margin-left:4px">
       <input type="date" id="dateFrom" class="date-input" />
       <span style="font-size:12px;color:#6B6255">→</span>
@@ -244,12 +247,21 @@ let currentRange = { from: fmt(bdtToday()), to: fmt(bdtToday()) };
 
 function applyPreset(preset) {
   const t = bdtToday();
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function monthRange(offset) {
+    const d = new Date(t.getFullYear(), t.getMonth() + offset, 1);
+    const last = new Date(d.getFullYear(), d.getMonth()+1, 0);
+    return { from: fmt(d), to: fmt(last) };
+  }
   const map = {
     today:    { from: fmt(t),                           to: fmt(t) },
     yesterday:{ from: fmt(addDays(t,-1)),               to: fmt(addDays(t,-1)) },
     week:     { from: fmt(startOfWeek(t)),              to: fmt(t) },
     lastweek: { from: fmt(startOfWeek(addDays(t,-7))),  to: fmt(addDays(startOfWeek(t),-1)) },
     month:    { from: fmt(startOfMonth(t)),             to: fmt(t) },
+    m0: monthRange(-1),
+    m1: monthRange(-2),
+    m2: monthRange(-3),
   };
   currentRange = map[preset] || map.today;
   document.getElementById("dateFrom").value = currentRange.from;
@@ -401,6 +413,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const t = bdtToday();
   document.getElementById("dateFrom").value = fmt(t);
   document.getElementById("dateTo").value   = fmt(t);
+
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  [1,2,3].forEach((offset, i) => {
+    const d = new Date(t.getFullYear(), t.getMonth() - offset, 1);
+    document.getElementById(`btn-m${i}`).textContent = MONTHS[d.getMonth()];
+  });
 
   document.querySelectorAll(".preset-btn").forEach(btn =>
     btn.addEventListener("click", () => {
