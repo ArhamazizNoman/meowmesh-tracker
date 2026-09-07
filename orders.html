@@ -221,6 +221,24 @@
     </table>
   </div>
 
+  <!-- Products sold -->
+  <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#6B6255;margin:28px 0 10px">Products Sold</p>
+  <div class="table-wrap">
+    <table id="productsTable">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th style="text-align:right">Qty</th>
+          <th style="text-align:right">Revenue</th>
+          <th style="text-align:right">Avg / unit</th>
+        </tr>
+      </thead>
+      <tbody id="productsBody">
+        <tr><td colspan="4" class="state-msg"><strong>—</strong>Load orders to see products</td></tr>
+      </tbody>
+    </table>
+  </div>
+
 </div>
 
 <script>
@@ -396,6 +414,21 @@ function updateKpis(orders) {
 }
 
 // ── Fetch ──────────────────────────────────────────────────────────────────
+function renderProducts(products) {
+  const tbody = document.getElementById("productsBody");
+  if (!products || !products.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="state-msg"><strong>—</strong> No product data</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = products.map(p => `
+    <tr>
+      <td>${p.name}</td>
+      <td style="text-align:right">${p.qty}</td>
+      <td style="text-align:right">${tk(p.total)}</td>
+      <td style="text-align:right">${tk(p.qty ? Math.round(p.total / p.qty) : 0)}</td>
+    </tr>`).join("");
+}
+
 async function loadOrders(from, to) {
   const st = document.getElementById("loadStatus");
   st.textContent = "Loading…";
@@ -412,6 +445,7 @@ async function loadOrders(from, to) {
     allOrders = json.orders;
     isSample = false;
     st.textContent = `✓ ${allOrders.length} orders`;
+    renderProducts(json.products || []);
   } catch(e) {
     allOrders = SAMPLE_ORDERS;
     isSample = true;
