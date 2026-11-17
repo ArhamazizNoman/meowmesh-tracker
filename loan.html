@@ -142,6 +142,9 @@
   </div>
 
   <div class="wrap">
+    <div id="sync-warn" style="display:none; background:#FBF0E8; border:1px solid #F0D3C6; color:#A8422F; font-size:12px; font-weight:600; border-radius:10px; padding:10px 13px; margin-bottom:14px; line-height:1.5;">
+      ⚠ This change was saved on this device but <b>could not be saved to the cloud</b>, so it won't show on your other devices. The database setup for repayments isn't finished — run the Loan setup SQL in Supabase (the <code>repaid</code> column + update permission), then mark it again.
+    </div>
     <p class="intro">Money <b>MeowMesh owes you personally</b> — mainly the Facebook / Meta ad spend you paid out of your own pocket. Enter each amount in <b>taka (৳)</b> — if you paid in another currency, convert it yourself first. Mark a row <b>Repay</b> when the business pays you back.</p>
 
     <div class="kpi-strip">
@@ -337,13 +340,14 @@ async function cloudPost(list, merge) {
 async function cloudInsertMany(list) { await cloudPost(list, true); }
 async function cloudInsert(e) { if (cloudOK) await cloudPost([e], false); }
 async function cloudUpdate(id, patch) {
-  if (!cloudOK) return;
+  if (!cloudOK) return true;   // offline: local-only is expected, not an error
   try {
-    await fetch(`${SB_URL}/rest/v1/loan_entries?id=eq.${encodeURIComponent(id)}`, {
+    const res = await fetch(`${SB_URL}/rest/v1/loan_entries?id=eq.${encodeURIComponent(id)}`, {
       method: 'PATCH', headers: { ...SB_HDR, 'Prefer': 'return=minimal' },
       body: JSON.stringify(patch),
     });
-  } catch(_) {}
+    return res.ok;
+  } catch(_) { return false; }
 }
 async function cloudDelete(id) {
   if (!cloudOK) return;
@@ -398,7 +402,7 @@ function confirmRepay() {
   e.repaid_date = document.getElementById('repay-date').value || todayBD();
   e.repaid_note = document.getElementById('repay-note').value.trim();
   saveLocal();
-  cloudUpdate(e.id, { repaid: true, repaid_date: e.repaid_date, repaid_note: e.repaid_note || null });
+  cloudUpdate(e.id, { repaid: true, repaid_date: e.repaid_date, repaid_note: e.repaid_note || null }).then(flagSync);
   cancelRepay(); render();
 }
 function undoRepay(id) {
@@ -406,8 +410,14 @@ function undoRepay(id) {
   if (!e) return;
   e.repaid = false; e.repaid_date = null; e.repaid_note = '';
   saveLocal();
-  cloudUpdate(id, { repaid: false, repaid_date: null, repaid_note: null });
+  cloudUpdate(id, { repaid: false, repaid_date: null, repaid_note: null }).then(flagSync);
   render();
+}
+function flagSync(ok) {
+  const w = document.getElementById('sync-warn');
+  if (!w) return;
+  if (ok === false) w.style.display = 'block';   // cloud rejected the change → tell the user
+  else w.style.display = 'none';
 }
 
 /* ── Render ── */
