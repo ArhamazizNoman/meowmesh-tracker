@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MeowMesh — Loan</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: #FBF6EC; color: #23201A; font-family: 'DM Sans', sans-serif; -webkit-font-smoothing: antialiased; }
+    h1,h2,h3 { font-family: 'Fraunces', serif; margin: 0; }
+    .clay { color: #C8553D; } .green { color: #4F7060; } .amber { color: #926A00; }
+
+    /* Topbar */
+    .topbar { background: #F3EADB; border-bottom: 1px solid #E2D6C2; }
+    .topbar-inner { padding: 9px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .topbar-brand h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+    .nav-links { display: flex; gap: 5px; flex-wrap: wrap; }
+    .nav-link { font-size: 11px; font-weight: 600; color: #6B6255; padding: 4px 11px; border-radius: 999px; border: 1px solid #E2D6C2; background: #fff; text-decoration: none; }
+    .nav-link.active { background: #23201A; color: #FBF6EC; border-color: #23201A; }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .store-tag { font-size: 9px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+    .store-cloud { background: #EAF1EC; color: #3D5C4F; }
+    .store-local { background: #FBF0E8; color: #A8422F; }
+
+    .wrap { max-width: 920px; margin: 0 auto; padding: 18px 16px 60px; }
+    .intro { font-size: 13px; color: #6B6255; margin: 2px 2px 16px; line-height: 1.5; }
+
+    /* KPI cards */
+    .kpi-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 16px; }
+    .kpi-card { background: #fff; border: 1px solid #E2D6C2; border-radius: 12px; padding: 13px 15px; border-top: 3px solid; }
+    .kpi-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #6B6255; margin-bottom: 4px; }
+    .kpi-val { font-family: 'Fraunces', serif; font-size: 25px; font-weight: 700; line-height: 1.1; }
+    .kpi-sub { font-size: 10px; color: #6B6255; margin-top: 3px; }
+    .owe-card { grid-column: 1 / -1; background: #2C2A26; border: none; border-top: 3px solid #C8553D; }
+    .owe-card .kpi-label { color: #C9BBA4; }
+    .owe-card .kpi-val { font-size: 34px; color: #FBF6EC; }
+    .owe-card .kpi-sub { color: #C9BBA4; }
+
+    /* Add bar */
+    .card { background: #fff; border: 1px solid #E2D6C2; border-radius: 12px; padding: 15px; margin-bottom: 16px; }
+    .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 11px; }
+    .add-bar { display: grid; grid-template-columns: 130px 1fr 150px auto; gap: 8px; align-items: end; }
+    .fld { display: flex; flex-direction: column; gap: 3px; }
+    .fld label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; }
+    .add-bar input, .add-bar select { font-family: 'DM Sans', sans-serif; font-size: 13px; border: 1px solid #E2D6C2; background: #FBF6EC; color: #23201A; border-radius: 8px; padding: 8px 9px; outline: none; width: 100%; }
+    .add-bar input:focus, .add-bar select:focus { border-color: #C8553D; background: #fff; }
+    .amt-wrap { display: flex; gap: 6px; }
+    .amt-wrap select { width: 60px; flex-shrink: 0; }
+    .kind-toggle { display: flex; gap: 0; border: 1px solid #E2D6C2; border-radius: 8px; overflow: hidden; }
+    .kind-toggle button { all: unset; cursor: pointer; flex: 1; text-align: center; font-size: 11px; font-weight: 600; padding: 8px 6px; color: #6B6255; background: #FBF6EC; }
+    .kind-toggle button.on-owe { background: #C8553D; color: #fff; }
+    .kind-toggle button.on-repay { background: #4F7060; color: #fff; }
+    .add-btn { all: unset; cursor: pointer; background: #23201A; color: #FBF6EC; font-size: 13px; font-weight: 700; padding: 9px 18px; border-radius: 8px; text-align: center; white-space: nowrap; }
+    .add-btn:hover { background: #4F7060; }
+    .conv-hint { font-size: 10px; color: #6B6255; margin-top: 7px; min-height: 13px; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; }
+    thead th { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; text-align: left; padding: 7px 10px; border-bottom: 1px solid #E2D6C2; }
+    thead th.r, tbody td.r { text-align: right; }
+    tbody td { font-size: 13px; padding: 9px 10px; border-bottom: 1px solid #F0E8D8; }
+    tbody tr:hover { background: #FCF8F0; }
+    .pill { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+    .pill-owe { background: #FBF0E8; color: #A8422F; }
+    .pill-repay { background: #EAF1EC; color: #3D5C4F; }
+    .amt-owe { color: #C8553D; font-weight: 600; }
+    .amt-repay { color: #4F7060; font-weight: 600; }
+    .btn-del { all: unset; cursor: pointer; color: #B9AF9E; font-size: 15px; line-height: 1; padding: 0 4px; }
+    .btn-del:hover { color: #C8553D; }
+    .empty { text-align: center; color: #9A8C7C; font-size: 13px; padding: 26px 0; }
+    tfoot td { font-size: 13px; font-weight: 700; padding: 10px; border-top: 2px solid #E2D6C2; }
+    .note-txt { color: #4A4336; }
+
+    @media (max-width: 680px) {
+      .kpi-strip { grid-template-columns: 1fr 1fr; }
+      .add-bar { grid-template-columns: 1fr 1fr; }
+      .add-bar .fld-note, .add-bar .add-btn { grid-column: 1 / -1; }
+      .hide-sm { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="topbar-brand"><h1>MeowMesh <span class="clay">Ops</span></h1></div>
+      <div class="nav-links">
+        <a class="nav-link" href="dashboard.html">Dashboard</a>
+        <a class="nav-link" href="orders.html">Orders</a>
+        <a class="nav-link" href="costs.html">Costs</a>
+        <a class="nav-link" href="operations.html">Daily</a>
+        <a class="nav-link" href="bank.html">Bank</a>
+        <a class="nav-link" href="sales.html">Sales</a>
+        <a class="nav-link active" href="loan.html">Loan</a>
+      </div>
+      <div class="topbar-right">
+        <span id="store-tag" class="store-tag store-local">saved on this device</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <p class="intro">Money <b>MeowMesh owes you personally</b> — mainly the Facebook / Meta ad spend you paid out of your own pocket. Add each amount you cover, and log repayments when the business pays you back. The outstanding balance is what you're still owed.</p>
+
+    <div class="kpi-strip">
+      <div class="owe-card kpi-card">
+        <div class="kpi-label">MeowMesh owes you</div>
+        <div class="kpi-val" id="k-owe">৳0</div>
+        <div class="kpi-sub" id="k-owe-sub">Nothing logged yet</div>
+      </div>
+      <div class="kpi-card" style="border-top-color:#C8553D">
+        <div class="kpi-label">You paid for ads</div>
+        <div class="kpi-val clay" id="k-paid">৳0</div>
+        <div class="kpi-sub" id="k-paid-sub">0 entries</div>
+      </div>
+      <div class="kpi-card" style="border-top-color:#4F7060">
+        <div class="kpi-label">Repaid to you</div>
+        <div class="kpi-val green" id="k-repaid">৳0</div>
+        <div class="kpi-sub" id="k-repaid-sub">0 repayments</div>
+      </div>
+      <div class="kpi-card" style="border-top-color:#6B9AB8">
+        <div class="kpi-label">This month you paid</div>
+        <div class="kpi-val" id="k-month" style="color:#2B5A8A">৳0</div>
+        <div class="kpi-sub" id="k-month-sub"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Add an entry</h3>
+      <div class="add-bar">
+        <div class="fld">
+          <label>Date</label>
+          <input type="date" id="e-date">
+        </div>
+        <div class="fld">
+          <label>Type</label>
+          <div class="kind-toggle">
+            <button type="button" id="k-owe-btn" class="on-owe" onclick="setKind('owe')">I paid for ads</button>
+            <button type="button" id="k-repay-btn" onclick="setKind('repay')">Repaid to me</button>
+          </div>
+        </div>
+        <div class="fld">
+          <label>Amount</label>
+          <div class="amt-wrap">
+            <select id="e-cur" onchange="updateConv()">
+              <option value="BDT">৳</option>
+              <option value="USD">$</option>
+            </select>
+            <input type="number" id="e-amt" min="0" step="0.01" placeholder="0" oninput="updateConv()">
+          </div>
+        </div>
+        <button class="add-btn" onclick="addEntry()">+ Add</button>
+        <div class="fld fld-note" style="grid-column:1 / -1">
+          <label>Note (optional)</label>
+          <input type="text" id="e-note" placeholder="e.g. Meta Ads — campaign top-up, Nov 12">
+        </div>
+      </div>
+      <div class="conv-hint" id="conv-hint"></div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:92px">Date</th>
+            <th style="width:120px">Type</th>
+            <th>Note</th>
+            <th class="r" style="width:120px">Amount</th>
+            <th class="r hide-sm" style="width:120px">Balance</th>
+            <th style="width:34px"></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+        <tfoot id="foot"></tfoot>
+      </table>
+    </div>
+  </div>
+
+<script>
+const SB_URL  = 'https://dicanelropavoaqisebh.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpY2FuZWxyb3Bhdm9hcWlzZWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5ODExMDYsImV4cCI6MjA5NjU1NzEwNn0.EwDW8At3lgaRN0M3pJr1zwCFyu5jwyX2OwB9JPRgWdE';
+const SB_HDR  = { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}`, 'Content-Type': 'application/json' };
+const LS_KEY  = 'meowmesh-loan-entries';
+const BDT_PER_USD = 140;
+
+const tk = n => '৳' + Math.round(n).toLocaleString('en-IN');
+function todayBD() { return new Date(Date.now() + 6 * 3600000).toISOString().slice(0,10); }
+function currentMonth() { return todayBD().slice(0,7); }
+function uid() { return 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+let entries = [];        // {id, entry_date, kind:'owe'|'repay', amount(BDT int), usd(num|null), note}
+let kind = 'owe';
+let cloudOK = false;
+
+function setKind(k) {
+  kind = k;
+  document.getElementById('k-owe-btn').className   = k === 'owe'   ? 'on-owe'   : '';
+  document.getElementById('k-repay-btn').className = k === 'repay' ? 'on-repay' : '';
+}
+function updateConv() {
+  const cur = document.getElementById('e-cur').value;
+  const v = parseFloat(document.getElementById('e-amt').value) || 0;
+  const h = document.getElementById('conv-hint');
+  if (cur === 'USD' && v > 0) h.textContent = `$${v.toFixed(2)} × ${BDT_PER_USD} = ${tk(v * BDT_PER_USD)}`;
+  else h.textContent = '';
+}
+
+/* ── Storage: localStorage always, Supabase best-effort ── */
+function saveLocal() { localStorage.setItem(LS_KEY, JSON.stringify(entries)); }
+function loadLocal() { try { entries = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch(_) { entries = []; } }
+
+async function loadCloud() {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/loan_entries?select=id,entry_date,kind,amount,usd,note&order=entry_date.desc`, {
+      headers: { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}` }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    const cloud = rows.map(r => ({ id: r.id, entry_date: r.entry_date, kind: r.kind, amount: r.amount || 0, usd: r.usd, note: r.note || '' }));
+    cloudOK = true;
+    const cloudIds = new Set(cloud.map(e => e.id));
+    const localOnly = entries.filter(e => !cloudIds.has(e.id));
+    if (localOnly.length) await cloudInsertMany(localOnly);
+    entries = [...cloud, ...localOnly].sort((a,b) => (b.entry_date||'').localeCompare(a.entry_date||''));
+    saveLocal();
+  } catch(_) {
+    cloudOK = false;
+    loadLocal();
+  }
+  setStoreTag();
+}
+async function cloudInsertMany(list) {
+  try {
+    await fetch(`${SB_URL}/rest/v1/loan_entries`, {
+      method: 'POST', headers: { ...SB_HDR, 'Prefer': 'return=minimal,resolution=merge-duplicates' },
+      body: JSON.stringify(list.map(e => ({ id: e.id, entry_date: e.entry_date, kind: e.kind, amount: e.amount, usd: e.usd, note: e.note }))),
+    });
+  } catch(_) {}
+}
+async function cloudInsert(e) {
+  if (!cloudOK) return;
+  try {
+    await fetch(`${SB_URL}/rest/v1/loan_entries`, {
+      method: 'POST', headers: { ...SB_HDR, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ id: e.id, entry_date: e.entry_date, kind: e.kind, amount: e.amount, usd: e.usd, note: e.note }),
+    });
+  } catch(_) {}
+}
+async function cloudDelete(id) {
+  if (!cloudOK) return;
+  try {
+    await fetch(`${SB_URL}/rest/v1/loan_entries?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: SB_HDR });
+  } catch(_) {}
+}
+function setStoreTag() {
+  const t = document.getElementById('store-tag');
+  if (cloudOK) { t.textContent = 'cloud synced'; t.className = 'store-tag store-cloud'; }
+  else         { t.textContent = 'saved on this device'; t.className = 'store-tag store-local'; }
+}
+
+/* ── Mutations ── */
+function addEntry() {
+  const date = document.getElementById('e-date').value || todayBD();
+  const cur  = document.getElementById('e-cur').value;
+  const raw  = parseFloat(document.getElementById('e-amt').value) || 0;
+  if (raw <= 0) { const el = document.getElementById('e-amt'); el.style.borderColor = '#C8553D'; el.focus(); setTimeout(()=>el.style.borderColor='',900); return; }
+  const usd = cur === 'USD' ? raw : null;
+  const amount = Math.round(cur === 'USD' ? raw * BDT_PER_USD : raw);
+  const note = document.getElementById('e-note').value.trim();
+  const e = { id: uid(), entry_date: date, kind, amount, usd, note };
+  entries.unshift(e);
+  entries.sort((a,b) => (b.entry_date||'').localeCompare(a.entry_date||''));
+  saveLocal(); cloudInsert(e); render();
+  document.getElementById('e-amt').value = '';
+  document.getElementById('e-note').value = '';
+  document.getElementById('conv-hint').textContent = '';
+}
+function removeEntry(id) {
+  entries = entries.filter(e => e.id !== id);
+  saveLocal(); cloudDelete(id); render();
+}
+
+/* ── Render ── */
+function render() {
+  const paid   = entries.filter(e => e.kind === 'owe').reduce((s,e) => s + e.amount, 0);
+  const repaid = entries.filter(e => e.kind === 'repay').reduce((s,e) => s + e.amount, 0);
+  const owe = paid - repaid;
+  const paidN = entries.filter(e => e.kind === 'owe').length;
+  const repayN = entries.filter(e => e.kind === 'repay').length;
+  const monthPaid = entries.filter(e => e.kind === 'owe' && (e.entry_date||'').slice(0,7) === currentMonth()).reduce((s,e)=>s+e.amount,0);
+
+  document.getElementById('k-owe').textContent = tk(owe);
+  document.getElementById('k-owe-sub').textContent = owe > 0 ? 'Outstanding — still owed to you'
+      : owe < 0 ? 'You have been overpaid by ' + tk(-owe) : (entries.length ? 'All settled 🎉' : 'Nothing logged yet');
+  document.getElementById('k-paid').textContent = tk(paid);
+  document.getElementById('k-paid-sub').textContent = paidN + (paidN === 1 ? ' entry' : ' entries');
+  document.getElementById('k-repaid').textContent = tk(repaid);
+  document.getElementById('k-repaid-sub').textContent = repayN + (repayN === 1 ? ' repayment' : ' repayments');
+  document.getElementById('k-month').textContent = tk(monthPaid);
+  document.getElementById('k-month-sub').textContent = new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'});
+
+  const rows = document.getElementById('rows');
+  const foot = document.getElementById('foot');
+  if (!entries.length) {
+    rows.innerHTML = `<tr><td colspan="6" class="empty">No entries yet. Add the ad spend you've paid for above.</td></tr>`;
+    foot.innerHTML = '';
+    return;
+  }
+  // running balance oldest→newest, then display newest first
+  const asc = [...entries].sort((a,b) => (a.entry_date||'').localeCompare(b.entry_date||''));
+  let bal = 0; const balById = {};
+  for (const e of asc) { bal += e.kind === 'owe' ? e.amount : -e.amount; balById[e.id] = bal; }
+
+  rows.innerHTML = entries.map(e => {
+    const isOwe = e.kind === 'owe';
+    const usdTag = e.usd ? ` <span style="color:#9A8C7C">($${(+e.usd).toFixed(2)})</span>` : '';
+    return `<tr>
+      <td>${fmtDate(e.entry_date)}</td>
+      <td><span class="pill ${isOwe ? 'pill-owe' : 'pill-repay'}">${isOwe ? 'Ad spend' : 'Repayment'}</span></td>
+      <td class="note-txt">${esc(e.note) || '<span style="color:#B9AF9E">—</span>'}${usdTag}</td>
+      <td class="r ${isOwe ? 'amt-owe' : 'amt-repay'}">${isOwe ? '+' : '−'}${tk(e.amount)}</td>
+      <td class="r hide-sm" style="color:#6B6255">${tk(balById[e.id])}</td>
+      <td class="r"><button class="btn-del" title="Delete" onclick="removeEntry('${e.id}')">×</button></td>
+    </tr>`;
+  }).join('');
+
+  foot.innerHTML = `<tr>
+    <td colspan="3">Outstanding — MeowMesh owes you</td>
+    <td class="r" style="color:${owe>=0?'#C8553D':'#4F7060'}">${tk(owe)}</td>
+    <td class="hide-sm"></td><td></td>
+  </tr>`;
+}
+function fmtDate(s) { if (!s) return ''; const d = new Date(s + 'T00:00:00'); return d.toLocaleDateString('en-US',{day:'numeric',month:'short'}); }
+function esc(s) { return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ── Init ── */
+document.getElementById('e-date').value = todayBD();
+loadLocal(); render();
+loadCloud().then(render);
+</script>
+</body>
+</html>
