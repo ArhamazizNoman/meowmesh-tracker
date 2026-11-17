@@ -75,9 +75,10 @@
     .pill { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
     .pill-owe { background: #FBF0E8; color: #A8422F; }
     .pill-repay { background: #EAF1EC; color: #3D5C4F; }
-    .amt-cells { display: flex; flex-direction: row; flex-wrap: wrap; gap: 3px 9px; justify-content: flex-end; }
+    .amt-cells { display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; justify-content: flex-end; }
     .amt-owe { color: #C8553D; font-weight: 600; white-space: nowrap; }
     .amt-repay { color: #4F7060; font-weight: 600; white-space: nowrap; }
+    .amt-eq { font-size: 11px; color: #9A8C7C; white-space: nowrap; }
     /* Month separators */
     .month-row td { background: #F6EEDD; border-top: 1px solid #E2D6C2; border-bottom: 1px solid #E2D6C2; padding: 6px 10px; }
     .month-row .m-name { font-family: 'Fraunces', serif; font-weight: 700; font-size: 12px; color: #23201A; }
@@ -141,7 +142,7 @@
   </div>
 
   <div class="wrap">
-    <p class="intro">Money <b>MeowMesh owes you personally</b> — mainly the Facebook / Meta ad spend you paid out of your own pocket. For each payment you can fill in <b>all three currencies at once</b> ($, kr, ৳) — e.g. $1 / kr 6.6 / ৳124 — and each one is totalled separately. Log repayments when the business pays you back.</p>
+    <p class="intro">Money <b>MeowMesh owes you personally</b> — mainly the Facebook / Meta ad spend you paid out of your own pocket. For each payment, fill in whichever currency you paid in — you can note the same amount in several ($1 = kr 6.6 = ৳124); it still counts as <b>one payment</b>. All totals are shown in <b>BDT</b>. Mark a row <b>Repay</b> when the business pays you back.</p>
 
     <div class="kpi-strip">
       <div class="owe-card kpi-card">
@@ -395,28 +396,30 @@ function undoRepay(id) {
 }
 
 /* ── Render ── */
-function totalsByCur() {
-  const paid = { USD:0, DKK:0, BDT:0 }, repaid = { USD:0, DKK:0, BDT:0 };
+// Each entry is ONE payment; the per-currency fields are the same amount in
+// different currencies (equivalents), so an entry is worth a single BDT value —
+// not the sum of its three fields. Prefer the BDT figure; else convert USD, else DKK.
+function entryBDT(e) {
+  if ((e.bdt || 0) > 0) return e.bdt;
+  if ((e.usd || 0) > 0) return e.usd * BDT_PER_USD;
+  if ((e.dkk || 0) > 0) return e.dkk * BDT_PER_DKK;
+  return 0;
+}
+function totalsBDT() {
+  let paid = 0, repaid = 0;
   for (const e of entries) {
-    if (e.kind === 'owe') {
-      paid.USD += e.usd || 0; paid.DKK += e.dkk || 0; paid.BDT += e.bdt || 0;
-      if (e.repaid) { repaid.USD += e.usd || 0; repaid.DKK += e.dkk || 0; repaid.BDT += e.bdt || 0; }
-    } else { // standalone 'repay' entry
-      repaid.USD += e.usd || 0; repaid.DKK += e.dkk || 0; repaid.BDT += e.bdt || 0;
-    }
+    const v = entryBDT(e);
+    if (e.kind === 'owe') { paid += v; if (e.repaid) repaid += v; }
+    else repaid += v;   // standalone 'repay' entry
   }
-  const net = {}; CURS.forEach(c => net[c] = paid[c] - repaid[c]);
-  return { paid, repaid, net };
+  return { paid, repaid, net: paid - repaid };
 }
 function render() {
-  const { paid, repaid, net } = totalsByCur();
-  const used = CURS.filter(c => paid[c] || repaid[c]);
   const paidN = entries.filter(e => e.kind === 'owe').length;
   const repayN = entries.filter(e => e.kind === 'repay' || (e.kind === 'owe' && e.repaid)).length;
 
-  // Summary cards: everything shown as one BDT figure (USD & DKK converted).
-  const toBDT = t => (t.BDT || 0) + (t.USD || 0) * BDT_PER_USD + (t.DKK || 0) * BDT_PER_DKK;
-  const paidBDT = toBDT(paid), repaidBDT = toBDT(repaid), netBDT = paidBDT - repaidBDT;
+  // Summary cards: one BDT figure each (each entry counted once).
+  const { paid: paidBDT, repaid: repaidBDT, net: netBDT } = totalsBDT();
 
   const oweEl = document.getElementById('k-owe');
   if (!entries.length) {
@@ -454,9 +457,12 @@ function render() {
     const isOwe = e.kind === 'owe';
     const cls = isOwe ? 'amt-owe' : 'amt-repay';
     const sign = isOwe ? '+' : '−';
-    const parts = [['USD',e.usd],['DKK',e.dkk],['BDT',e.bdt]]
-      .filter(([c,v]) => v > 0)
-      .map(([c,v]) => `<span class="${cls}">${sign}${fmtCur(c, v)}</span>`).join('');
+    // One payment: primary shown big (BDT preferred), other currencies as equivalents.
+    const entered = [['BDT',e.bdt],['USD',e.usd],['DKK',e.dkk]].filter(([c,v]) => v > 0);
+    const primary = entered.length ? entered[0] : ['BDT', 0];
+    const rest = entered.slice(1);
+    const parts = `<span class="${cls}">${sign}${fmtCur(primary[0], primary[1])}</span>`
+      + (rest.length ? `<span class="amt-eq">= ${rest.map(([c,v]) => fmtCur(c, v)).join(' · ')}</span>` : '');
     const noteHtml = esc(e.note) || '<span style="color:#B9AF9E">—</span>';
     const badge = (isOwe && e.repaid)
       ? `<div class="repaid-badge">✓ Repaid ${fmtDate(e.repaid_date)}${e.repaid_note ? ' · ' + esc(e.repaid_note) : ''}</div>`
@@ -485,7 +491,7 @@ function fmtDate(s) { if (!s) return ''; const d = new Date(s + 'T00:00:00'); re
 function monthLabel(ym) { if (!ym) return 'Undated'; const d = new Date(ym + '-01T00:00:00'); return d.toLocaleDateString('en-US',{month:'long',year:'numeric'}); }
 function monthSpend(ym) {
   let bdt = 0;
-  for (const e of entries) if (e.kind === 'owe' && (e.entry_date||'').slice(0,7) === ym) bdt += (e.bdt||0) + (e.usd||0)*BDT_PER_USD + (e.dkk||0)*BDT_PER_DKK;
+  for (const e of entries) if (e.kind === 'owe' && (e.entry_date||'').slice(0,7) === ym) bdt += entryBDT(e);
   return bdt > 0 ? 'Spent: ' + fmtCur('BDT', bdt) : '';
 }
 function esc(s) { return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
