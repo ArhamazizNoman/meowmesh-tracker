@@ -299,23 +299,29 @@ async function loadCloud() {
   }
   setStoreTag();
 }
-async function cloudInsertMany(list) {
+// Only the columns guaranteed to exist in the base table — used as a fallback
+// so a write still succeeds even if bdt/repaid columns were never added.
+function toRowMinimal(e) {
+  return { id: e.id, entry_date: e.entry_date, kind: e.kind, amount: Math.round(e.bdt || 0), note: e.note };
+}
+async function cloudPost(list, merge) {
+  const prefer = merge ? 'return=minimal,resolution=merge-duplicates' : 'return=minimal';
   try {
-    await fetch(`${SB_URL}/rest/v1/loan_entries`, {
-      method: 'POST', headers: { ...SB_HDR, 'Prefer': 'return=minimal,resolution=merge-duplicates' },
+    let res = await fetch(`${SB_URL}/rest/v1/loan_entries`, {
+      method: 'POST', headers: { ...SB_HDR, 'Prefer': prefer },
       body: JSON.stringify(list.map(toRow)),
     });
-  } catch(_) {}
+    if (!res.ok) {               // table may be missing bdt/repaid columns → retry with base columns
+      res = await fetch(`${SB_URL}/rest/v1/loan_entries`, {
+        method: 'POST', headers: { ...SB_HDR, 'Prefer': prefer },
+        body: JSON.stringify(list.map(toRowMinimal)),
+      });
+    }
+    return res.ok;
+  } catch(_) { return false; }
 }
-async function cloudInsert(e) {
-  if (!cloudOK) return;
-  try {
-    await fetch(`${SB_URL}/rest/v1/loan_entries`, {
-      method: 'POST', headers: { ...SB_HDR, 'Prefer': 'return=minimal' },
-      body: JSON.stringify(toRow(e)),
-    });
-  } catch(_) {}
-}
+async function cloudInsertMany(list) { await cloudPost(list, true); }
+async function cloudInsert(e) { if (cloudOK) await cloudPost([e], false); }
 async function cloudUpdate(id, patch) {
   if (!cloudOK) return;
   try {
