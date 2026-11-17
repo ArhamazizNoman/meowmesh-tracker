@@ -75,9 +75,13 @@
     .pill { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
     .pill-owe { background: #FBF0E8; color: #A8422F; }
     .pill-repay { background: #EAF1EC; color: #3D5C4F; }
-    .amt-cells { display: flex; flex-direction: column; gap: 1px; align-items: flex-end; }
+    .amt-cells { display: flex; flex-direction: row; flex-wrap: wrap; gap: 3px 9px; justify-content: flex-end; }
     .amt-owe { color: #C8553D; font-weight: 600; white-space: nowrap; }
     .amt-repay { color: #4F7060; font-weight: 600; white-space: nowrap; }
+    /* Month separators */
+    .month-row td { background: #F6EEDD; border-top: 1px solid #E2D6C2; border-bottom: 1px solid #E2D6C2; padding: 6px 10px; }
+    .month-row .m-name { font-family: 'Fraunces', serif; font-weight: 700; font-size: 12px; color: #23201A; }
+    .month-row .m-sub { font-size: 11px; font-weight: 600; color: #8A7E6B; text-align: right; white-space: nowrap; }
     .btn-del { all: unset; cursor: pointer; color: #B9AF9E; font-size: 15px; line-height: 1; padding: 0 4px; }
     .btn-del:hover { color: #C8553D; }
     .empty { text-align: center; color: #9A8C7C; font-size: 13px; padding: 26px 0; }
@@ -194,7 +198,7 @@
             <th style="width:92px">Date</th>
             <th style="width:120px">Type</th>
             <th>Note</th>
-            <th class="r" style="width:150px">Amount</th>
+            <th class="r" style="width:210px">Amount</th>
             <th style="width:112px"></th>
           </tr>
         </thead>
@@ -435,7 +439,13 @@ function render() {
     foot.innerHTML = '';
     return;
   }
-  rows.innerHTML = entries.map(e => {
+  let html = '', lastMonth = null;
+  for (const e of entries) {               // already sorted newest-first
+    const ym = (e.entry_date || '').slice(0,7);
+    if (ym !== lastMonth) {
+      lastMonth = ym;
+      html += `<tr class="month-row"><td colspan="3" class="m-name">${monthLabel(ym)}</td><td colspan="2" class="m-sub">${monthSpend(ym)}</td></tr>`;
+    }
     const isOwe = e.kind === 'owe';
     const cls = isOwe ? 'amt-owe' : 'amt-repay';
     const sign = isOwe ? '+' : '−';
@@ -450,14 +460,15 @@ function render() {
     if (isOwe && !e.repaid) acts += `<button class="row-btn repay" onclick="openRepay('${e.id}')">Repay</button>`;
     if (isOwe && e.repaid)  acts += `<button class="row-btn undo" onclick="undoRepay('${e.id}')">Undo</button>`;
     acts += `<button class="btn-del" title="Delete" onclick="removeEntry('${e.id}')">×</button>`;
-    return `<tr class="${isOwe && e.repaid ? 'is-repaid' : ''}">
+    html += `<tr class="${isOwe && e.repaid ? 'is-repaid' : ''}">
       <td>${fmtDate(e.entry_date)}</td>
       <td><span class="pill ${isOwe ? 'pill-owe' : 'pill-repay'}">${isOwe ? 'Ad spend' : 'Repayment'}</span></td>
       <td class="note-txt">${noteHtml}${badge}</td>
       <td class="r"><div class="amt-cells">${parts}</div></td>
       <td class="r"><div class="row-acts">${acts}</div></td>
     </tr>`;
-  }).join('');
+  }
+  rows.innerHTML = html;
 
   foot.innerHTML = `<tr>
     <td colspan="3">Outstanding — MeowMesh owes you</td>
@@ -466,6 +477,13 @@ function render() {
   </tr>`;
 }
 function fmtDate(s) { if (!s) return ''; const d = new Date(s + 'T00:00:00'); return d.toLocaleDateString('en-US',{day:'numeric',month:'short'}); }
+function monthLabel(ym) { if (!ym) return 'Undated'; const d = new Date(ym + '-01T00:00:00'); return d.toLocaleDateString('en-US',{month:'long',year:'numeric'}); }
+function monthSpend(ym) {
+  const m = { USD:0, DKK:0, BDT:0 };
+  for (const e of entries) if (e.kind === 'owe' && (e.entry_date||'').slice(0,7) === ym) { m.USD += e.usd||0; m.DKK += e.dkk||0; m.BDT += e.bdt||0; }
+  const parts = CURS.filter(c => m[c] > 0).map(c => fmtCur(c, m[c]));
+  return parts.length ? 'Spent: ' + parts.join(' · ') : '';
+}
 function esc(s) { return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 /* ── Init ── */
