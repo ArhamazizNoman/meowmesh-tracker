@@ -231,6 +231,10 @@ const LS_KEY  = 'meowmesh-loan-entries';
 
 const CURS = ['USD','DKK','BDT'];
 const SYM  = { USD: '$', DKK: 'kr ', BDT: '৳' };
+// Rates used ONLY to show the three summary cards as a single BDT figure.
+// The entry list itself keeps every amount in its original currency.
+const BDT_PER_USD = 140;
+const BDT_PER_DKK = 20;
 function fmtCur(cur, n) {
   const d = cur === 'BDT' ? 0 : 2;
   return SYM[cur] + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -410,26 +414,27 @@ function render() {
   const paidN = entries.filter(e => e.kind === 'owe').length;
   const repayN = entries.filter(e => e.kind === 'repay' || (e.kind === 'owe' && e.repaid)).length;
 
+  // Summary cards: everything shown as one BDT figure (USD & DKK converted).
+  const toBDT = t => (t.BDT || 0) + (t.USD || 0) * BDT_PER_USD + (t.DKK || 0) * BDT_PER_DKK;
+  const paidBDT = toBDT(paid), repaidBDT = toBDT(repaid), netBDT = paidBDT - repaidBDT;
+
   const oweEl = document.getElementById('k-owe');
-  if (!used.length) {
+  if (!entries.length) {
     oweEl.innerHTML = '<span class="none">Nothing logged yet</span>';
     document.getElementById('k-owe-sub').textContent = '';
   } else {
-    oweEl.innerHTML = used.map(c => `<span class="chip"><small>${c}</small>${fmtCur(c, net[c])}</span>`).join('');
-    const anyOwed = used.some(c => net[c] > 0.0001);
-    document.getElementById('k-owe-sub').textContent = anyOwed ? 'Still owed to you — kept separate per currency' : 'All settled 🎉';
+    oweEl.innerHTML = `<span class="chip">${fmtCur('BDT', netBDT)}</span>`;
+    document.getElementById('k-owe-sub').textContent = netBDT > 0.5
+      ? `Still owed to you · converted at $1=৳${BDT_PER_USD}, kr1=৳${BDT_PER_DKK}`
+      : 'All settled 🎉';
   }
 
-  const paidUsed = CURS.filter(c => paid[c] > 0);
-  document.getElementById('k-paid').innerHTML = paidUsed.length
-    ? paidUsed.map(c => `<span class="ln"><small>${c}</small>${fmtCur(c, paid[c])}</span>`).join('')
-    : '<span class="none">none yet</span>';
+  document.getElementById('k-paid').innerHTML = paidBDT > 0
+    ? `<span class="ln">${fmtCur('BDT', paidBDT)}</span>` : '<span class="none">none yet</span>';
   document.getElementById('k-paid-sub').textContent = paidN + (paidN === 1 ? ' entry' : ' entries');
 
-  const repUsed = CURS.filter(c => repaid[c] > 0);
-  document.getElementById('k-repaid').innerHTML = repUsed.length
-    ? repUsed.map(c => `<span class="ln"><small>${c}</small>${fmtCur(c, repaid[c])}</span>`).join('')
-    : '<span class="none">none yet</span>';
+  document.getElementById('k-repaid').innerHTML = repaidBDT > 0
+    ? `<span class="ln">${fmtCur('BDT', repaidBDT)}</span>` : '<span class="none">none yet</span>';
   document.getElementById('k-repaid-sub').textContent = repayN + (repayN === 1 ? ' repayment' : ' repayments');
 
   const rows = document.getElementById('rows');
