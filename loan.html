@@ -288,9 +288,23 @@ async function loadCloud() {
     const rows = await res.json();
     const cloud = rows.map(fromRow);
     cloudOK = true;
-    const cloudIds = new Set(cloud.map(e => e.id));
-    const localOnly = entries.filter(e => !cloudIds.has(e.id));
+    const cloudById = {}; cloud.forEach(e => cloudById[e.id] = e);
+    const localById = {}; entries.forEach(e => localById[e.id] = e);
+
+    // 1) Upload entries that exist only on this device.
+    const localOnly = entries.filter(e => !cloudById[e.id]);
     if (localOnly.length) await cloudInsertMany(localOnly);
+
+    // 2) A "Repaid" mark made on this device but not yet in the cloud: push it
+    //    to the existing row, and never let the reload drop it locally.
+    for (const c of cloud) {
+      const l = localById[c.id];
+      if (l && l.repaid && !c.repaid) {
+        await cloudUpdate(c.id, { repaid: true, repaid_date: l.repaid_date || null, repaid_note: l.repaid_note || null });
+        c.repaid = true; c.repaid_date = l.repaid_date || null; c.repaid_note = l.repaid_note || '';
+      }
+    }
+
     entries = [...cloud, ...localOnly].sort((a,b) => (b.entry_date||'').localeCompare(a.entry_date||''));
     saveLocal();
   } catch(_) {
