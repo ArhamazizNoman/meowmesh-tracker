@@ -28,56 +28,60 @@
     .intro { font-size: 13px; color: #6B6255; margin: 2px 2px 16px; line-height: 1.5; }
 
     /* KPI cards */
-    .kpi-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 16px; }
+    .kpi-strip { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
     .kpi-card { background: #fff; border: 1px solid #E2D6C2; border-radius: 12px; padding: 13px 15px; border-top: 3px solid; }
-    .kpi-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #6B6255; margin-bottom: 4px; }
-    .kpi-val { font-family: 'Fraunces', serif; font-size: 25px; font-weight: 700; line-height: 1.1; }
-    .kpi-sub { font-size: 10px; color: #6B6255; margin-top: 3px; }
+    .kpi-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #6B6255; margin-bottom: 6px; }
+    .kpi-sub { font-size: 10px; color: #6B6255; margin-top: 6px; }
     .owe-card { grid-column: 1 / -1; background: #2C2A26; border: none; border-top: 3px solid #C8553D; }
     .owe-card .kpi-label { color: #C9BBA4; }
-    .owe-card .kpi-val { font-size: 34px; color: #FBF6EC; }
     .owe-card .kpi-sub { color: #C9BBA4; }
+    .owe-chips { display: flex; flex-wrap: wrap; gap: 20px; }
+    .owe-chips .chip { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 700; color: #FBF6EC; line-height: 1.1; }
+    .owe-chips .chip small { display: block; font-size: 9px; font-weight: 700; letter-spacing: .06em; color: #C9BBA4; font-family: 'DM Sans', sans-serif; margin-bottom: 1px; }
+    .owe-chips .none, .cur-lines .none { font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; color: #9A8C7C; }
+    .owe-chips .none { color: #C9BBA4; }
+    .cur-lines { display: flex; flex-direction: column; gap: 2px; }
+    .cur-lines .ln { font-family: 'Fraunces', serif; font-size: 19px; font-weight: 700; line-height: 1.25; }
+    .cur-lines .ln small { font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 700; color: #9A8C7C; letter-spacing: .05em; margin-right: 5px; }
 
     /* Add bar */
     .card { background: #fff; border: 1px solid #E2D6C2; border-radius: 12px; padding: 15px; margin-bottom: 16px; }
     .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 11px; }
-    .add-bar { display: grid; grid-template-columns: 130px 1fr 150px auto; gap: 8px; align-items: end; }
+    .add-bar { display: grid; grid-template-columns: 130px 1fr 170px auto; gap: 8px; align-items: end; }
     .fld { display: flex; flex-direction: column; gap: 3px; }
     .fld label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; }
     .add-bar input, .add-bar select { font-family: 'DM Sans', sans-serif; font-size: 13px; border: 1px solid #E2D6C2; background: #FBF6EC; color: #23201A; border-radius: 8px; padding: 8px 9px; outline: none; width: 100%; }
     .add-bar input:focus, .add-bar select:focus { border-color: #C8553D; background: #fff; }
     .amt-wrap { display: flex; gap: 6px; }
-    .amt-wrap select { width: 60px; flex-shrink: 0; }
+    .amt-wrap select { width: 86px; flex-shrink: 0; }
     .kind-toggle { display: flex; gap: 0; border: 1px solid #E2D6C2; border-radius: 8px; overflow: hidden; }
     .kind-toggle button { all: unset; cursor: pointer; flex: 1; text-align: center; font-size: 11px; font-weight: 600; padding: 8px 6px; color: #6B6255; background: #FBF6EC; }
     .kind-toggle button.on-owe { background: #C8553D; color: #fff; }
     .kind-toggle button.on-repay { background: #4F7060; color: #fff; }
     .add-btn { all: unset; cursor: pointer; background: #23201A; color: #FBF6EC; font-size: 13px; font-weight: 700; padding: 9px 18px; border-radius: 8px; text-align: center; white-space: nowrap; }
     .add-btn:hover { background: #4F7060; }
-    .conv-hint { font-size: 10px; color: #6B6255; margin-top: 7px; min-height: 13px; }
 
     /* Table */
     table { width: 100%; border-collapse: collapse; }
     thead th { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; text-align: left; padding: 7px 10px; border-bottom: 1px solid #E2D6C2; }
-    thead th.r, tbody td.r { text-align: right; }
+    thead th.r, tbody td.r, tfoot td.r { text-align: right; }
     tbody td { font-size: 13px; padding: 9px 10px; border-bottom: 1px solid #F0E8D8; }
     tbody tr:hover { background: #FCF8F0; }
     .pill { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
     .pill-owe { background: #FBF0E8; color: #A8422F; }
     .pill-repay { background: #EAF1EC; color: #3D5C4F; }
-    .amt-owe { color: #C8553D; font-weight: 600; }
-    .amt-repay { color: #4F7060; font-weight: 600; }
+    .amt-owe { color: #C8553D; font-weight: 600; white-space: nowrap; }
+    .amt-repay { color: #4F7060; font-weight: 600; white-space: nowrap; }
     .btn-del { all: unset; cursor: pointer; color: #B9AF9E; font-size: 15px; line-height: 1; padding: 0 4px; }
     .btn-del:hover { color: #C8553D; }
     .empty { text-align: center; color: #9A8C7C; font-size: 13px; padding: 26px 0; }
     tfoot td { font-size: 13px; font-weight: 700; padding: 10px; border-top: 2px solid #E2D6C2; }
+    tfoot .foot-amt { color: #C8553D; }
     .note-txt { color: #4A4336; }
 
     @media (max-width: 680px) {
-      .kpi-strip { grid-template-columns: 1fr 1fr; }
       .add-bar { grid-template-columns: 1fr 1fr; }
       .add-bar .fld-note, .add-bar .add-btn { grid-column: 1 / -1; }
-      .hide-sm { display: none; }
     }
   </style>
 </head>
@@ -101,28 +105,23 @@
   </div>
 
   <div class="wrap">
-    <p class="intro">Money <b>MeowMesh owes you personally</b> — mainly the Facebook / Meta ad spend you paid out of your own pocket. Add each amount you cover, and log repayments when the business pays you back. The outstanding balance is what you're still owed.</p>
+    <p class="intro">Money <b>MeowMesh owes you personally</b> — mainly the Facebook / Meta ad spend you paid out of your own pocket. Add each amount you cover in whichever currency you paid (<b>$</b>, <b>kr</b> or <b>৳</b>), and log repayments when the business pays you back. Totals are kept separately for each currency.</p>
 
     <div class="kpi-strip">
       <div class="owe-card kpi-card">
-        <div class="kpi-label">MeowMesh owes you</div>
-        <div class="kpi-val" id="k-owe">৳0</div>
-        <div class="kpi-sub" id="k-owe-sub">Nothing logged yet</div>
+        <div class="kpi-label">MeowMesh owes you — outstanding</div>
+        <div class="owe-chips" id="k-owe"><span class="none">Nothing logged yet</span></div>
+        <div class="kpi-sub" id="k-owe-sub"></div>
       </div>
       <div class="kpi-card" style="border-top-color:#C8553D">
         <div class="kpi-label">You paid for ads</div>
-        <div class="kpi-val clay" id="k-paid">৳0</div>
+        <div class="cur-lines" id="k-paid"><span class="none">none yet</span></div>
         <div class="kpi-sub" id="k-paid-sub">0 entries</div>
       </div>
       <div class="kpi-card" style="border-top-color:#4F7060">
         <div class="kpi-label">Repaid to you</div>
-        <div class="kpi-val green" id="k-repaid">৳0</div>
+        <div class="cur-lines" id="k-repaid"><span class="none">none yet</span></div>
         <div class="kpi-sub" id="k-repaid-sub">0 repayments</div>
-      </div>
-      <div class="kpi-card" style="border-top-color:#6B9AB8">
-        <div class="kpi-label">This month you paid</div>
-        <div class="kpi-val" id="k-month" style="color:#2B5A8A">৳0</div>
-        <div class="kpi-sub" id="k-month-sub"></div>
       </div>
     </div>
 
@@ -143,11 +142,12 @@
         <div class="fld">
           <label>Amount</label>
           <div class="amt-wrap">
-            <select id="e-cur" onchange="updateConv()">
-              <option value="BDT">৳</option>
-              <option value="USD">$</option>
+            <select id="e-cur">
+              <option value="USD">$ USD</option>
+              <option value="DKK">kr DKK</option>
+              <option value="BDT">৳ BDT</option>
             </select>
-            <input type="number" id="e-amt" min="0" step="0.01" placeholder="0" oninput="updateConv()">
+            <input type="number" id="e-amt" min="0" step="0.01" placeholder="0" onkeydown="if(event.key==='Enter')addEntry()">
           </div>
         </div>
         <button class="add-btn" onclick="addEntry()">+ Add</button>
@@ -156,7 +156,6 @@
           <input type="text" id="e-note" placeholder="e.g. Meta Ads — campaign top-up, Nov 12">
         </div>
       </div>
-      <div class="conv-hint" id="conv-hint"></div>
     </div>
 
     <div class="card" style="padding:0;overflow:hidden">
@@ -166,8 +165,7 @@
             <th style="width:92px">Date</th>
             <th style="width:120px">Type</th>
             <th>Note</th>
-            <th class="r" style="width:120px">Amount</th>
-            <th class="r hide-sm" style="width:120px">Balance</th>
+            <th class="r" style="width:150px">Amount</th>
             <th style="width:34px"></th>
           </tr>
         </thead>
@@ -182,14 +180,17 @@ const SB_URL  = 'https://dicanelropavoaqisebh.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpY2FuZWxyb3Bhdm9hcWlzZWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5ODExMDYsImV4cCI6MjA5NjU1NzEwNn0.EwDW8At3lgaRN0M3pJr1zwCFyu5jwyX2OwB9JPRgWdE';
 const SB_HDR  = { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}`, 'Content-Type': 'application/json' };
 const LS_KEY  = 'meowmesh-loan-entries';
-const BDT_PER_USD = 140;
 
-const tk = n => '৳' + Math.round(n).toLocaleString('en-IN');
+const CURS = ['USD','DKK','BDT'];
+const SYM  = { USD: '$', DKK: 'kr ', BDT: '৳' };
+function fmtCur(cur, n) {
+  const d = cur === 'BDT' ? 0 : 2;
+  return SYM[cur] + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
 function todayBD() { return new Date(Date.now() + 6 * 3600000).toISOString().slice(0,10); }
-function currentMonth() { return todayBD().slice(0,7); }
 function uid() { return 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-let entries = [];        // {id, entry_date, kind:'owe'|'repay', amount(BDT int), usd(num|null), note}
+let entries = [];        // {id, entry_date, kind:'owe'|'repay', cur:'USD'|'DKK'|'BDT', amt:Number, note}
 let kind = 'owe';
 let cloudOK = false;
 
@@ -198,26 +199,29 @@ function setKind(k) {
   document.getElementById('k-owe-btn').className   = k === 'owe'   ? 'on-owe'   : '';
   document.getElementById('k-repay-btn').className = k === 'repay' ? 'on-repay' : '';
 }
-function updateConv() {
-  const cur = document.getElementById('e-cur').value;
-  const v = parseFloat(document.getElementById('e-amt').value) || 0;
-  const h = document.getElementById('conv-hint');
-  if (cur === 'USD' && v > 0) h.textContent = `$${v.toFixed(2)} × ${BDT_PER_USD} = ${tk(v * BDT_PER_USD)}`;
-  else h.textContent = '';
-}
 
 /* ── Storage: localStorage always, Supabase best-effort ── */
 function saveLocal() { localStorage.setItem(LS_KEY, JSON.stringify(entries)); }
 function loadLocal() { try { entries = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch(_) { entries = []; } }
 
+function fromRow(r) {
+  // Backward compatible with earlier rows that stored BDT in `amount` / USD in `usd`.
+  const cur = r.orig_cur || (r.usd != null ? 'USD' : 'BDT');
+  const amt = r.orig_amt != null ? +r.orig_amt : (r.usd != null ? +r.usd : (r.amount || 0));
+  return { id: r.id, entry_date: r.entry_date, kind: r.kind, cur, amt, note: r.note || '' };
+}
+function toRow(e) {
+  return { id: e.id, entry_date: e.entry_date, kind: e.kind, amount: Math.round(e.amt), orig_cur: e.cur, orig_amt: e.amt, note: e.note };
+}
+
 async function loadCloud() {
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/loan_entries?select=id,entry_date,kind,amount,usd,note&order=entry_date.desc`, {
+    const res = await fetch(`${SB_URL}/rest/v1/loan_entries?select=id,entry_date,kind,amount,orig_cur,orig_amt,usd,note&order=entry_date.desc`, {
       headers: { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}` }
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const rows = await res.json();
-    const cloud = rows.map(r => ({ id: r.id, entry_date: r.entry_date, kind: r.kind, amount: r.amount || 0, usd: r.usd, note: r.note || '' }));
+    const cloud = rows.map(fromRow);
     cloudOK = true;
     const cloudIds = new Set(cloud.map(e => e.id));
     const localOnly = entries.filter(e => !cloudIds.has(e.id));
@@ -234,7 +238,7 @@ async function cloudInsertMany(list) {
   try {
     await fetch(`${SB_URL}/rest/v1/loan_entries`, {
       method: 'POST', headers: { ...SB_HDR, 'Prefer': 'return=minimal,resolution=merge-duplicates' },
-      body: JSON.stringify(list.map(e => ({ id: e.id, entry_date: e.entry_date, kind: e.kind, amount: e.amount, usd: e.usd, note: e.note }))),
+      body: JSON.stringify(list.map(toRow)),
     });
   } catch(_) {}
 }
@@ -243,7 +247,7 @@ async function cloudInsert(e) {
   try {
     await fetch(`${SB_URL}/rest/v1/loan_entries`, {
       method: 'POST', headers: { ...SB_HDR, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ id: e.id, entry_date: e.entry_date, kind: e.kind, amount: e.amount, usd: e.usd, note: e.note }),
+      body: JSON.stringify(toRow(e)),
     });
   } catch(_) {}
 }
@@ -265,16 +269,13 @@ function addEntry() {
   const cur  = document.getElementById('e-cur').value;
   const raw  = parseFloat(document.getElementById('e-amt').value) || 0;
   if (raw <= 0) { const el = document.getElementById('e-amt'); el.style.borderColor = '#C8553D'; el.focus(); setTimeout(()=>el.style.borderColor='',900); return; }
-  const usd = cur === 'USD' ? raw : null;
-  const amount = Math.round(cur === 'USD' ? raw * BDT_PER_USD : raw);
   const note = document.getElementById('e-note').value.trim();
-  const e = { id: uid(), entry_date: date, kind, amount, usd, note };
+  const e = { id: uid(), entry_date: date, kind, cur, amt: raw, note };
   entries.unshift(e);
   entries.sort((a,b) => (b.entry_date||'').localeCompare(a.entry_date||''));
   saveLocal(); cloudInsert(e); render();
   document.getElementById('e-amt').value = '';
   document.getElementById('e-note').value = '';
-  document.getElementById('conv-hint').textContent = '';
 }
 function removeEntry(id) {
   entries = entries.filter(e => e.id !== id);
@@ -282,53 +283,65 @@ function removeEntry(id) {
 }
 
 /* ── Render ── */
+function totalsByCur() {
+  const paid = { USD:0, DKK:0, BDT:0 }, repaid = { USD:0, DKK:0, BDT:0 };
+  for (const e of entries) (e.kind === 'owe' ? paid : repaid)[e.cur] += e.amt;
+  const net = {}; CURS.forEach(c => net[c] = paid[c] - repaid[c]);
+  return { paid, repaid, net };
+}
 function render() {
-  const paid   = entries.filter(e => e.kind === 'owe').reduce((s,e) => s + e.amount, 0);
-  const repaid = entries.filter(e => e.kind === 'repay').reduce((s,e) => s + e.amount, 0);
-  const owe = paid - repaid;
+  const { paid, repaid, net } = totalsByCur();
+  const used = CURS.filter(c => paid[c] || repaid[c]);
   const paidN = entries.filter(e => e.kind === 'owe').length;
   const repayN = entries.filter(e => e.kind === 'repay').length;
-  const monthPaid = entries.filter(e => e.kind === 'owe' && (e.entry_date||'').slice(0,7) === currentMonth()).reduce((s,e)=>s+e.amount,0);
 
-  document.getElementById('k-owe').textContent = tk(owe);
-  document.getElementById('k-owe-sub').textContent = owe > 0 ? 'Outstanding — still owed to you'
-      : owe < 0 ? 'You have been overpaid by ' + tk(-owe) : (entries.length ? 'All settled 🎉' : 'Nothing logged yet');
-  document.getElementById('k-paid').textContent = tk(paid);
+  // Hero: outstanding per currency
+  const oweEl = document.getElementById('k-owe');
+  if (!used.length) {
+    oweEl.innerHTML = '<span class="none">Nothing logged yet</span>';
+    document.getElementById('k-owe-sub').textContent = '';
+  } else {
+    oweEl.innerHTML = used.map(c => `<span class="chip"><small>${c}</small>${fmtCur(c, net[c])}</span>`).join('');
+    const anyOwed = used.some(c => net[c] > 0.0001);
+    document.getElementById('k-owe-sub').textContent = anyOwed ? 'Still owed to you — kept separate per currency' : 'All settled 🎉';
+  }
+
+  // Paid / Repaid cards
+  const paidUsed = CURS.filter(c => paid[c] > 0);
+  document.getElementById('k-paid').innerHTML = paidUsed.length
+    ? paidUsed.map(c => `<span class="ln"><small>${c}</small>${fmtCur(c, paid[c])}</span>`).join('')
+    : '<span class="none">none yet</span>';
   document.getElementById('k-paid-sub').textContent = paidN + (paidN === 1 ? ' entry' : ' entries');
-  document.getElementById('k-repaid').textContent = tk(repaid);
-  document.getElementById('k-repaid-sub').textContent = repayN + (repayN === 1 ? ' repayment' : ' repayments');
-  document.getElementById('k-month').textContent = tk(monthPaid);
-  document.getElementById('k-month-sub').textContent = new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'});
 
+  const repUsed = CURS.filter(c => repaid[c] > 0);
+  document.getElementById('k-repaid').innerHTML = repUsed.length
+    ? repUsed.map(c => `<span class="ln"><small>${c}</small>${fmtCur(c, repaid[c])}</span>`).join('')
+    : '<span class="none">none yet</span>';
+  document.getElementById('k-repaid-sub').textContent = repayN + (repayN === 1 ? ' repayment' : ' repayments');
+
+  // Table
   const rows = document.getElementById('rows');
   const foot = document.getElementById('foot');
   if (!entries.length) {
-    rows.innerHTML = `<tr><td colspan="6" class="empty">No entries yet. Add the ad spend you've paid for above.</td></tr>`;
+    rows.innerHTML = `<tr><td colspan="5" class="empty">No entries yet. Add the ad spend you've paid for above.</td></tr>`;
     foot.innerHTML = '';
     return;
   }
-  // running balance oldest→newest, then display newest first
-  const asc = [...entries].sort((a,b) => (a.entry_date||'').localeCompare(b.entry_date||''));
-  let bal = 0; const balById = {};
-  for (const e of asc) { bal += e.kind === 'owe' ? e.amount : -e.amount; balById[e.id] = bal; }
-
   rows.innerHTML = entries.map(e => {
     const isOwe = e.kind === 'owe';
-    const usdTag = e.usd ? ` <span style="color:#9A8C7C">($${(+e.usd).toFixed(2)})</span>` : '';
     return `<tr>
       <td>${fmtDate(e.entry_date)}</td>
       <td><span class="pill ${isOwe ? 'pill-owe' : 'pill-repay'}">${isOwe ? 'Ad spend' : 'Repayment'}</span></td>
-      <td class="note-txt">${esc(e.note) || '<span style="color:#B9AF9E">—</span>'}${usdTag}</td>
-      <td class="r ${isOwe ? 'amt-owe' : 'amt-repay'}">${isOwe ? '+' : '−'}${tk(e.amount)}</td>
-      <td class="r hide-sm" style="color:#6B6255">${tk(balById[e.id])}</td>
+      <td class="note-txt">${esc(e.note) || '<span style="color:#B9AF9E">—</span>'}</td>
+      <td class="r ${isOwe ? 'amt-owe' : 'amt-repay'}">${isOwe ? '+' : '−'}${fmtCur(e.cur, e.amt)}</td>
       <td class="r"><button class="btn-del" title="Delete" onclick="removeEntry('${e.id}')">×</button></td>
     </tr>`;
   }).join('');
 
   foot.innerHTML = `<tr>
     <td colspan="3">Outstanding — MeowMesh owes you</td>
-    <td class="r" style="color:${owe>=0?'#C8553D':'#4F7060'}">${tk(owe)}</td>
-    <td class="hide-sm"></td><td></td>
+    <td class="r foot-amt">${used.length ? used.map(c => fmtCur(c, net[c])).join('<br>') : '—'}</td>
+    <td></td>
   </tr>`;
 }
 function fmtDate(s) { if (!s) return ''; const d = new Date(s + 'T00:00:00'); return d.toLocaleDateString('en-US',{day:'numeric',month:'short'}); }
