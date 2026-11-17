@@ -86,6 +86,32 @@
     tfoot .foot-amt span { display: block; white-space: nowrap; }
     .note-txt { color: #4A4336; }
 
+    /* Row actions */
+    .row-acts { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+    .row-btn { all: unset; cursor: pointer; font-size: 10px; font-weight: 700; padding: 4px 9px; border-radius: 999px; white-space: nowrap; }
+    .row-btn.repay { background: #EAF1EC; color: #3D5C4F; border: 1px solid #CFE0D4; }
+    .row-btn.repay:hover { background: #4F7060; color: #fff; }
+    .row-btn.undo { background: #FBF0E8; color: #A8422F; border: 1px solid #F0D3C6; }
+    .row-btn.undo:hover { background: #C8553D; color: #fff; }
+    tr.is-repaid .amt-cells span { text-decoration: line-through; opacity: .5; }
+    .repaid-badge { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 10px; font-weight: 700; color: #3D5C4F; background: #EAF1EC; border-radius: 999px; padding: 2px 8px; }
+
+    /* Repay modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(35,32,26,.42); z-index: 50; display: none; align-items: center; justify-content: center; }
+    .modal-overlay.show { display: flex; }
+    .modal-box { background: #fff; border: 1px solid #E2D6C2; border-radius: 14px; width: 320px; max-width: calc(100vw - 32px); padding: 18px 20px 16px; box-shadow: 0 12px 40px rgba(35,32,26,.22); }
+    .modal-box h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .modal-box .desc { font-size: 11px; color: #6B6255; margin: 0 0 14px; line-height: 1.4; }
+    .modal-box label { display: block; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #6B6255; margin: 10px 0 3px; }
+    .modal-box input { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 13px; border: 1px solid #E2D6C2; background: #FBF6EC; color: #23201A; border-radius: 8px; padding: 8px 9px; outline: none; }
+    .modal-box input:focus { border-color: #C8553D; background: #fff; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .m-btn { all: unset; cursor: pointer; text-align: center; flex: 1; font-size: 12px; font-weight: 700; padding: 9px 0; border-radius: 8px; }
+    .m-btn.primary { background: #23201A; color: #FBF6EC; }
+    .m-btn.primary:hover { background: #4F7060; }
+    .m-btn.ghost { background: #F3EADB; color: #6B6255; }
+    .m-btn.ghost:hover { background: #E9DDC9; }
+
     @media (max-width: 560px) {
       .amt-cell input { width: 84px; }
     }
@@ -169,12 +195,27 @@
             <th style="width:120px">Type</th>
             <th>Note</th>
             <th class="r" style="width:150px">Amount</th>
-            <th style="width:34px"></th>
+            <th style="width:112px"></th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
         <tfoot id="foot"></tfoot>
       </table>
+    </div>
+  </div>
+
+  <div id="repay-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h3>Mark as repaid</h3>
+      <p class="desc" id="repay-desc"></p>
+      <label>When were you repaid?</label>
+      <input type="date" id="repay-date">
+      <label>Note (optional)</label>
+      <input type="text" id="repay-note" placeholder="e.g. via bKash / cash">
+      <div class="modal-actions">
+        <button class="m-btn ghost" onclick="cancelRepay()">Cancel</button>
+        <button class="m-btn primary" onclick="confirmRepay()">Mark repaid</button>
+      </div>
     </div>
   </div>
 
@@ -193,7 +234,7 @@ function fmtCur(cur, n) {
 function todayBD() { return new Date(Date.now() + 6 * 3600000).toISOString().slice(0,10); }
 function uid() { return 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-let entries = [];        // {id, entry_date, kind:'owe'|'repay', usd, dkk, bdt, note}  (amounts: Number, 0 = none)
+let entries = [];        // {id, entry_date, kind:'owe'|'repay', usd, dkk, bdt, note, repaid, repaid_date, repaid_note}
 let kind = 'owe';
 let cloudOK = false;
 
@@ -219,7 +260,8 @@ function fromRow(r) {
     else if (r.orig_cur === 'BDT') bdt = +r.orig_amt || 0;
     else if (r.amount) bdt = +r.amount;
   }
-  return { id: r.id, entry_date: r.entry_date, kind: r.kind, usd, dkk, bdt, note: r.note || '' };
+  return { id: r.id, entry_date: r.entry_date, kind: r.kind, usd, dkk, bdt, note: r.note || '',
+           repaid: !!r.repaid, repaid_date: r.repaid_date || null, repaid_note: r.repaid_note || '' };
 }
 function toRow(e) {
   return {
@@ -227,6 +269,7 @@ function toRow(e) {
     amount: Math.round(e.usd || e.dkk || e.bdt || 0),  // fills the NOT NULL column; unused for display
     usd: e.usd || null, dkk: e.dkk || null, bdt: e.bdt || null,
     note: e.note,
+    repaid: !!e.repaid, repaid_date: e.repaid_date || null, repaid_note: e.repaid_note || null,
   };
 }
 
@@ -267,6 +310,15 @@ async function cloudInsert(e) {
     });
   } catch(_) {}
 }
+async function cloudUpdate(id, patch) {
+  if (!cloudOK) return;
+  try {
+    await fetch(`${SB_URL}/rest/v1/loan_entries?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH', headers: { ...SB_HDR, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(patch),
+    });
+  } catch(_) {}
+}
 async function cloudDelete(id) {
   if (!cloudOK) return;
   try {
@@ -302,12 +354,48 @@ function removeEntry(id) {
   saveLocal(); cloudDelete(id); render();
 }
 
+/* ── Mark repaid (from the list) ── */
+let repayTargetId = null;
+function openRepay(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  repayTargetId = id;
+  const amt = [['USD',e.usd],['DKK',e.dkk],['BDT',e.bdt]].filter(([c,v])=>v>0).map(([c,v])=>fmtCur(c,v)).join(' · ');
+  document.getElementById('repay-desc').textContent = `${fmtDate(e.entry_date)} — ${amt}${e.note ? ' · ' + e.note : ''}`;
+  document.getElementById('repay-date').value = e.repaid_date || todayBD();
+  document.getElementById('repay-note').value = e.repaid_note || '';
+  document.getElementById('repay-modal').classList.add('show');
+}
+function cancelRepay() { repayTargetId = null; document.getElementById('repay-modal').classList.remove('show'); }
+function confirmRepay() {
+  const e = entries.find(x => x.id === repayTargetId);
+  if (!e) { cancelRepay(); return; }
+  e.repaid = true;
+  e.repaid_date = document.getElementById('repay-date').value || todayBD();
+  e.repaid_note = document.getElementById('repay-note').value.trim();
+  saveLocal();
+  cloudUpdate(e.id, { repaid: true, repaid_date: e.repaid_date, repaid_note: e.repaid_note || null });
+  cancelRepay(); render();
+}
+function undoRepay(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  e.repaid = false; e.repaid_date = null; e.repaid_note = '';
+  saveLocal();
+  cloudUpdate(id, { repaid: false, repaid_date: null, repaid_note: null });
+  render();
+}
+
 /* ── Render ── */
 function totalsByCur() {
   const paid = { USD:0, DKK:0, BDT:0 }, repaid = { USD:0, DKK:0, BDT:0 };
   for (const e of entries) {
-    const t = e.kind === 'owe' ? paid : repaid;
-    t.USD += e.usd || 0; t.DKK += e.dkk || 0; t.BDT += e.bdt || 0;
+    if (e.kind === 'owe') {
+      paid.USD += e.usd || 0; paid.DKK += e.dkk || 0; paid.BDT += e.bdt || 0;
+      if (e.repaid) { repaid.USD += e.usd || 0; repaid.DKK += e.dkk || 0; repaid.BDT += e.bdt || 0; }
+    } else { // standalone 'repay' entry
+      repaid.USD += e.usd || 0; repaid.DKK += e.dkk || 0; repaid.BDT += e.bdt || 0;
+    }
   }
   const net = {}; CURS.forEach(c => net[c] = paid[c] - repaid[c]);
   return { paid, repaid, net };
@@ -316,7 +404,7 @@ function render() {
   const { paid, repaid, net } = totalsByCur();
   const used = CURS.filter(c => paid[c] || repaid[c]);
   const paidN = entries.filter(e => e.kind === 'owe').length;
-  const repayN = entries.filter(e => e.kind === 'repay').length;
+  const repayN = entries.filter(e => e.kind === 'repay' || (e.kind === 'owe' && e.repaid)).length;
 
   const oweEl = document.getElementById('k-owe');
   if (!used.length) {
@@ -354,12 +442,20 @@ function render() {
     const parts = [['USD',e.usd],['DKK',e.dkk],['BDT',e.bdt]]
       .filter(([c,v]) => v > 0)
       .map(([c,v]) => `<span class="${cls}">${sign}${fmtCur(c, v)}</span>`).join('');
-    return `<tr>
+    const noteHtml = esc(e.note) || '<span style="color:#B9AF9E">—</span>';
+    const badge = (isOwe && e.repaid)
+      ? `<div class="repaid-badge">✓ Repaid ${fmtDate(e.repaid_date)}${e.repaid_note ? ' · ' + esc(e.repaid_note) : ''}</div>`
+      : '';
+    let acts = '';
+    if (isOwe && !e.repaid) acts += `<button class="row-btn repay" onclick="openRepay('${e.id}')">Repay</button>`;
+    if (isOwe && e.repaid)  acts += `<button class="row-btn undo" onclick="undoRepay('${e.id}')">Undo</button>`;
+    acts += `<button class="btn-del" title="Delete" onclick="removeEntry('${e.id}')">×</button>`;
+    return `<tr class="${isOwe && e.repaid ? 'is-repaid' : ''}">
       <td>${fmtDate(e.entry_date)}</td>
       <td><span class="pill ${isOwe ? 'pill-owe' : 'pill-repay'}">${isOwe ? 'Ad spend' : 'Repayment'}</span></td>
-      <td class="note-txt">${esc(e.note) || '<span style="color:#B9AF9E">—</span>'}</td>
+      <td class="note-txt">${noteHtml}${badge}</td>
       <td class="r"><div class="amt-cells">${parts}</div></td>
-      <td class="r"><button class="btn-del" title="Delete" onclick="removeEntry('${e.id}')">×</button></td>
+      <td class="r"><div class="row-acts">${acts}</div></td>
     </tr>`;
   }).join('');
 
