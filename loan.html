@@ -477,17 +477,16 @@ function render() {
 
   foot.innerHTML = `<tr>
     <td colspan="3">Outstanding — MeowMesh owes you</td>
-    <td class="r foot-amt">${used.length ? used.map(c => `<span>${fmtCur(c, net[c])}</span>`).join('') : '—'}</td>
+    <td class="r foot-amt">${entries.length ? fmtCur('BDT', netBDT) : '—'}</td>
     <td></td>
   </tr>`;
 }
 function fmtDate(s) { if (!s) return ''; const d = new Date(s + 'T00:00:00'); return d.toLocaleDateString('en-US',{day:'numeric',month:'short'}); }
 function monthLabel(ym) { if (!ym) return 'Undated'; const d = new Date(ym + '-01T00:00:00'); return d.toLocaleDateString('en-US',{month:'long',year:'numeric'}); }
 function monthSpend(ym) {
-  const m = { USD:0, DKK:0, BDT:0 };
-  for (const e of entries) if (e.kind === 'owe' && (e.entry_date||'').slice(0,7) === ym) { m.USD += e.usd||0; m.DKK += e.dkk||0; m.BDT += e.bdt||0; }
-  const parts = CURS.filter(c => m[c] > 0).map(c => fmtCur(c, m[c]));
-  return parts.length ? 'Spent: ' + parts.join(' · ') : '';
+  let bdt = 0;
+  for (const e of entries) if (e.kind === 'owe' && (e.entry_date||'').slice(0,7) === ym) bdt += (e.bdt||0) + (e.usd||0)*BDT_PER_USD + (e.dkk||0)*BDT_PER_DKK;
+  return bdt > 0 ? 'Spent: ' + fmtCur('BDT', bdt) : '';
 }
 function esc(s) { return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
