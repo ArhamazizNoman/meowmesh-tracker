@@ -56,7 +56,7 @@
     .amt3 { display: flex; gap: 7px; }
     .amt-cell { position: relative; }
     .amt-cell .sym { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 12px; font-weight: 600; color: #9A8C7C; pointer-events: none; }
-    .amt-cell input { width: 108px; padding-left: 28px; }
+    .amt-cell input { width: 150px; padding-left: 26px; }
     .kind-toggle { display: flex; border: 1px solid #E2D6C2; border-radius: 8px; overflow: hidden; }
     .kind-toggle button { all: unset; cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; padding: 8px 12px; color: #6B6255; background: #FBF6EC; }
     .kind-toggle button.on-owe { background: #C8553D; color: #fff; }
@@ -142,7 +142,7 @@
   </div>
 
   <div class="wrap">
-    <p class="intro">Money <b>MeowMesh owes you personally</b> — mainly the Facebook / Meta ad spend you paid out of your own pocket. For each payment, fill in whichever currency you paid in — you can note the same amount in several ($1 = kr 6.6 = ৳124); it still counts as <b>one payment</b>. All totals are shown in <b>BDT</b>. Mark a row <b>Repay</b> when the business pays you back.</p>
+    <p class="intro">Money <b>MeowMesh owes you personally</b> — mainly the Facebook / Meta ad spend you paid out of your own pocket. Enter each amount in <b>taka (৳)</b> — if you paid in another currency, convert it yourself first. Mark a row <b>Repay</b> when the business pays you back.</p>
 
     <div class="kpi-strip">
       <div class="owe-card kpi-card">
@@ -177,12 +177,8 @@
           </div>
         </div>
         <div class="fld">
-          <label>Amount — fill any you know</label>
-          <div class="amt3">
-            <div class="amt-cell"><span class="sym">$</span><input type="number" id="e-usd" min="0" step="0.01" placeholder="USD" onkeydown="if(event.key==='Enter')addEntry()"></div>
-            <div class="amt-cell"><span class="sym">kr</span><input type="number" id="e-dkk" min="0" step="0.01" placeholder="DKK" onkeydown="if(event.key==='Enter')addEntry()"></div>
-            <div class="amt-cell"><span class="sym">৳</span><input type="number" id="e-bdt" min="0" step="0.01" placeholder="BDT" onkeydown="if(event.key==='Enter')addEntry()"></div>
-          </div>
+          <label>Amount (৳)</label>
+          <div class="amt-cell"><span class="sym">৳</span><input type="number" id="e-bdt" min="0" step="1" placeholder="0" onkeydown="if(event.key==='Enter')addEntry()"></div>
         </div>
         <button class="add-btn" onclick="addEntry()">+ Add</button>
         <div class="fld note-full">
@@ -230,15 +226,9 @@ const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsIn
 const SB_HDR  = { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}`, 'Content-Type': 'application/json' };
 const LS_KEY  = 'meowmesh-loan-entries';
 
-const CURS = ['USD','DKK','BDT'];
-const SYM  = { USD: '$', DKK: 'kr ', BDT: '৳' };
-// Rates used ONLY to show the three summary cards as a single BDT figure.
-// The entry list itself keeps every amount in its original currency.
-const BDT_PER_USD = 140;
-const BDT_PER_DKK = 20;
+const SYM  = { BDT: '৳' };
 function fmtCur(cur, n) {
-  const d = cur === 'BDT' ? 0 : 2;
-  return SYM[cur] + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  return SYM[cur] + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 function todayBD() { return new Date(Date.now() + 6 * 3600000).toISOString().slice(0,10); }
 function uid() { return 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -255,28 +245,34 @@ function setKind(k) {
 
 /* ── Storage ── */
 function saveLocal() { localStorage.setItem(LS_KEY, JSON.stringify(entries)); }
-function loadLocal() { try { entries = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch(_) { entries = []; } }
+function loadLocal() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+    entries = raw.map(e => ({
+      id: e.id, entry_date: e.entry_date, kind: e.kind,
+      bdt: e.bdt != null ? +e.bdt : (e.amount != null ? +e.amount : 0),   // normalise old local entries
+      note: e.note || '',
+      repaid: !!e.repaid, repaid_date: e.repaid_date || null, repaid_note: e.repaid_note || '',
+    }));
+  } catch(_) { entries = []; }
+}
 
 function fromRow(r) {
-  let usd = r.usd != null ? +r.usd : 0;
-  let dkk = r.dkk != null ? +r.dkk : 0;
+  // BDT-only. Use the stored ৳ figure; fall back to the oldest `amount` column
+  // (which held BDT) so pre-existing entries are not lost. No currency conversion.
   let bdt = r.bdt != null ? +r.bdt : 0;
-  // Back-compat: earlier single-currency rows stored value in orig_cur/orig_amt,
-  // or (oldest) a BDT figure in `amount`.
-  if (!usd && !dkk && !bdt) {
-    if (r.orig_cur === 'USD') usd = +r.orig_amt || 0;
-    else if (r.orig_cur === 'DKK') dkk = +r.orig_amt || 0;
-    else if (r.orig_cur === 'BDT') bdt = +r.orig_amt || 0;
+  if (!bdt) {
+    if (r.orig_cur === 'BDT') bdt = +r.orig_amt || 0;
     else if (r.amount) bdt = +r.amount;
   }
-  return { id: r.id, entry_date: r.entry_date, kind: r.kind, usd, dkk, bdt, note: r.note || '',
+  return { id: r.id, entry_date: r.entry_date, kind: r.kind, bdt, note: r.note || '',
            repaid: !!r.repaid, repaid_date: r.repaid_date || null, repaid_note: r.repaid_note || '' };
 }
 function toRow(e) {
   return {
     id: e.id, entry_date: e.entry_date, kind: e.kind,
-    amount: Math.round(e.usd || e.dkk || e.bdt || 0),  // fills the NOT NULL column; unused for display
-    usd: e.usd || null, dkk: e.dkk || null, bdt: e.bdt || null,
+    amount: Math.round(e.bdt || 0),  // fills the NOT NULL column
+    bdt: e.bdt || null, usd: null, dkk: null,
     note: e.note,
     repaid: !!e.repaid, repaid_date: e.repaid_date || null, repaid_note: e.repaid_note || null,
   };
@@ -344,19 +340,18 @@ function setStoreTag() {
 function num(id) { return Math.max(0, parseFloat(document.getElementById(id).value) || 0); }
 function addEntry() {
   const date = document.getElementById('e-date').value || todayBD();
-  const usd = num('e-usd'), dkk = num('e-dkk'), bdt = num('e-bdt');
-  if (usd <= 0 && dkk <= 0 && bdt <= 0) {
-    ['e-usd','e-dkk','e-bdt'].forEach(id => { const el = document.getElementById(id); el.style.borderColor = '#C8553D'; setTimeout(()=>el.style.borderColor='',900); });
-    document.getElementById('e-usd').focus();
+  const bdt = num('e-bdt');
+  if (bdt <= 0) {
+    const el = document.getElementById('e-bdt'); el.style.borderColor = '#C8553D'; setTimeout(()=>el.style.borderColor='',900); el.focus();
     return;
   }
   const note = document.getElementById('e-note').value.trim();
-  const e = { id: uid(), entry_date: date, kind, usd, dkk, bdt, note };
+  const e = { id: uid(), entry_date: date, kind, bdt, note };
   entries.unshift(e);
   entries.sort((a,b) => (b.entry_date||'').localeCompare(a.entry_date||''));
   saveLocal(); cloudInsert(e); render();
-  ['e-usd','e-dkk','e-bdt','e-note'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('e-usd').focus();
+  ['e-bdt','e-note'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('e-bdt').focus();
 }
 function removeEntry(id) {
   entries = entries.filter(e => e.id !== id);
@@ -369,8 +364,7 @@ function openRepay(id) {
   const e = entries.find(x => x.id === id);
   if (!e) return;
   repayTargetId = id;
-  const amt = [['USD',e.usd],['DKK',e.dkk],['BDT',e.bdt]].filter(([c,v])=>v>0).map(([c,v])=>fmtCur(c,v)).join(' · ');
-  document.getElementById('repay-desc').textContent = `${fmtDate(e.entry_date)} — ${amt}${e.note ? ' · ' + e.note : ''}`;
+  document.getElementById('repay-desc').textContent = `${fmtDate(e.entry_date)} — ${fmtCur('BDT', e.bdt || 0)}${e.note ? ' · ' + e.note : ''}`;
   document.getElementById('repay-date').value = e.repaid_date || todayBD();
   document.getElementById('repay-note').value = e.repaid_note || '';
   document.getElementById('repay-modal').classList.add('show');
@@ -396,15 +390,7 @@ function undoRepay(id) {
 }
 
 /* ── Render ── */
-// Each entry is ONE payment; the per-currency fields are the same amount in
-// different currencies (equivalents), so an entry is worth a single BDT value —
-// not the sum of its three fields. Prefer the BDT figure; else convert USD, else DKK.
-function entryBDT(e) {
-  if ((e.bdt || 0) > 0) return e.bdt;
-  if ((e.usd || 0) > 0) return e.usd * BDT_PER_USD;
-  if ((e.dkk || 0) > 0) return e.dkk * BDT_PER_DKK;
-  return 0;
-}
+function entryBDT(e) { return e.bdt || 0; }
 function totalsBDT() {
   let paid = 0, repaid = 0;
   for (const e of entries) {
@@ -427,9 +413,7 @@ function render() {
     document.getElementById('k-owe-sub').textContent = '';
   } else {
     oweEl.innerHTML = `<span class="chip">${fmtCur('BDT', netBDT)}</span>`;
-    document.getElementById('k-owe-sub').textContent = netBDT > 0.5
-      ? `Still owed to you · converted at $1=৳${BDT_PER_USD}, kr1=৳${BDT_PER_DKK}`
-      : 'All settled 🎉';
+    document.getElementById('k-owe-sub').textContent = netBDT > 0.5 ? 'Still owed to you' : 'All settled 🎉';
   }
 
   document.getElementById('k-paid').innerHTML = paidBDT > 0
@@ -457,12 +441,7 @@ function render() {
     const isOwe = e.kind === 'owe';
     const cls = isOwe ? 'amt-owe' : 'amt-repay';
     const sign = isOwe ? '+' : '−';
-    // One payment: primary shown big (BDT preferred), other currencies as equivalents.
-    const entered = [['BDT',e.bdt],['USD',e.usd],['DKK',e.dkk]].filter(([c,v]) => v > 0);
-    const primary = entered.length ? entered[0] : ['BDT', 0];
-    const rest = entered.slice(1);
-    const parts = `<span class="${cls}">${sign}${fmtCur(primary[0], primary[1])}</span>`
-      + (rest.length ? `<span class="amt-eq">= ${rest.map(([c,v]) => fmtCur(c, v)).join(' · ')}</span>` : '');
+    const parts = `<span class="${cls}">${sign}${fmtCur('BDT', e.bdt || 0)}</span>`;
     const noteHtml = esc(e.note) || '<span style="color:#B9AF9E">—</span>';
     const badge = (isOwe && e.repaid)
       ? `<div class="repaid-badge">✓ Repaid ${fmtDate(e.repaid_date)}${e.repaid_note ? ' · ' + esc(e.repaid_note) : ''}</div>`
