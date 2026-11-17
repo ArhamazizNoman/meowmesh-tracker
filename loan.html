@@ -271,8 +271,8 @@ function fromRow(r) {
 function toRow(e) {
   return {
     id: e.id, entry_date: e.entry_date, kind: e.kind,
-    amount: Math.round(e.bdt || 0),  // fills the NOT NULL column
-    bdt: e.bdt || null, usd: null, dkk: null,
+    amount: Math.round(e.bdt || 0),  // BDT also kept in the NOT NULL `amount` column
+    bdt: e.bdt || null,
     note: e.note,
     repaid: !!e.repaid, repaid_date: e.repaid_date || null, repaid_note: e.repaid_note || null,
   };
@@ -280,7 +280,8 @@ function toRow(e) {
 
 async function loadCloud() {
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/loan_entries?select=id,entry_date,kind,amount,usd,dkk,bdt,orig_cur,orig_amt,note&order=entry_date.desc`, {
+    // select=* so a not-yet-added column can never make the read fail.
+    const res = await fetch(`${SB_URL}/rest/v1/loan_entries?select=*&order=entry_date.desc`, {
       headers: { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}` }
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
