@@ -47,29 +47,35 @@
     /* Add bar */
     .card { background: #fff; border: 1px solid #E2D6C2; border-radius: 12px; padding: 15px; margin-bottom: 16px; }
     .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 11px; }
-    .add-bar { display: grid; grid-template-columns: 130px 1fr 170px auto; gap: 8px; align-items: end; }
+    .add-grid { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
     .fld { display: flex; flex-direction: column; gap: 3px; }
     .fld label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; }
-    .add-bar input, .add-bar select { font-family: 'DM Sans', sans-serif; font-size: 13px; border: 1px solid #E2D6C2; background: #FBF6EC; color: #23201A; border-radius: 8px; padding: 8px 9px; outline: none; width: 100%; }
-    .add-bar input:focus, .add-bar select:focus { border-color: #C8553D; background: #fff; }
-    .amt-wrap { display: flex; gap: 6px; }
-    .amt-wrap select { width: 86px; flex-shrink: 0; }
-    .kind-toggle { display: flex; gap: 0; border: 1px solid #E2D6C2; border-radius: 8px; overflow: hidden; }
-    .kind-toggle button { all: unset; cursor: pointer; flex: 1; text-align: center; font-size: 11px; font-weight: 600; padding: 8px 6px; color: #6B6255; background: #FBF6EC; }
+    .add-grid input, .add-grid select { font-family: 'DM Sans', sans-serif; font-size: 13px; border: 1px solid #E2D6C2; background: #FBF6EC; color: #23201A; border-radius: 8px; padding: 8px 9px; outline: none; }
+    .add-grid input:focus { border-color: #C8553D; background: #fff; }
+    #e-date { width: 140px; }
+    .amt3 { display: flex; gap: 7px; }
+    .amt-cell { position: relative; }
+    .amt-cell .sym { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 12px; font-weight: 600; color: #9A8C7C; pointer-events: none; }
+    .amt-cell input { width: 108px; padding-left: 28px; }
+    .kind-toggle { display: flex; border: 1px solid #E2D6C2; border-radius: 8px; overflow: hidden; }
+    .kind-toggle button { all: unset; cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; padding: 8px 12px; color: #6B6255; background: #FBF6EC; }
     .kind-toggle button.on-owe { background: #C8553D; color: #fff; }
     .kind-toggle button.on-repay { background: #4F7060; color: #fff; }
-    .add-btn { all: unset; cursor: pointer; background: #23201A; color: #FBF6EC; font-size: 13px; font-weight: 700; padding: 9px 18px; border-radius: 8px; text-align: center; white-space: nowrap; }
+    .add-btn { all: unset; cursor: pointer; background: #23201A; color: #FBF6EC; font-size: 13px; font-weight: 700; padding: 9px 20px; border-radius: 8px; text-align: center; white-space: nowrap; }
     .add-btn:hover { background: #4F7060; }
+    .note-full { flex: 1 1 100%; }
+    .note-full input { width: 100%; }
 
     /* Table */
     table { width: 100%; border-collapse: collapse; }
     thead th { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B6255; text-align: left; padding: 7px 10px; border-bottom: 1px solid #E2D6C2; }
     thead th.r, tbody td.r, tfoot td.r { text-align: right; }
-    tbody td { font-size: 13px; padding: 9px 10px; border-bottom: 1px solid #F0E8D8; }
+    tbody td { font-size: 13px; padding: 9px 10px; border-bottom: 1px solid #F0E8D8; vertical-align: top; }
     tbody tr:hover { background: #FCF8F0; }
     .pill { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
     .pill-owe { background: #FBF0E8; color: #A8422F; }
     .pill-repay { background: #EAF1EC; color: #3D5C4F; }
+    .amt-cells { display: flex; flex-direction: column; gap: 1px; align-items: flex-end; }
     .amt-owe { color: #C8553D; font-weight: 600; white-space: nowrap; }
     .amt-repay { color: #4F7060; font-weight: 600; white-space: nowrap; }
     .btn-del { all: unset; cursor: pointer; color: #B9AF9E; font-size: 15px; line-height: 1; padding: 0 4px; }
@@ -77,11 +83,11 @@
     .empty { text-align: center; color: #9A8C7C; font-size: 13px; padding: 26px 0; }
     tfoot td { font-size: 13px; font-weight: 700; padding: 10px; border-top: 2px solid #E2D6C2; }
     tfoot .foot-amt { color: #C8553D; }
+    tfoot .foot-amt span { display: block; white-space: nowrap; }
     .note-txt { color: #4A4336; }
 
-    @media (max-width: 680px) {
-      .add-bar { grid-template-columns: 1fr 1fr; }
-      .add-bar .fld-note, .add-bar .add-btn { grid-column: 1 / -1; }
+    @media (max-width: 560px) {
+      .amt-cell input { width: 84px; }
     }
   </style>
 </head>
@@ -105,7 +111,7 @@
   </div>
 
   <div class="wrap">
-    <p class="intro">Money <b>MeowMesh owes you personally</b> — mainly the Facebook / Meta ad spend you paid out of your own pocket. Add each amount you cover in whichever currency you paid (<b>$</b>, <b>kr</b> or <b>৳</b>), and log repayments when the business pays you back. Totals are kept separately for each currency.</p>
+    <p class="intro">Money <b>MeowMesh owes you personally</b> — mainly the Facebook / Meta ad spend you paid out of your own pocket. For each payment you can fill in <b>all three currencies at once</b> ($, kr, ৳) — e.g. $1 / kr 6.6 / ৳124 — and each one is totalled separately. Log repayments when the business pays you back.</p>
 
     <div class="kpi-strip">
       <div class="owe-card kpi-card">
@@ -127,7 +133,7 @@
 
     <div class="card">
       <h3>Add an entry</h3>
-      <div class="add-bar">
+      <div class="add-grid">
         <div class="fld">
           <label>Date</label>
           <input type="date" id="e-date">
@@ -140,18 +146,15 @@
           </div>
         </div>
         <div class="fld">
-          <label>Amount</label>
-          <div class="amt-wrap">
-            <select id="e-cur">
-              <option value="USD">$ USD</option>
-              <option value="DKK">kr DKK</option>
-              <option value="BDT">৳ BDT</option>
-            </select>
-            <input type="number" id="e-amt" min="0" step="0.01" placeholder="0" onkeydown="if(event.key==='Enter')addEntry()">
+          <label>Amount — fill any you know</label>
+          <div class="amt3">
+            <div class="amt-cell"><span class="sym">$</span><input type="number" id="e-usd" min="0" step="0.01" placeholder="USD" onkeydown="if(event.key==='Enter')addEntry()"></div>
+            <div class="amt-cell"><span class="sym">kr</span><input type="number" id="e-dkk" min="0" step="0.01" placeholder="DKK" onkeydown="if(event.key==='Enter')addEntry()"></div>
+            <div class="amt-cell"><span class="sym">৳</span><input type="number" id="e-bdt" min="0" step="0.01" placeholder="BDT" onkeydown="if(event.key==='Enter')addEntry()"></div>
           </div>
         </div>
         <button class="add-btn" onclick="addEntry()">+ Add</button>
-        <div class="fld fld-note" style="grid-column:1 / -1">
+        <div class="fld note-full">
           <label>Note (optional)</label>
           <input type="text" id="e-note" placeholder="e.g. Meta Ads — campaign top-up, Nov 12">
         </div>
@@ -190,7 +193,7 @@ function fmtCur(cur, n) {
 function todayBD() { return new Date(Date.now() + 6 * 3600000).toISOString().slice(0,10); }
 function uid() { return 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-let entries = [];        // {id, entry_date, kind:'owe'|'repay', cur:'USD'|'DKK'|'BDT', amt:Number, note}
+let entries = [];        // {id, entry_date, kind:'owe'|'repay', usd, dkk, bdt, note}  (amounts: Number, 0 = none)
 let kind = 'owe';
 let cloudOK = false;
 
@@ -200,23 +203,36 @@ function setKind(k) {
   document.getElementById('k-repay-btn').className = k === 'repay' ? 'on-repay' : '';
 }
 
-/* ── Storage: localStorage always, Supabase best-effort ── */
+/* ── Storage ── */
 function saveLocal() { localStorage.setItem(LS_KEY, JSON.stringify(entries)); }
 function loadLocal() { try { entries = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch(_) { entries = []; } }
 
 function fromRow(r) {
-  // Backward compatible with earlier rows that stored BDT in `amount` / USD in `usd`.
-  const cur = r.orig_cur || (r.usd != null ? 'USD' : 'BDT');
-  const amt = r.orig_amt != null ? +r.orig_amt : (r.usd != null ? +r.usd : (r.amount || 0));
-  return { id: r.id, entry_date: r.entry_date, kind: r.kind, cur, amt, note: r.note || '' };
+  let usd = r.usd != null ? +r.usd : 0;
+  let dkk = r.dkk != null ? +r.dkk : 0;
+  let bdt = r.bdt != null ? +r.bdt : 0;
+  // Back-compat: earlier single-currency rows stored value in orig_cur/orig_amt,
+  // or (oldest) a BDT figure in `amount`.
+  if (!usd && !dkk && !bdt) {
+    if (r.orig_cur === 'USD') usd = +r.orig_amt || 0;
+    else if (r.orig_cur === 'DKK') dkk = +r.orig_amt || 0;
+    else if (r.orig_cur === 'BDT') bdt = +r.orig_amt || 0;
+    else if (r.amount) bdt = +r.amount;
+  }
+  return { id: r.id, entry_date: r.entry_date, kind: r.kind, usd, dkk, bdt, note: r.note || '' };
 }
 function toRow(e) {
-  return { id: e.id, entry_date: e.entry_date, kind: e.kind, amount: Math.round(e.amt), orig_cur: e.cur, orig_amt: e.amt, note: e.note };
+  return {
+    id: e.id, entry_date: e.entry_date, kind: e.kind,
+    amount: Math.round(e.usd || e.dkk || e.bdt || 0),  // fills the NOT NULL column; unused for display
+    usd: e.usd || null, dkk: e.dkk || null, bdt: e.bdt || null,
+    note: e.note,
+  };
 }
 
 async function loadCloud() {
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/loan_entries?select=id,entry_date,kind,amount,orig_cur,orig_amt,usd,note&order=entry_date.desc`, {
+    const res = await fetch(`${SB_URL}/rest/v1/loan_entries?select=id,entry_date,kind,amount,usd,dkk,bdt,orig_cur,orig_amt,note&order=entry_date.desc`, {
       headers: { 'apikey': SB_ANON, 'Authorization': `Bearer ${SB_ANON}` }
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -264,18 +280,22 @@ function setStoreTag() {
 }
 
 /* ── Mutations ── */
+function num(id) { return Math.max(0, parseFloat(document.getElementById(id).value) || 0); }
 function addEntry() {
   const date = document.getElementById('e-date').value || todayBD();
-  const cur  = document.getElementById('e-cur').value;
-  const raw  = parseFloat(document.getElementById('e-amt').value) || 0;
-  if (raw <= 0) { const el = document.getElementById('e-amt'); el.style.borderColor = '#C8553D'; el.focus(); setTimeout(()=>el.style.borderColor='',900); return; }
+  const usd = num('e-usd'), dkk = num('e-dkk'), bdt = num('e-bdt');
+  if (usd <= 0 && dkk <= 0 && bdt <= 0) {
+    ['e-usd','e-dkk','e-bdt'].forEach(id => { const el = document.getElementById(id); el.style.borderColor = '#C8553D'; setTimeout(()=>el.style.borderColor='',900); });
+    document.getElementById('e-usd').focus();
+    return;
+  }
   const note = document.getElementById('e-note').value.trim();
-  const e = { id: uid(), entry_date: date, kind, cur, amt: raw, note };
+  const e = { id: uid(), entry_date: date, kind, usd, dkk, bdt, note };
   entries.unshift(e);
   entries.sort((a,b) => (b.entry_date||'').localeCompare(a.entry_date||''));
   saveLocal(); cloudInsert(e); render();
-  document.getElementById('e-amt').value = '';
-  document.getElementById('e-note').value = '';
+  ['e-usd','e-dkk','e-bdt','e-note'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('e-usd').focus();
 }
 function removeEntry(id) {
   entries = entries.filter(e => e.id !== id);
@@ -285,7 +305,10 @@ function removeEntry(id) {
 /* ── Render ── */
 function totalsByCur() {
   const paid = { USD:0, DKK:0, BDT:0 }, repaid = { USD:0, DKK:0, BDT:0 };
-  for (const e of entries) (e.kind === 'owe' ? paid : repaid)[e.cur] += e.amt;
+  for (const e of entries) {
+    const t = e.kind === 'owe' ? paid : repaid;
+    t.USD += e.usd || 0; t.DKK += e.dkk || 0; t.BDT += e.bdt || 0;
+  }
   const net = {}; CURS.forEach(c => net[c] = paid[c] - repaid[c]);
   return { paid, repaid, net };
 }
@@ -295,7 +318,6 @@ function render() {
   const paidN = entries.filter(e => e.kind === 'owe').length;
   const repayN = entries.filter(e => e.kind === 'repay').length;
 
-  // Hero: outstanding per currency
   const oweEl = document.getElementById('k-owe');
   if (!used.length) {
     oweEl.innerHTML = '<span class="none">Nothing logged yet</span>';
@@ -306,7 +328,6 @@ function render() {
     document.getElementById('k-owe-sub').textContent = anyOwed ? 'Still owed to you — kept separate per currency' : 'All settled 🎉';
   }
 
-  // Paid / Repaid cards
   const paidUsed = CURS.filter(c => paid[c] > 0);
   document.getElementById('k-paid').innerHTML = paidUsed.length
     ? paidUsed.map(c => `<span class="ln"><small>${c}</small>${fmtCur(c, paid[c])}</span>`).join('')
@@ -319,7 +340,6 @@ function render() {
     : '<span class="none">none yet</span>';
   document.getElementById('k-repaid-sub').textContent = repayN + (repayN === 1 ? ' repayment' : ' repayments');
 
-  // Table
   const rows = document.getElementById('rows');
   const foot = document.getElementById('foot');
   if (!entries.length) {
@@ -329,18 +349,23 @@ function render() {
   }
   rows.innerHTML = entries.map(e => {
     const isOwe = e.kind === 'owe';
+    const cls = isOwe ? 'amt-owe' : 'amt-repay';
+    const sign = isOwe ? '+' : '−';
+    const parts = [['USD',e.usd],['DKK',e.dkk],['BDT',e.bdt]]
+      .filter(([c,v]) => v > 0)
+      .map(([c,v]) => `<span class="${cls}">${sign}${fmtCur(c, v)}</span>`).join('');
     return `<tr>
       <td>${fmtDate(e.entry_date)}</td>
       <td><span class="pill ${isOwe ? 'pill-owe' : 'pill-repay'}">${isOwe ? 'Ad spend' : 'Repayment'}</span></td>
       <td class="note-txt">${esc(e.note) || '<span style="color:#B9AF9E">—</span>'}</td>
-      <td class="r ${isOwe ? 'amt-owe' : 'amt-repay'}">${isOwe ? '+' : '−'}${fmtCur(e.cur, e.amt)}</td>
+      <td class="r"><div class="amt-cells">${parts}</div></td>
       <td class="r"><button class="btn-del" title="Delete" onclick="removeEntry('${e.id}')">×</button></td>
     </tr>`;
   }).join('');
 
   foot.innerHTML = `<tr>
     <td colspan="3">Outstanding — MeowMesh owes you</td>
-    <td class="r foot-amt">${used.length ? used.map(c => fmtCur(c, net[c])).join('<br>') : '—'}</td>
+    <td class="r foot-amt">${used.length ? used.map(c => `<span>${fmtCur(c, net[c])}</span>`).join('') : '—'}</td>
     <td></td>
   </tr>`;
 }
